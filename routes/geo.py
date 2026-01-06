@@ -4,7 +4,7 @@ Geo-detection API Routes
 """
 from flask import Blueprint, request, jsonify
 import requests
-from models.db import Country
+from models import Country
 
 geo_bp = Blueprint('geo', __name__)
 

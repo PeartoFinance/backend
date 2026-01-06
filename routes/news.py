@@ -4,7 +4,7 @@ News API Routes with SQLAlchemy
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, or_
-from models.db import db, Article
+from models import db, Article
 
 news_bp = Blueprint('news', __name__)
 

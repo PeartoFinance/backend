@@ -4,7 +4,7 @@ Crypto API Routes with SQLAlchemy
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
-from models.db import db, MarketPrice, CryptoMarketData
+from models import db, MarketData as MarketPrice, CryptoMarketData
 
 crypto_bp = Blueprint('crypto', __name__)
 

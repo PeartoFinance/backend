@@ -8,7 +8,7 @@ import jwt
 import uuid
 from datetime import datetime, timedelta
 from config import config
-from models.db import db, User, PasswordResetToken
+from models import db, User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
 
