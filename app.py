@@ -49,6 +49,10 @@ from routes.market import market_bp
 from routes.portfolio import portfolio_bp
 from routes.articles import articles_bp
 from routes.content import content_bp
+from routes.account import account_bp
+from routes.user import user_bp
+from routes.verification import verification_bp
+from routes.devices import devices_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -59,6 +63,10 @@ app.register_blueprint(market_bp, url_prefix='/api/market')
 app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
 app.register_blueprint(articles_bp, url_prefix='/api/articles')
 app.register_blueprint(content_bp, url_prefix='/api/content')
+app.register_blueprint(account_bp, url_prefix='/api/account')
+app.register_blueprint(user_bp, url_prefix='/api/user')
+app.register_blueprint(verification_bp, url_prefix='/api/user/verification')
+app.register_blueprint(devices_bp, url_prefix='/api/devices')
 
 
 # Error handlers

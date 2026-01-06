@@ -10,6 +10,10 @@ from .market import market_bp
 from .portfolio import portfolio_bp
 from .articles import articles_bp
 from .content import content_bp
+from .account import account_bp
+from .user import user_bp
+from .verification import verification_bp
+from .devices import devices_bp
 
 __all__ = [
     'auth_bp', 
@@ -20,5 +24,10 @@ __all__ = [
     'market_bp',
     'portfolio_bp',
     'articles_bp',
-    'content_bp'
+    'content_bp',
+    'account_bp',
+    'user_bp',
+    'verification_bp',
+    'devices_bp'
 ]
+
