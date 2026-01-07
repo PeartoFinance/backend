@@ -89,31 +89,50 @@ class NewsItem(db.Model):
     """News items - matches actual pearto.news_items table"""
     __tablename__ = 'news_items'
     
-    id = db.Column(db.String(255), primary_key=True)
-    title = db.Column(db.String(500), nullable=False)
-    summary = db.Column(db.Text)
-    url = db.Column(db.Text)
-    image_url = db.Column(db.Text)
-    source = db.Column(db.String(100))
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    source = db.Column(db.String(50))
     source_url = db.Column(db.Text)
-    category = db.Column(db.String(100))
+    canonical_url = db.Column(db.Text)
+    title = db.Column(db.Text, nullable=False)
+    summary = db.Column(db.Text)
     published_at = db.Column(db.DateTime)
-    sentiment = db.Column(db.String(20))
-    relevance_score = db.Column(db.Numeric(5, 2))
-    symbols = db.Column(db.JSON)
-    country_code = db.Column(db.String(10))
+    raw = db.Column(db.Text)
+    hash = db.Column(db.String(64))
+    simhash = db.Column(db.String(32))
+    status = db.Column(db.String(20), default='queued')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime)
+    error_message = db.Column(db.Text)
+    retry_count = db.Column(db.Integer, default=0)
+    image = db.Column(db.Text)
+    featured = db.Column(db.Boolean, default=False)
+    category = db.Column(db.String(50))
+    curated_status = db.Column(db.String(20), default='draft')
+    updated_at = db.Column(db.DateTime)
+    source_type = db.Column(db.String(20), default='rss')
+    full_content = db.Column(db.Text)
+    author = db.Column(db.String(255))
+    slug = db.Column(db.String(255))
+    meta_description = db.Column(db.String(500))
+    country_code = db.Column(db.String(2))
     
     def to_dict(self):
         return {
             'id': self.id,
             'title': self.title,
             'summary': self.summary,
-            'url': self.url,
-            'imageUrl': self.image_url,
-            'source': self.source,
-            'category': self.category,
-            'publishedAt': self.published_at.isoformat() if self.published_at else None
+            'description': self.summary,
+            'link': self.canonical_url or (f'/news/{self.slug}' if self.slug else '#'),
+            'url': self.canonical_url,
+            'image': self.image or '/placeholder.svg',
+            'source': self.source or ('Pearto' if self.source_type == 'admin' else 'News'),
+            'category': self.category or 'general',
+            'featured': self.featured,
+            'slug': self.slug,
+            'author': self.author,
+            'publishedAt': self.published_at.isoformat() if self.published_at else None,
+            'isInternal': bool(not self.canonical_url and self.slug),
+            'country': self.country_code
         }
 
 

@@ -81,15 +81,29 @@ class APIRegistry(db.Model):
 
 
 class ToolSettings(db.Model):
-    """Calculator/tool settings"""
+    """Tool settings for calculators/tools"""
     __tablename__ = 'tool_settings'
     
-    id = db.Column(db.String(255), primary_key=True)
-    tool_name = db.Column(db.String(100), nullable=False)
-    settings = db.Column(db.JSON)
-    is_active = db.Column(db.Boolean, default=True)
-    country_code = db.Column(db.String(10))
+    tool_slug = db.Column(db.String(100), primary_key=True)
+    tool_name = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(100))
+    enabled = db.Column(db.Boolean, default=True)
+    order_index = db.Column(db.Integer, default=0)
+    is_implemented = db.Column(db.Boolean, default=False)
+    country_code = db.Column(db.String(10), default='US')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'tool_slug': self.tool_slug,
+            'tool_name': self.tool_name,
+            'category': self.category,
+            'enabled': self.enabled,
+            'order_index': self.order_index,
+            'is_implemented': self.is_implemented,
+            'country_code': self.country_code
+        }
 
 
 class NavigationItem(db.Model):

@@ -18,8 +18,8 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config.SQLALCHEMY_ENGINE_OPTIONS
 # Initialize SQLAlchemy
 db.init_app(app)
 
-# Configure CORS
-CORS(app, origins=config.CORS_ORIGINS, supports_credentials=True)
+# Configure CORS - allow all origins
+CORS(app, origins="*", supports_credentials=True)
 
 
 # Middleware to extract country from headers
@@ -53,6 +53,8 @@ from routes.account import account_bp
 from routes.user import user_bp
 from routes.verification import verification_bp
 from routes.devices import devices_bp
+from routes.tools import tools_bp
+from routes.admin import admin_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -67,6 +69,8 @@ app.register_blueprint(account_bp, url_prefix='/api/account')
 app.register_blueprint(user_bp, url_prefix='/api/user')
 app.register_blueprint(verification_bp, url_prefix='/api/user/verification')
 app.register_blueprint(devices_bp, url_prefix='/api/devices')
+app.register_blueprint(tools_bp)
+app.register_blueprint(admin_bp)
 
 
 # Error handlers
@@ -94,13 +98,13 @@ def create_app():
 with app.app_context():
     try:
         db.create_all()
-        print("✅ Database tables ready")
+        print("[OK] Database tables ready")
     except Exception as e:
-        print(f"⚠️ Database setup note: {e}")
+        print(f"[WARNING] Database setup note: {e}")
 
 
 if __name__ == '__main__':
-    print(f"🚀 Starting PeartoFinance API on port {config.PORT}")
+    print(f"[INFO] Starting PeartoFinance API on port {config.PORT}")
     app.run(
         host='0.0.0.0',
         port=config.PORT,

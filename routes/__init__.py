@@ -14,6 +14,7 @@ from .account import account_bp
 from .user import user_bp
 from .verification import verification_bp
 from .devices import devices_bp
+from .tools import tools_bp
 
 __all__ = [
     'auth_bp', 
@@ -28,6 +29,8 @@ __all__ = [
     'account_bp',
     'user_bp',
     'verification_bp',
-    'devices_bp'
+    'devices_bp',
+    'tools_bp'
 ]
+
 

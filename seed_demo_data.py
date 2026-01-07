@@ -13,6 +13,7 @@ from models.base import db
 from models.market import MarketData, MarketIndices, CommodityData, StockOffer
 from models.media import TVChannel, RadioStation, TrendingTopic
 from models.article import NewsItem
+from models.settings import ToolSettings
 
 def create_app():
     """Create Flask app for seeding"""
@@ -182,57 +183,156 @@ def seed_stock_offers():
     print(f"✓ Seeded {count} stock offers")
 
 def seed_news():
-    """Create news items"""
+    """Create news items for all categories"""
     news_items = [
+        # Business
         {
             'title': 'Fed Signals Potential Rate Cuts in 2024 Amid Cooling Inflation Data',
-            'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling.',
+            'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling. Markets respond positively to dovish signals.',
             'source': 'Bloomberg',
-            'category': 'Economy',
+            'category': 'business',
             'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
+            'featured': True,
+            'slug': 'fed-signals-rate-cuts-2024'
         },
         {
-            'title': 'Tech Stocks Rally on Strong Q4 Earnings Reports',
-            'summary': 'Major technology companies exceed earnings expectations, driving market gains.',
+            'title': 'Major Merger Announced Between Tech Giants Worth $50 Billion',
+            'summary': 'Two leading technology companies announce historic merger deal, reshaping the industry landscape.',
+            'source': 'Financial Times',
+            'category': 'business',
+            'image': 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600',
+            'featured': False,
+            'slug': 'tech-giants-merger-50b'
+        },
+        {
+            'title': 'Q4 Earnings Season Kicks Off With Strong Corporate Results',
+            'summary': 'Early reports show companies exceeding analyst expectations across multiple sectors.',
             'source': 'CNBC',
-            'category': 'Markets',
+            'category': 'business',
             'image': 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&h=600',
+            'featured': False,
+            'slug': 'q4-earnings-strong-results'
+        },
+        # Markets
+        {
+            'title': 'Tech Stocks Rally on Strong Q4 Earnings Reports',
+            'summary': 'Major technology companies exceed earnings expectations, driving market gains. NASDAQ reaches new highs.',
+            'source': 'CNBC',
+            'category': 'markets',
+            'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
+            'featured': True,
+            'slug': 'tech-stocks-rally-q4'
         },
         {
             'title': 'Bitcoin Surges Past $90,000 on ETF Momentum',
-            'summary': 'Cryptocurrency markets rally as institutional adoption continues to grow.',
+            'summary': 'Cryptocurrency markets rally as institutional adoption continues to grow with new ETF approvals.',
             'source': 'CoinDesk',
-            'category': 'Crypto',
+            'category': 'markets',
             'image': 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&h=600',
+            'featured': False,
+            'slug': 'bitcoin-surges-90k-etf'
         },
         {
-            'title': 'Oil Prices Surge Amid Middle East Tensions',
-            'summary': 'Crude oil prices rise as geopolitical concerns affect supply outlook.',
-            'source': 'Reuters',
-            'category': 'Commodities',
-            'image': 'https://images.unsplash.com/photo-1513828583688-c52646db42da?w=800&h=600',
+            'title': 'S&P 500 Hits Record High as Investors Eye Rate Cuts',
+            'summary': 'Stock market reaches new all-time highs as optimism grows about monetary policy easing.',
+            'source': 'Wall Street Journal',
+            'category': 'markets',
+            'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
+            'featured': False,
+            'slug': 'sp500-record-high-rate-cuts'
         },
+        # Technology
         {
             'title': 'NVIDIA Announces Next-Gen AI Chips at CES',
-            'summary': 'Chip giant reveals breakthrough GPU architecture for AI applications.',
+            'summary': 'Chip giant reveals breakthrough GPU architecture for AI applications, promising 10x performance gains.',
             'source': 'TechCrunch',
-            'category': 'Technology',
+            'category': 'technology',
             'image': 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&h=600',
+            'featured': True,
+            'slug': 'nvidia-next-gen-ai-chips-ces'
+        },
+        {
+            'title': 'AI Breakthrough: New Language Models Show Human-Level Reasoning',
+            'summary': 'Latest research demonstrates significant advances in artificial intelligence reasoning capabilities.',
+            'source': 'MIT Technology Review',
+            'category': 'technology',
+            'image': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600',
+            'featured': False,
+            'slug': 'ai-breakthrough-human-reasoning'
+        },
+        {
+            'title': 'Cloud Computing Market Expected to Reach $1 Trillion by 2028',
+            'summary': 'Industry analysts project continued strong growth in cloud infrastructure spending.',
+            'source': 'Gartner',
+            'category': 'technology',
+            'image': 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&h=600',
+            'featured': False,
+            'slug': 'cloud-computing-trillion-2028'
+        },
+        # World
+        {
+            'title': 'Global Trade Tensions Ease as New Agreements Signed',
+            'summary': 'Major economies reach new trade deals, reducing tariff concerns and boosting market confidence.',
+            'source': 'Reuters',
+            'category': 'world',
+            'image': 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&h=600',
+            'featured': True,
+            'slug': 'global-trade-tensions-ease'
+        },
+        {
+            'title': 'European Central Bank Maintains Steady Interest Rates',
+            'summary': 'ECB holds rates unchanged while signaling cautious approach to monetary policy.',
+            'source': 'Financial Times',
+            'category': 'world',
+            'image': 'https://images.unsplash.com/photo-1569025743873-ea3a9ber5f1c?w=800&h=600',
+            'featured': False,
+            'slug': 'ecb-steady-interest-rates'
+        },
+        # Energy
+        {
+            'title': 'Oil Prices Surge Amid Middle East Tensions',
+            'summary': 'Crude oil prices rise sharply as geopolitical concerns affect global supply outlook.',
+            'source': 'Reuters',
+            'category': 'energy',
+            'image': 'https://images.unsplash.com/photo-1513828583688-c52646db42da?w=800&h=600',
+            'featured': True,
+            'slug': 'oil-prices-surge-middle-east'
+        },
+        {
+            'title': 'Renewable Energy Investment Hits Record $500 Billion',
+            'summary': 'Global investment in solar and wind power reaches new highs as clean energy transition accelerates.',
+            'source': 'Bloomberg Green',
+            'category': 'energy',
+            'image': 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=600',
+            'featured': False,
+            'slug': 'renewable-energy-record-500b'
+        },
+        {
+            'title': 'Electric Vehicle Sales Double Year Over Year',
+            'summary': 'EV adoption accelerates globally as prices fall and charging infrastructure expands.',
+            'source': 'Electrek',
+            'category': 'energy',
+            'image': 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=600',
+            'featured': False,
+            'slug': 'ev-sales-double-yoy'
         },
     ]
     
     count = 0
     for item in news_items:
-        existing = NewsItem.query.filter_by(title=item['title']).first()
+        existing = NewsItem.query.filter_by(slug=item['slug']).first()
         if not existing:
             news = NewsItem(
-                id=str(uuid.uuid4()),
                 title=item['title'],
                 summary=item['summary'],
                 source=item['source'],
                 category=item['category'],
-                image_url=item['image'],
-                published_at=datetime.now() - timedelta(hours=random.randint(1, 48)),
+                image=item['image'],
+                featured=item.get('featured', False),
+                slug=item['slug'],
+                curated_status='published',
+                source_type='admin',
+                published_at=datetime.now() - timedelta(hours=random.randint(1, 72)),
                 country_code='US'
             )
             db.session.add(news)
@@ -333,6 +433,83 @@ def seed_trending_topics():
         print(f"⚠ Trending topics table may not exist yet: {e}")
         db.session.rollback()
 
+def seed_tool_settings():
+    """Create tool settings data"""
+    tools = [
+        # Investing Category
+        {'slug': 'sip', 'name': 'SIP Calculator', 'category': 'Investing', 'implemented': True},
+        {'slug': 'compound', 'name': 'Compound Interest Calculator', 'category': 'Investing', 'implemented': True},
+        {'slug': 'goal-planner', 'name': 'Goal Planner', 'category': 'Investing', 'implemented': False},
+        {'slug': 'lumpsum', 'name': 'Lumpsum Calculator', 'category': 'Investing', 'implemented': False},
+        {'slug': 'step-up-sip', 'name': 'Step-up SIP Calculator', 'category': 'Investing', 'implemented': False},
+        {'slug': 'mutual-fund-returns', 'name': 'Mutual Fund Returns', 'category': 'Investing', 'implemented': False},
+        {'slug': 'dividend-yield', 'name': 'Dividend Yield Calculator', 'category': 'Investing', 'implemented': False},
+        
+        # Finance & Loans
+        {'slug': 'emi', 'name': 'Loan EMI Calculator', 'category': 'Finance & Loans', 'implemented': True},
+        {'slug': 'home-loan', 'name': 'Home Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
+        {'slug': 'car-loan', 'name': 'Car Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
+        {'slug': 'personal-loan', 'name': 'Personal Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
+        {'slug': 'loan-eligibility', 'name': 'Loan Eligibility', 'category': 'Finance & Loans', 'implemented': False},
+        {'slug': 'prepayment-calculator', 'name': 'Loan Prepayment', 'category': 'Finance & Loans', 'implemented': False},
+        
+        # Taxation
+        {'slug': 'income-tax', 'name': 'Income Tax Calculator', 'category': 'Taxation', 'implemented': False},
+        {'slug': 'hra-exemption', 'name': 'HRA Exemption Calculator', 'category': 'Taxation', 'implemented': False},
+        {'slug': 'capital-gains', 'name': 'Capital Gains Tax', 'category': 'Taxation', 'implemented': False},
+        {'slug': 'tax-regime-comparison', 'name': 'Old vs New Tax Regime', 'category': 'Taxation', 'implemented': False},
+        
+        # Retirement
+        {'slug': 'retirement', 'name': 'Retirement Calculator', 'category': 'Retirement', 'implemented': False},
+        {'slug': 'pension', 'name': 'Pension Calculator', 'category': 'Retirement', 'implemented': False},
+        {'slug': 'nps', 'name': 'NPS Calculator', 'category': 'Retirement', 'implemented': False},
+        {'slug': 'epf', 'name': 'EPF Calculator', 'category': 'Retirement', 'implemented': False},
+        
+        # Insurance
+        {'slug': 'life-insurance', 'name': 'Life Insurance Needs', 'category': 'Insurance', 'implemented': False},
+        {'slug': 'term-insurance', 'name': 'Term Insurance Planner', 'category': 'Insurance', 'implemented': False},
+        {'slug': 'health-premium', 'name': 'Health Premium Estimator', 'category': 'Insurance', 'implemented': False},
+        {'slug': 'car-insurance', 'name': 'Car Insurance Calculator', 'category': 'Insurance', 'implemented': False},
+        
+        # Personal Finance
+        {'slug': 'budget-planner', 'name': 'Budget Planner', 'category': 'Personal Finance', 'implemented': False},
+        {'slug': 'emergency-fund', 'name': 'Emergency Fund Calculator', 'category': 'Personal Finance', 'implemented': False},
+        {'slug': 'net-worth', 'name': 'Net Worth Calculator', 'category': 'Personal Finance', 'implemented': False},
+        {'slug': 'inflation', 'name': 'Inflation Calculator', 'category': 'Personal Finance', 'implemented': False},
+        
+        # Debt
+        {'slug': 'credit-card-payoff', 'name': 'Credit Card Payoff', 'category': 'Debt', 'implemented': False},
+        {'slug': 'debt-snowball', 'name': 'Debt Snowball Calculator', 'category': 'Debt', 'implemented': False},
+        {'slug': 'debt-avalanche', 'name': 'Debt Avalanche Calculator', 'category': 'Debt', 'implemented': False},
+        
+        # Real Estate
+        {'slug': 'rent-vs-buy', 'name': 'Rent vs Buy Calculator', 'category': 'Real Estate', 'implemented': False},
+        {'slug': 'stamp-duty', 'name': 'Stamp Duty Calculator', 'category': 'Real Estate', 'implemented': False},
+        
+        # Health & Fitness
+        {'slug': 'bmi', 'name': 'BMI Calculator', 'category': 'Health & Fitness', 'implemented': False},
+        {'slug': 'calorie-calculator', 'name': 'Calorie Calculator', 'category': 'Health & Fitness', 'implemented': False},
+    ]
+    
+    count = 0
+    for idx, tool in enumerate(tools):
+        existing = ToolSettings.query.filter_by(tool_slug=tool['slug']).first()
+        if not existing:
+            tool_setting = ToolSettings(
+                tool_slug=tool['slug'],
+                tool_name=tool['name'],
+                category=tool['category'],
+                enabled=True,
+                order_index=idx,
+                is_implemented=tool['implemented'],
+                country_code='GLOBAL'  # Available globally
+            )
+            db.session.add(tool_setting)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} tool settings")
+
 def run_seed():
     """Run all seed functions"""
     app = create_app()
@@ -348,6 +525,7 @@ def run_seed():
             seed_tv_channels()
             seed_radio_stations()
             seed_trending_topics()
+            seed_tool_settings()
             
             print("\n✅ Database seeding completed successfully!\n")
         except Exception as e:
