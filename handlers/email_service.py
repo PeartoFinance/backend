@@ -10,6 +10,8 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
+import threading
+from flask import render_template_string
 
 # Load environment variables
 load_dotenv()
@@ -311,15 +313,26 @@ class EmailService:
         return server
     
     def _render_template(self, template: str, data: Dict[str, Any]) -> str:
-        """Replace template variables with actual values"""
-        rendered = template
+        """Replace template variables with actual values using Jinja2"""
         data['app_name'] = APP_NAME
         data['login_url'] = f"{APP_URL}/login"
         data['security_url'] = f"{APP_URL}/profile?tab=devices"
         
-        for key, value in data.items():
-            rendered = rendered.replace('{{' + key + '}}', str(value or ''))
-        return rendered
+        try:
+            return render_template_string(template, **data)
+        except Exception as e:
+            print(f'[EmailService] ❌ Template rendering failed: {e}')
+            # Fallback to simple replacement if Flask context is missing or rendering fails
+            rendered = template
+            for key, value in data.items():
+                rendered = rendered.replace('{{' + key + '}}', str(value or ''))
+            return rendered
+
+    def send_email_async(self, to: str, template_type: str, data: Dict[str, Any]):
+        """Send email in a background thread"""
+        thread = threading.Thread(target=self.send_email, args=(to, template_type, data))
+        thread.start()
+
     
     def send_email(self, to: str, template_type: str, data: Dict[str, Any]) -> bool:
         """Send email using template"""
@@ -384,7 +397,7 @@ _email_service = EmailService()
 
 def send_welcome_email(user_email: str, user_name: str) -> bool:
     """Send welcome email after signup"""
-    return _email_service.send_email(user_email, 'signup', {
+    return _email_service.send_email_async(user_email, 'signup', {
         'user_name': user_name,
         'user_email': user_email,
     })
@@ -394,7 +407,7 @@ def send_login_notification_email(user_email: str, user_name: str,
                                    ip_address: str = 'Unknown',
                                    user_agent: str = 'Unknown device') -> bool:
     """Send login notification email"""
-    return _email_service.send_email(user_email, 'login', {
+    return _email_service.send_email_async(user_email, 'login', {
         'user_name': user_name,
         'login_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'device_info': user_agent[:50] if user_agent else 'Unknown device',
@@ -405,7 +418,7 @@ def send_login_notification_email(user_email: str, user_name: str,
 def send_password_reset_email(user_email: str, user_name: str, reset_token: str) -> bool:
     """Send password reset email"""
     reset_url = f"{APP_URL}/reset-password?token={reset_token}"
-    return _email_service.send_email(user_email, 'forgot_password', {
+    return _email_service.send_email_async(user_email, 'forgot_password', {
         'user_name': user_name,
         'reset_url': reset_url,
     })
@@ -413,7 +426,7 @@ def send_password_reset_email(user_email: str, user_name: str, reset_token: str)
 
 def send_verification_code_email(user_email: str, user_name: str, code: str) -> bool:
     """Send email verification code"""
-    return _email_service.send_email(user_email, 'verification_code', {
+    return _email_service.send_email_async(user_email, 'verification_code', {
         'user_name': user_name,
         'code': code,
     })
@@ -421,7 +434,7 @@ def send_verification_code_email(user_email: str, user_name: str, code: str) -> 
 
 def send_profile_update_email(user_email: str, user_name: str, changed_fields: list) -> bool:
     """Send profile update notification email"""
-    return _email_service.send_email(user_email, 'profile_update', {
+    return _email_service.send_email_async(user_email, 'profile_update', {
         'user_name': user_name,
         'changed_fields': ', '.join(changed_fields) if isinstance(changed_fields, list) else changed_fields,
     })
