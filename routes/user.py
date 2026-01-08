@@ -6,7 +6,7 @@ Based on old/Frontend/server/src/userPreferencesApi.js
 from flask import Blueprint, request, jsonify
 import bcrypt
 from datetime import datetime
-from models import db, User
+from models import db, User, UserPortfolio, UserWatchlist, MarketData
 
 user_bp = Blueprint('user', __name__)
 
@@ -143,3 +143,49 @@ def change_password():
         'success': True,
         'message': 'Password changed successfully'
     })
+
+
+@user_bp.route('/portfolio', methods=['GET'])
+def get_user_portfolio_summary():
+    """Return current user's portfolios summary for /api/user/portfolio."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    portfolios = UserPortfolio.query.filter_by(user_id=user.id).all()
+    return jsonify({
+        'portfolios': [p.to_dict() for p in portfolios]
+    })
+
+
+@user_bp.route('/watchlist', methods=['GET'])
+def get_user_watchlist():
+    """Return current user's watchlist symbols with basic quote info."""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    user_symbols = UserWatchlist.query.filter_by(user_id=user.id).all()
+    symbols = [w.symbol for w in user_symbols]
+
+    if not symbols:
+        return jsonify({'items': []})
+
+    prices = MarketData.query.filter(
+        MarketData.symbol.in_(symbols)
+    ).all()
+    price_by_symbol = {p.symbol: p for p in prices}
+
+    items = []
+    for w in user_symbols:
+        p = price_by_symbol.get(w.symbol)
+        items.append({
+            'symbol': w.symbol,
+            'addedAt': w.added_at.isoformat() if w.added_at else None,
+            'price': float(p.price) if p and p.price else None,
+            'change': float(p.change) if p and p.change else None,
+            'changePercent': float(p.change_percent) if p and p.change_percent else None,
+        })
+
+    return jsonify({'items': items})
+
