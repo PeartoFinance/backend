@@ -11,6 +11,12 @@ from .content import content_bp
 from .team import team_bp
 from .settings import settings_bp
 from .audit import audit_bp
+from .marketing import marketing_bp
+from .tasks import tasks_bp
+from .support import support_bp
+from .jobs import jobs_bp
+from .market import market_bp
+from .media import media_bp
 
 # Main admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -24,5 +30,11 @@ admin_bp.register_blueprint(content_bp)
 admin_bp.register_blueprint(team_bp)
 admin_bp.register_blueprint(settings_bp)
 admin_bp.register_blueprint(audit_bp)
+admin_bp.register_blueprint(marketing_bp)
+admin_bp.register_blueprint(tasks_bp)
+admin_bp.register_blueprint(support_bp)
+admin_bp.register_blueprint(jobs_bp)
+admin_bp.register_blueprint(market_bp)
+admin_bp.register_blueprint(media_bp)
 
 __all__ = ['admin_bp']

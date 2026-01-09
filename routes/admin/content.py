@@ -3,22 +3,11 @@ Admin Content Management Routes
 CRUD for pages, posts, categories
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
 from datetime import datetime
+from .auth import admin_required
 from models import db, Page, Post, PostCategory
 
 content_bp = Blueprint('admin_content', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 # ============ PAGES ============
