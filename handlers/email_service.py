@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 import threading
-from flask import render_template_string
+from jinja2 import Template
 
 # Load environment variables
 load_dotenv()
@@ -313,16 +313,16 @@ class EmailService:
         return server
     
     def _render_template(self, template: str, data: Dict[str, Any]) -> str:
-        """Replace template variables with actual values using Jinja2"""
+        """Replace template variables with actual values using Jinja2 (standalone)"""
         data['app_name'] = APP_NAME
         data['login_url'] = f"{APP_URL}/login"
         data['security_url'] = f"{APP_URL}/profile?tab=devices"
         
         try:
-            return render_template_string(template, **data)
+            return Template(template).render(**data)
         except Exception as e:
             print(f'[EmailService] ❌ Template rendering failed: {e}')
-            # Fallback to simple replacement if Flask context is missing or rendering fails
+            # Fallback to simple replacement
             rendered = template
             for key, value in data.items():
                 rendered = rendered.replace('{{' + key + '}}', str(value or ''))

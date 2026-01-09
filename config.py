@@ -5,8 +5,8 @@ import os
 from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
-load_dotenv()
-
+# Force load environment variables from .env file, overriding system variables
+load_dotenv(override=True)
 
 class Config:
     # Database - SQLAlchemy connection string

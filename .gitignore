@@ -1,11 +1,30 @@
 # Python cache
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
 # Virtual environments
 venv/
+env/
 
 # Environment variables
 .env
+.env.local
+
+# Private Tools & Scripts (Do not push)
+api_docs.py
+debug_env.py
+check_db.py
+list_tables.py
+check_users.py
+
+# IDE & Editor
+.vscode/
+.idea/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
