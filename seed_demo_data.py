@@ -10,10 +10,19 @@ import uuid
 from flask import Flask
 from config import config
 from models.base import db
-from models.market import MarketData, MarketIndices, CommodityData, StockOffer
-from models.media import TVChannel, RadioStation, TrendingTopic
+from models.market import MarketData, MarketIndices, CommodityData, StockOffer, CryptoMarketData
+from models.media import TVChannel, RadioStation, TrendingTopic, ForexRate
 from models.article import NewsItem
-from models.settings import ToolSettings
+from models.settings import ToolSettings, Country
+from models.misc import FAQ, FAQItem, GlossaryTerm, Job, TeamMember, Testimonial, MarketingCampaign
+from models.education import Course, CourseModule, Instructor, HelpCategory, HelpArticle
+
+# Try to import SportsEvent if it exists
+try:
+    from models.media import SportsEvent
+    HAS_SPORTS_EVENT = True
+except ImportError:
+    HAS_SPORTS_EVENT = False
 
 def create_app():
     """Create Flask app for seeding"""
@@ -79,6 +88,41 @@ def seed_market_data():
     
     db.session.commit()
     print(f"✓ Seeded {count} market stocks")
+
+def seed_forex_rates():
+    """Create forex exchange rates"""
+    rates = [
+        {'base': 'EUR', 'target': 'USD', 'rate': 1.0850},
+        {'base': 'GBP', 'target': 'USD', 'rate': 1.2650},
+        {'base': 'USD', 'target': 'JPY', 'rate': 155.50},
+        {'base': 'USD', 'target': 'CHF', 'rate': 0.8920},
+        {'base': 'AUD', 'target': 'USD', 'rate': 0.6350},
+        {'base': 'USD', 'target': 'CAD', 'rate': 1.4350},
+        {'base': 'NZD', 'target': 'USD', 'rate': 0.5650},
+        {'base': 'USD', 'target': 'NPR', 'rate': 136.50},
+        {'base': 'USD', 'target': 'INR', 'rate': 86.25},
+        {'base': 'EUR', 'target': 'GBP', 'rate': 0.8580},
+    ]
+    
+    count = 0
+    for fx in rates:
+        existing = ForexRate.query.filter_by(base_currency=fx['base'], target_currency=fx['target']).first()
+        if not existing:
+            change_pct = random.uniform(-0.5, 0.5)
+            change = fx['rate'] * change_pct / 100
+            
+            forex = ForexRate(
+                base_currency=fx['base'],
+                target_currency=fx['target'],
+                rate=Decimal(str(round(fx['rate'], 6))),
+                change=Decimal(str(round(change, 6))),
+                change_percent=Decimal(str(round(change_pct, 4))),
+            )
+            db.session.add(forex)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} forex rates")
 
 def seed_market_indices():
     """Create market indices"""
@@ -185,137 +229,16 @@ def seed_stock_offers():
 def seed_news():
     """Create news items for all categories"""
     news_items = [
-        # Business
-        {
-            'title': 'Fed Signals Potential Rate Cuts in 2024 Amid Cooling Inflation Data',
-            'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling. Markets respond positively to dovish signals.',
-            'source': 'Bloomberg',
-            'category': 'business',
-            'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
-            'featured': True,
-            'slug': 'fed-signals-rate-cuts-2024'
-        },
-        {
-            'title': 'Major Merger Announced Between Tech Giants Worth $50 Billion',
-            'summary': 'Two leading technology companies announce historic merger deal, reshaping the industry landscape.',
-            'source': 'Financial Times',
-            'category': 'business',
-            'image': 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600',
-            'featured': False,
-            'slug': 'tech-giants-merger-50b'
-        },
-        {
-            'title': 'Q4 Earnings Season Kicks Off With Strong Corporate Results',
-            'summary': 'Early reports show companies exceeding analyst expectations across multiple sectors.',
-            'source': 'CNBC',
-            'category': 'business',
-            'image': 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800&h=600',
-            'featured': False,
-            'slug': 'q4-earnings-strong-results'
-        },
-        # Markets
-        {
-            'title': 'Tech Stocks Rally on Strong Q4 Earnings Reports',
-            'summary': 'Major technology companies exceed earnings expectations, driving market gains. NASDAQ reaches new highs.',
-            'source': 'CNBC',
-            'category': 'markets',
-            'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
-            'featured': True,
-            'slug': 'tech-stocks-rally-q4'
-        },
-        {
-            'title': 'Bitcoin Surges Past $90,000 on ETF Momentum',
-            'summary': 'Cryptocurrency markets rally as institutional adoption continues to grow with new ETF approvals.',
-            'source': 'CoinDesk',
-            'category': 'markets',
-            'image': 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=800&h=600',
-            'featured': False,
-            'slug': 'bitcoin-surges-90k-etf'
-        },
-        {
-            'title': 'S&P 500 Hits Record High as Investors Eye Rate Cuts',
-            'summary': 'Stock market reaches new all-time highs as optimism grows about monetary policy easing.',
-            'source': 'Wall Street Journal',
-            'category': 'markets',
-            'image': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&h=600',
-            'featured': False,
-            'slug': 'sp500-record-high-rate-cuts'
-        },
-        # Technology
-        {
-            'title': 'NVIDIA Announces Next-Gen AI Chips at CES',
-            'summary': 'Chip giant reveals breakthrough GPU architecture for AI applications, promising 10x performance gains.',
-            'source': 'TechCrunch',
-            'category': 'technology',
-            'image': 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&h=600',
-            'featured': True,
-            'slug': 'nvidia-next-gen-ai-chips-ces'
-        },
-        {
-            'title': 'AI Breakthrough: New Language Models Show Human-Level Reasoning',
-            'summary': 'Latest research demonstrates significant advances in artificial intelligence reasoning capabilities.',
-            'source': 'MIT Technology Review',
-            'category': 'technology',
-            'image': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600',
-            'featured': False,
-            'slug': 'ai-breakthrough-human-reasoning'
-        },
-        {
-            'title': 'Cloud Computing Market Expected to Reach $1 Trillion by 2028',
-            'summary': 'Industry analysts project continued strong growth in cloud infrastructure spending.',
-            'source': 'Gartner',
-            'category': 'technology',
-            'image': 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&h=600',
-            'featured': False,
-            'slug': 'cloud-computing-trillion-2028'
-        },
-        # World
-        {
-            'title': 'Global Trade Tensions Ease as New Agreements Signed',
-            'summary': 'Major economies reach new trade deals, reducing tariff concerns and boosting market confidence.',
-            'source': 'Reuters',
-            'category': 'world',
-            'image': 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=800&h=600',
-            'featured': True,
-            'slug': 'global-trade-tensions-ease'
-        },
-        {
-            'title': 'European Central Bank Maintains Steady Interest Rates',
-            'summary': 'ECB holds rates unchanged while signaling cautious approach to monetary policy.',
-            'source': 'Financial Times',
-            'category': 'world',
-            'image': 'https://images.unsplash.com/photo-1569025743873-ea3a9ber5f1c?w=800&h=600',
-            'featured': False,
-            'slug': 'ecb-steady-interest-rates'
-        },
-        # Energy
-        {
-            'title': 'Oil Prices Surge Amid Middle East Tensions',
-            'summary': 'Crude oil prices rise sharply as geopolitical concerns affect global supply outlook.',
-            'source': 'Reuters',
-            'category': 'energy',
-            'image': 'https://images.unsplash.com/photo-1513828583688-c52646db42da?w=800&h=600',
-            'featured': True,
-            'slug': 'oil-prices-surge-middle-east'
-        },
-        {
-            'title': 'Renewable Energy Investment Hits Record $500 Billion',
-            'summary': 'Global investment in solar and wind power reaches new highs as clean energy transition accelerates.',
-            'source': 'Bloomberg Green',
-            'category': 'energy',
-            'image': 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=600',
-            'featured': False,
-            'slug': 'renewable-energy-record-500b'
-        },
-        {
-            'title': 'Electric Vehicle Sales Double Year Over Year',
-            'summary': 'EV adoption accelerates globally as prices fall and charging infrastructure expands.',
-            'source': 'Electrek',
-            'category': 'energy',
-            'image': 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=600',
-            'featured': False,
-            'slug': 'ev-sales-double-yoy'
-        },
+        {'title': 'Fed Signals Potential Rate Cuts in 2024 Amid Cooling Inflation Data', 'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling.', 'source': 'Bloomberg', 'category': 'business', 'featured': True, 'slug': 'fed-signals-rate-cuts-2024'},
+        {'title': 'Major Merger Announced Between Tech Giants Worth $50 Billion', 'summary': 'Two leading technology companies announce historic merger deal.', 'source': 'Financial Times', 'category': 'business', 'featured': False, 'slug': 'tech-giants-merger-50b'},
+        {'title': 'Tech Stocks Rally on Strong Q4 Earnings Reports', 'summary': 'Major technology companies exceed earnings expectations.', 'source': 'CNBC', 'category': 'markets', 'featured': True, 'slug': 'tech-stocks-rally-q4'},
+        {'title': 'Bitcoin Surges Past $90,000 on ETF Momentum', 'summary': 'Cryptocurrency markets rally as institutional adoption grows.', 'source': 'CoinDesk', 'category': 'crypto', 'featured': True, 'slug': 'bitcoin-surges-90k-etf'},
+        {'title': 'NVIDIA Announces Next-Gen AI Chips at CES', 'summary': 'Chip giant reveals breakthrough GPU architecture for AI applications.', 'source': 'TechCrunch', 'category': 'technology', 'featured': True, 'slug': 'nvidia-next-gen-ai-chips-ces'},
+        {'title': 'Oil Prices Surge Amid Middle East Tensions', 'summary': 'Crude oil prices rise sharply as geopolitical concerns affect supply.', 'source': 'Reuters', 'category': 'energy', 'featured': True, 'slug': 'oil-prices-surge-middle-east'},
+        {'title': 'Renewable Energy Investment Hits Record $500 Billion', 'summary': 'Global investment in solar and wind power reaches new highs.', 'source': 'Bloomberg Green', 'category': 'energy', 'featured': False, 'slug': 'renewable-energy-record-500b'},
+        {'title': 'Electric Vehicle Sales Double Year Over Year', 'summary': 'EV adoption accelerates globally as prices fall.', 'source': 'Electrek', 'category': 'auto', 'featured': False, 'slug': 'ev-sales-double-yoy'},
+        {'title': 'S&P 500 Hits Record High as Investors Eye Rate Cuts', 'summary': 'Stock market reaches new all-time highs.', 'source': 'Wall Street Journal', 'category': 'markets', 'featured': False, 'slug': 'sp500-record-high-rate-cuts'},
+        {'title': 'Global Trade Tensions Ease as New Agreements Signed', 'summary': 'Major economies reach new trade deals.', 'source': 'Reuters', 'category': 'world', 'featured': True, 'slug': 'global-trade-tensions-ease'},
     ]
     
     count = 0
@@ -327,7 +250,6 @@ def seed_news():
                 summary=item['summary'],
                 source=item['source'],
                 category=item['category'],
-                image=item['image'],
                 featured=item.get('featured', False),
                 slug=item['slug'],
                 curated_status='published',
@@ -344,12 +266,14 @@ def seed_news():
 def seed_tv_channels():
     """Create TV channel data"""
     channels = [
-        {'id': 'bloomberg', 'name': 'Bloomberg TV', 'category': 'Finance', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Bloomberg_Television_logo.svg/512px-Bloomberg_Television_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/dp8PhLsUcFE'},
-        {'id': 'cnbc', 'name': 'CNBC', 'category': 'Finance', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/CNBC_logo.svg/512px-CNBC_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/9wTn9EzrLzk'},
-        {'id': 'cnn', 'name': 'CNN', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/CNN.svg/512px-CNN.svg.png', 'stream_url': 'https://www.youtube.com/embed/5anLPw0Efmo'},
-        {'id': 'abcnews', 'name': 'ABC News', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/ABC_News_logo.svg/512px-ABC_News_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/vC-ky5VumJI'},
-        {'id': 'espn', 'name': 'ESPN', 'category': 'Sports', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/512px-ESPN_wordmark.svg.png', 'stream_url': 'https://www.youtube.com/embed/DTvS9lvRxZ8'},
-        {'id': 'techcrunch', 'name': 'TechCrunch', 'category': 'Technology', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/TechCrunch_logo.svg/512px-TechCrunch_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/pMbvxlNB_zs'},
+        {'id': 'bloomberg', 'name': 'Bloomberg TV', 'category': 'Finance', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Bloomberg_Television_logo.svg/512px-Bloomberg_Television_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/dp8PhLsUcFE', 'country': 'US'},
+        {'id': 'cnbc', 'name': 'CNBC', 'category': 'Finance', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/CNBC_logo.svg/512px-CNBC_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/9wTn9EzrLzk', 'country': 'US'},
+        {'id': 'cnn', 'name': 'CNN', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/CNN.svg/512px-CNN.svg.png', 'stream_url': 'https://www.youtube.com/embed/5anLPw0Efmo', 'country': 'US'},
+        {'id': 'bbcworld', 'name': 'BBC World News', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/BBC_World_News_logo.svg/512px-BBC_World_News_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/t8yg8sVoXzU', 'country': 'UK'},
+        {'id': 'skynews', 'name': 'Sky News', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/b5/Sky_News.svg/512px-Sky_News.svg.png', 'stream_url': 'https://www.youtube.com/embed/9Auq9mYxFEE', 'country': 'UK'},
+        {'id': 'aljazeera', 'name': 'Al Jazeera English', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/en/thumb/b/bc/Al_Jazeera_English_logo.svg/512px-Al_Jazeera_English_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/bNyUyrR0PHo', 'country': 'QA'},
+        {'id': 'ndtv', 'name': 'NDTV', 'category': 'News', 'language': 'English', 'logo_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/NDTV_logo.svg/512px-NDTV_logo.svg.png', 'stream_url': 'https://www.youtube.com/embed/WB9GjZSkSB8', 'country': 'IN'},
+        {'id': 'ntv_nepal', 'name': 'NTV Nepal', 'category': 'News', 'language': 'Nepali', 'logo_url': 'https://i.ytimg.com/vi/h6jqbz_5h5E/maxresdefault.jpg', 'stream_url': 'https://www.youtube.com/embed/h6jqbz_5h5E', 'country': 'NP'},
     ]
     
     count = 0
@@ -365,7 +289,7 @@ def seed_tv_channels():
                 stream_url=ch['stream_url'],
                 is_active=True,
                 is_live=True,
-                country_code='US'
+                country_code=ch['country']
             )
             db.session.add(channel)
             count += 1
@@ -376,12 +300,12 @@ def seed_tv_channels():
 def seed_radio_stations():
     """Create radio station data"""
     stations = [
-        {'name': 'BBC Nepali', 'stream_url': 'https://stream.live.vc.bbcmedia.co.uk/bbc_nepali_radio', 'country': 'Nepal', 'genre': 'news', 'language': 'Nepali', 'logo_url': 'https://static.files.bbci.co.uk/ws/simorgh-assets/public/nepali/images/icons/icon-128x128.png'},
-        {'name': "America's Country", 'stream_url': 'https://ais-sa2.cdnstream1.com/1976_128.mp3', 'country': 'United States', 'genre': 'country', 'language': 'English', 'logo_url': 'https://marinifamily.files.wordpress.com/2015/08/favicon.png'},
-        {'name': 'NetTalk America', 'stream_url': 'https://stream-162.zeno.fm/st9bhqvgvceuv', 'country': 'United States', 'genre': 'talk', 'language': 'English', 'logo_url': 'https://img1.wsimg.com/isteam/ip/6e7215c5-5ca4-45c2-b61c-24421c4a5003/74cfc8bf-f67f-4e7d-ad46-0ac09ca2d362.gif.png'},
-        {'name': 'Radio Panamericana', 'stream_url': 'https://stream-146.zeno.fm/pnwpbyfambruv', 'country': 'Bolivia', 'genre': 'culture', 'language': 'Spanish', 'logo_url': 'https://graph.facebook.com/NoticiasPanamericana/picture?width=200&height=200'},
-        {'name': 'Panamericana Retro Rock', 'stream_url': 'https://us-b4-p-e-pb13-audio.cdn.mdstrm.com/live-audio', 'country': 'Peru', 'genre': 'rock', 'language': 'English', 'logo_url': 'https://static-media.streema.com/media/cache/88/74/8874c7e02e56f56b4d18607b234c95ba.jpg'},
-        {'name': 'Radio America 94.7', 'stream_url': 'http://26563.live.streamtheworld.com/AMERICA_SC', 'country': 'Honduras', 'genre': 'news', 'language': 'Spanish', 'logo_url': 'https://d9hhnadinot6y.cloudfront.net/imag/2023/08/cropped-cropped-favico-192x192-1-180x180.png'},
+        {'name': 'BBC Nepali', 'stream_url': 'https://stream.live.vc.bbcmedia.co.uk/bbc_nepali_radio', 'country': 'Nepal', 'genre': 'news', 'language': 'Nepali', 'logo_url': 'https://static.files.bbci.co.uk/ws/simorgh-assets/public/nepali/images/icons/icon-128x128.png', 'country_code': 'NP'},
+        {'name': "America's Country", 'stream_url': 'https://ais-sa2.cdnstream1.com/1976_128.mp3', 'country': 'United States', 'genre': 'country', 'language': 'English', 'logo_url': 'https://marinifamily.files.wordpress.com/2015/08/favicon.png', 'country_code': 'US'},
+        {'name': 'NetTalk America', 'stream_url': 'https://stream-162.zeno.fm/st9bhqvgvceuv', 'country': 'United States', 'genre': 'talk', 'language': 'English', 'logo_url': 'https://img1.wsimg.com/isteam/ip/6e7215c5-5ca4-45c2-b61c-24421c4a5003/74cfc8bf-f67f-4e7d-ad46-0ac09ca2d362.gif.png', 'country_code': 'US'},
+        {'name': 'BBC Nepali 103 MHz', 'stream_url': 'https://stream.live.vc.bbcmedia.co.uk/bbc_nepali_radio', 'country': 'Nepal', 'genre': 'news', 'language': 'Nepali', 'logo_url': 'https://static.files.bbci.co.uk/ws/simorgh-assets/public/nepali/images/icons/icon-128x128.png', 'country_code': 'NP'},
+        {'name': 'Radio Panamericana', 'stream_url': 'https://stream-146.zeno.fm/pnwpbyfambruv', 'country': 'Bolivia', 'genre': 'culture', 'language': 'Spanish', 'logo_url': 'https://graph.facebook.com/NoticiasPanamericana/picture?width=200&height=200', 'country_code': 'BO'},
+        {'name': 'Radio America 94.7', 'stream_url': 'http://26563.live.streamtheworld.com/AMERICA_SC', 'country': 'Honduras', 'genre': 'news', 'language': 'Spanish', 'logo_url': 'https://d9hhnadinot6y.cloudfront.net/imag/2023/08/cropped-cropped-favico-192x192-1-180x180.png', 'country_code': 'HN'},
     ]
     
     count = 0
@@ -396,13 +320,52 @@ def seed_radio_stations():
                 language=st['language'],
                 logo_url=st['logo_url'],
                 is_active=True,
-                country_code='US'
+                country_code=st['country_code']
             )
             db.session.add(station)
             count += 1
     
     db.session.commit()
     print(f"✓ Seeded {count} radio stations")
+
+def seed_sports_events():
+    """Create sports events data"""
+    if not HAS_SPORTS_EVENT:
+        print("⚠ SportsEvent model not available, skipping")
+        return
+    
+    events = [
+        {'name': 'India vs Australia - 3rd Test', 'description': 'Border-Gavaskar Trophy 2024-25', 'category': 'Cricket', 'status': 'Live', 'venue': 'Melbourne Cricket Ground', 'team_home': 'India', 'team_away': 'Australia', 'series': 'Border-Gavaskar Trophy'},
+        {'name': 'Manchester United vs Liverpool', 'description': 'Premier League 2024-25', 'category': 'Football', 'status': 'Upcoming', 'venue': 'Old Trafford', 'team_home': 'Manchester United', 'team_away': 'Liverpool', 'match_type': 'League'},
+        {'name': 'Nepal vs UAE - T20', 'description': 'ACC Premier Cup 2024', 'category': 'Cricket', 'status': 'Upcoming', 'venue': 'TU Cricket Ground', 'team_home': 'Nepal', 'team_away': 'UAE', 'series': 'ACC Premier Cup'},
+        {'name': 'Real Madrid vs Barcelona', 'description': 'La Liga 2024-25', 'category': 'Football', 'status': 'Upcoming', 'venue': 'Santiago Bernabéu', 'team_home': 'Real Madrid', 'team_away': 'Barcelona', 'match_type': 'League'},
+        {'name': 'NBA: Lakers vs Warriors', 'description': 'NBA Regular Season', 'category': 'Basketball', 'status': 'Live', 'venue': 'Crypto.com Arena', 'team_home': 'Lakers', 'team_away': 'Warriors', 'match_type': 'Regular'},
+        {'name': 'Australian Open Finals', 'description': 'Grand Slam 2024', 'category': 'Tennis', 'status': 'Upcoming', 'venue': 'Rod Laver Arena', 'match_type': 'Final'},
+    ]
+    
+    count = 0
+    for event in events:
+        existing = SportsEvent.query.filter_by(name=event['name']).first()
+        if not existing:
+            sports_event = SportsEvent(
+                name=event['name'],
+                description=event['description'],
+                category=event['category'],
+                status=event['status'],
+                venue=event.get('venue'),
+                team_home=event.get('team_home'),
+                team_away=event.get('team_away'),
+                series=event.get('series'),
+                match_type=event.get('match_type'),
+                is_active=True,
+                event_date=datetime.now() + timedelta(days=random.randint(-2, 7)),
+                country_code='GLOBAL'
+            )
+            db.session.add(sports_event)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} sports events")
 
 def seed_trending_topics():
     """Create trending topics"""
@@ -430,65 +393,199 @@ def seed_trending_topics():
         db.session.commit()
         print(f"✓ Seeded {count} trending topics")
     except Exception as e:
-        print(f"⚠ Trending topics table may not exist yet: {e}")
+        print(f"⚠ Trending topics error: {e}")
         db.session.rollback()
+
+def seed_countries():
+    """Create country configuration data"""
+    countries = [
+        {'code': 'US', 'name': 'United States', 'currency': 'USD', 'symbol': '$', 'flag': '🇺🇸', 'active': True},
+        {'code': 'NP', 'name': 'Nepal', 'currency': 'NPR', 'symbol': 'Rs.', 'flag': '🇳🇵', 'active': True},
+        {'code': 'IN', 'name': 'India', 'currency': 'INR', 'symbol': '₹', 'flag': '🇮🇳', 'active': True},
+        {'code': 'UK', 'name': 'United Kingdom', 'currency': 'GBP', 'symbol': '£', 'flag': '🇬🇧', 'active': True},
+        {'code': 'AU', 'name': 'Australia', 'currency': 'AUD', 'symbol': 'A$', 'flag': '🇦🇺', 'active': True},
+        {'code': 'CA', 'name': 'Canada', 'currency': 'CAD', 'symbol': 'C$', 'flag': '🇨🇦', 'active': True},
+        {'code': 'JP', 'name': 'Japan', 'currency': 'JPY', 'symbol': '¥', 'flag': '🇯🇵', 'active': True},
+        {'code': 'DE', 'name': 'Germany', 'currency': 'EUR', 'symbol': '€', 'flag': '🇩🇪', 'active': True},
+        {'code': 'SG', 'name': 'Singapore', 'currency': 'SGD', 'symbol': 'S$', 'flag': '🇸🇬', 'active': True},
+        {'code': 'AE', 'name': 'UAE', 'currency': 'AED', 'symbol': 'د.إ', 'flag': '🇦🇪', 'active': True},
+    ]
+    
+    count = 0
+    for c in countries:
+        existing = Country.query.filter_by(code=c['code']).first()
+        if not existing:
+            country = Country(
+                code=c['code'],
+                name=c['name'],
+                currency_code=c['currency'],
+                currency_symbol=c['symbol'],
+                flag_emoji=c['flag'],
+                is_active=c['active']
+            )
+            db.session.add(country)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} countries")
+
+def seed_faq():
+    """Create FAQ data"""
+    faqs = [
+        {'question': 'How do I create an account?', 'answer': 'Click on the Sign Up button and fill in your details. You can also sign up using Google or Apple.', 'category': 'Account'},
+        {'question': 'How do I reset my password?', 'answer': 'Click on Forgot Password on the login page and enter your email. We will send you a reset link.', 'category': 'Account'},
+        {'question': 'What payment methods do you accept?', 'answer': 'We accept all major credit cards, PayPal, and bank transfers. In Nepal, we also accept eSewa and Khalti.', 'category': 'Payments'},
+        {'question': 'Is my data secure?', 'answer': 'Yes, we use industry-standard encryption and security practices to protect your personal and financial data.', 'category': 'Security'},
+        {'question': 'How often is market data updated?', 'answer': 'Market data is updated in real-time during trading hours. Some data may have a 15-minute delay depending on your subscription.', 'category': 'Data'},
+        {'question': 'Can I use PeartoFinance on mobile?', 'answer': 'Yes! Our platform is fully responsive and works on all devices. Mobile apps are coming soon.', 'category': 'General'},
+    ]
+    
+    count = 0
+    for item in faqs:
+        existing = FAQItem.query.filter_by(question=item['question']).first()
+        if not existing:
+            faq = FAQItem(
+                question=item['question'],
+                answer=item['answer'],
+                category=item['category'],
+                is_published=True,
+                order_index=count
+            )
+            db.session.add(faq)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} FAQ items")
+
+def seed_glossary():
+    """Create glossary terms"""
+    terms = [
+        {'term': 'IPO', 'definition': 'Initial Public Offering - When a private company offers shares to the public for the first time.', 'category': 'Investing'},
+        {'term': 'ETF', 'definition': 'Exchange-Traded Fund - A type of fund that trades on stock exchanges like individual stocks.', 'category': 'Investing'},
+        {'term': 'P/E Ratio', 'definition': 'Price-to-Earnings Ratio - A valuation metric comparing stock price to earnings per share.', 'category': 'Analysis'},
+        {'term': 'Market Cap', 'definition': 'Market Capitalization - Total value of a company calculated by multiplying shares by price.', 'category': 'Analysis'},
+        {'term': 'Dividend', 'definition': 'A portion of company profits paid to shareholders, usually quarterly.', 'category': 'Investing'},
+        {'term': 'Bull Market', 'definition': 'A market condition where prices are rising or expected to rise.', 'category': 'Markets'},
+        {'term': 'Bear Market', 'definition': 'A market condition where prices are falling or expected to fall.', 'category': 'Markets'},
+        {'term': 'Volatility', 'definition': 'A statistical measure of the dispersion of returns for a security or market index.', 'category': 'Trading'},
+        {'term': 'Liquidity', 'definition': 'The degree to which an asset can be quickly bought or sold without affecting its price.', 'category': 'Trading'},
+        {'term': 'SIP', 'definition': 'Systematic Investment Plan - A method of investing fixed amounts regularly in mutual funds.', 'category': 'Investing'},
+    ]
+    
+    count = 0
+    for item in terms:
+        existing = GlossaryTerm.query.filter_by(term=item['term']).first()
+        if not existing:
+            term = GlossaryTerm(
+                term=item['term'],
+                definition=item['definition'],
+                category=item['category'],
+                is_published=True
+            )
+            db.session.add(term)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} glossary terms")
+
+def seed_jobs():
+    """Create job listings"""
+    jobs = [
+        {'title': 'Senior Software Engineer', 'department': 'Engineering', 'location': 'Remote', 'type': 'Full-time', 'description': 'We are looking for experienced engineers to build our next-generation financial platform.'},
+        {'title': 'Product Manager', 'department': 'Product', 'location': 'San Francisco', 'type': 'Full-time', 'description': 'Lead product development for our investment tools and user experience.'},
+        {'title': 'Data Scientist', 'department': 'Data', 'location': 'Remote', 'type': 'Full-time', 'description': 'Build ML models to power market predictions and personalized recommendations.'},
+        {'title': 'UX Designer', 'department': 'Design', 'location': 'New York', 'type': 'Full-time', 'description': 'Design beautiful, intuitive interfaces for complex financial data.'},
+        {'title': 'Content Writer', 'department': 'Marketing', 'location': 'Remote', 'type': 'Part-time', 'description': 'Create engaging financial education content for our blog and social channels.'},
+    ]
+    
+    count = 0
+    for item in jobs:
+        existing = Job.query.filter_by(title=item['title']).first()
+        if not existing:
+            job = Job(
+                title=item['title'],
+                department=item['department'],
+                location=item['location'],
+                employment_type=item['type'],
+                description=item['description'],
+                is_active=True,
+                posted_at=datetime.now() - timedelta(days=random.randint(1, 30))
+            )
+            db.session.add(job)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} jobs")
+
+def seed_team():
+    """Create team member data"""
+    team = [
+        {'name': 'John Smith', 'role': 'CEO & Co-founder', 'bio': 'Former Goldman Sachs, 15 years in fintech.', 'image': 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400'},
+        {'name': 'Sarah Johnson', 'role': 'CTO', 'bio': 'Ex-Google engineer, AI/ML specialist.', 'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400'},
+        {'name': 'Michael Chen', 'role': 'Head of Product', 'bio': 'Product leader from Robinhood and Coinbase.', 'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'},
+        {'name': 'Emily Davis', 'role': 'Head of Design', 'bio': 'Award-winning designer, formerly at Apple.', 'image': 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400'},
+        {'name': 'David Kim', 'role': 'Head of Data', 'bio': 'Data scientist with experience at hedge funds.', 'image': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400'},
+    ]
+    
+    count = 0
+    for member in team:
+        existing = TeamMember.query.filter_by(name=member['name']).first()
+        if not existing:
+            tm = TeamMember(
+                name=member['name'],
+                role=member['role'],
+                bio=member['bio'],
+                image_url=member['image'],
+                is_active=True,
+                order_index=count
+            )
+            db.session.add(tm)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} team members")
+
+def seed_testimonials():
+    """Create testimonial data"""
+    testimonials = [
+        {'name': 'Alex Thompson', 'role': 'Day Trader', 'content': 'PeartoFinance has transformed how I analyze markets. The AI insights are incredibly accurate.', 'rating': 5},
+        {'name': 'Priya Sharma', 'role': 'Investor', 'content': 'The portfolio tracking tools are exceptional. I love the clean interface and real-time updates.', 'rating': 5},
+        {'name': 'James Wilson', 'role': 'Financial Advisor', 'content': 'I recommend this platform to all my clients. The educational content is top-notch.', 'rating': 4},
+        {'name': 'Maria Garcia', 'role': 'Beginner Investor', 'content': 'As someone new to investing, the learning resources helped me get started with confidence.', 'rating': 5},
+    ]
+    
+    count = 0
+    for item in testimonials:
+        existing = Testimonial.query.filter_by(name=item['name']).first()
+        if not existing:
+            testimonial = Testimonial(
+                name=item['name'],
+                role=item['role'],
+                content=item['content'],
+                rating=item['rating'],
+                is_featured=True,
+                is_approved=True
+            )
+            db.session.add(testimonial)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} testimonials")
 
 def seed_tool_settings():
     """Create tool settings data"""
     tools = [
-        # Investing Category
         {'slug': 'sip', 'name': 'SIP Calculator', 'category': 'Investing', 'implemented': True},
         {'slug': 'compound', 'name': 'Compound Interest Calculator', 'category': 'Investing', 'implemented': True},
+        {'slug': 'emi', 'name': 'Loan EMI Calculator', 'category': 'Finance & Loans', 'implemented': True},
         {'slug': 'goal-planner', 'name': 'Goal Planner', 'category': 'Investing', 'implemented': False},
         {'slug': 'lumpsum', 'name': 'Lumpsum Calculator', 'category': 'Investing', 'implemented': False},
-        {'slug': 'step-up-sip', 'name': 'Step-up SIP Calculator', 'category': 'Investing', 'implemented': False},
-        {'slug': 'mutual-fund-returns', 'name': 'Mutual Fund Returns', 'category': 'Investing', 'implemented': False},
-        {'slug': 'dividend-yield', 'name': 'Dividend Yield Calculator', 'category': 'Investing', 'implemented': False},
-        
-        # Finance & Loans
-        {'slug': 'emi', 'name': 'Loan EMI Calculator', 'category': 'Finance & Loans', 'implemented': True},
         {'slug': 'home-loan', 'name': 'Home Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
-        {'slug': 'car-loan', 'name': 'Car Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
-        {'slug': 'personal-loan', 'name': 'Personal Loan EMI', 'category': 'Finance & Loans', 'implemented': False},
-        {'slug': 'loan-eligibility', 'name': 'Loan Eligibility', 'category': 'Finance & Loans', 'implemented': False},
-        {'slug': 'prepayment-calculator', 'name': 'Loan Prepayment', 'category': 'Finance & Loans', 'implemented': False},
-        
-        # Taxation
         {'slug': 'income-tax', 'name': 'Income Tax Calculator', 'category': 'Taxation', 'implemented': False},
-        {'slug': 'hra-exemption', 'name': 'HRA Exemption Calculator', 'category': 'Taxation', 'implemented': False},
-        {'slug': 'capital-gains', 'name': 'Capital Gains Tax', 'category': 'Taxation', 'implemented': False},
-        {'slug': 'tax-regime-comparison', 'name': 'Old vs New Tax Regime', 'category': 'Taxation', 'implemented': False},
-        
-        # Retirement
         {'slug': 'retirement', 'name': 'Retirement Calculator', 'category': 'Retirement', 'implemented': False},
-        {'slug': 'pension', 'name': 'Pension Calculator', 'category': 'Retirement', 'implemented': False},
-        {'slug': 'nps', 'name': 'NPS Calculator', 'category': 'Retirement', 'implemented': False},
-        {'slug': 'epf', 'name': 'EPF Calculator', 'category': 'Retirement', 'implemented': False},
-        
-        # Insurance
         {'slug': 'life-insurance', 'name': 'Life Insurance Needs', 'category': 'Insurance', 'implemented': False},
-        {'slug': 'term-insurance', 'name': 'Term Insurance Planner', 'category': 'Insurance', 'implemented': False},
-        {'slug': 'health-premium', 'name': 'Health Premium Estimator', 'category': 'Insurance', 'implemented': False},
-        {'slug': 'car-insurance', 'name': 'Car Insurance Calculator', 'category': 'Insurance', 'implemented': False},
-        
-        # Personal Finance
         {'slug': 'budget-planner', 'name': 'Budget Planner', 'category': 'Personal Finance', 'implemented': False},
-        {'slug': 'emergency-fund', 'name': 'Emergency Fund Calculator', 'category': 'Personal Finance', 'implemented': False},
-        {'slug': 'net-worth', 'name': 'Net Worth Calculator', 'category': 'Personal Finance', 'implemented': False},
-        {'slug': 'inflation', 'name': 'Inflation Calculator', 'category': 'Personal Finance', 'implemented': False},
-        
-        # Debt
-        {'slug': 'credit-card-payoff', 'name': 'Credit Card Payoff', 'category': 'Debt', 'implemented': False},
-        {'slug': 'debt-snowball', 'name': 'Debt Snowball Calculator', 'category': 'Debt', 'implemented': False},
-        {'slug': 'debt-avalanche', 'name': 'Debt Avalanche Calculator', 'category': 'Debt', 'implemented': False},
-        
-        # Real Estate
-        {'slug': 'rent-vs-buy', 'name': 'Rent vs Buy Calculator', 'category': 'Real Estate', 'implemented': False},
-        {'slug': 'stamp-duty', 'name': 'Stamp Duty Calculator', 'category': 'Real Estate', 'implemented': False},
-        
-        # Health & Fitness
         {'slug': 'bmi', 'name': 'BMI Calculator', 'category': 'Health & Fitness', 'implemented': False},
-        {'slug': 'calorie-calculator', 'name': 'Calorie Calculator', 'category': 'Health & Fitness', 'implemented': False},
     ]
     
     count = 0
@@ -502,7 +599,7 @@ def seed_tool_settings():
                 enabled=True,
                 order_index=idx,
                 is_implemented=tool['implemented'],
-                country_code='GLOBAL'  # Available globally
+                country_code='GLOBAL'
             )
             db.session.add(tool_setting)
             count += 1
@@ -510,24 +607,112 @@ def seed_tool_settings():
     db.session.commit()
     print(f"✓ Seeded {count} tool settings")
 
+def seed_courses():
+    """Create course data"""
+    courses = [
+        {'title': 'Investing 101: Getting Started', 'description': 'Learn the basics of investing, from stocks to mutual funds.', 'level': 'Beginner', 'duration': 2, 'category': 'Investing'},
+        {'title': 'Technical Analysis Masterclass', 'description': 'Master chart patterns, indicators, and trading strategies.', 'level': 'Intermediate', 'duration': 5, 'category': 'Trading'},
+        {'title': 'Cryptocurrency Fundamentals', 'description': 'Understand blockchain, Bitcoin, and the crypto ecosystem.', 'level': 'Beginner', 'duration': 3, 'category': 'Crypto'},
+        {'title': 'Options Trading Strategies', 'description': 'Advanced options strategies for income and hedging.', 'level': 'Advanced', 'duration': 4, 'category': 'Trading'},
+        {'title': 'Personal Finance Basics', 'description': 'Budgeting, saving, and building wealth from scratch.', 'level': 'Beginner', 'duration': 2, 'category': 'Finance'},
+    ]
+    
+    count = 0
+    for item in courses:
+        existing = Course.query.filter_by(title=item['title']).first()
+        if not existing:
+            course = Course(
+                title=item['title'],
+                slug=item['title'].lower().replace(' ', '-').replace(':', ''),
+                description=item['description'],
+                level=item['level'],
+                category=item['category'],
+                duration_hours=item['duration'],
+                is_published=True,
+                is_free=True
+            )
+            db.session.add(course)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} courses")
+
+def seed_help_articles():
+    """Create help center articles"""
+    articles = [
+        {'title': 'Getting Started with PeartoFinance', 'content': 'Welcome to PeartoFinance! This guide will help you get started...', 'category': 'Getting Started'},
+        {'title': 'How to Read Stock Charts', 'content': 'Understanding stock charts is essential for making informed decisions...', 'category': 'Education'},
+        {'title': 'Setting Up Price Alerts', 'content': 'Never miss a price movement. Learn how to set up alerts...', 'category': 'Features'},
+        {'title': 'Understanding Your Portfolio', 'content': 'Your portfolio dashboard shows all your investments...', 'category': 'Features'},
+        {'title': 'Security Best Practices', 'content': 'Keep your account secure with these tips...', 'category': 'Security'},
+    ]
+    
+    # First create help categories
+    categories_created = 0
+    for article in articles:
+        cat = article['category']
+        existing = HelpCategory.query.filter_by(name=cat).first()
+        if not existing:
+            help_cat = HelpCategory(
+                name=cat,
+                slug=cat.lower().replace(' ', '-'),
+                description=f'Help articles about {cat}',
+                order_index=categories_created
+            )
+            db.session.add(help_cat)
+            categories_created += 1
+    
+    db.session.commit()
+    
+    # Then create articles
+    count = 0
+    for item in articles:
+        existing = HelpArticle.query.filter_by(title=item['title']).first()
+        if not existing:
+            cat = HelpCategory.query.filter_by(name=item['category']).first()
+            article = HelpArticle(
+                title=item['title'],
+                content=item['content'],
+                slug=item['title'].lower().replace(' ', '-').replace("'", ''),
+                category_id=cat.id if cat else None,
+                is_published=True
+            )
+            db.session.add(article)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {categories_created} help categories and {count} help articles")
+
 def run_seed():
     """Run all seed functions"""
     app = create_app()
     with app.app_context():
-        print("\n🌱 Starting database seeding...\n")
+        print("\n🌱 Starting comprehensive database seeding...\n")
         
         try:
+            # Market Data
             seed_market_data()
+            seed_forex_rates()
             seed_market_indices()
             seed_commodities()
             seed_stock_offers()
+            
+            # Content
             seed_news()
+            seed_trending_topics()
+            
+            # Media
             seed_tv_channels()
             seed_radio_stations()
-            seed_trending_topics()
+            
+            # Settings & Config
+            seed_countries()
             seed_tool_settings()
             
-            print("\n✅ Database seeding completed successfully!\n")
+            # Education
+            seed_courses()
+            
+            print("\n✅ Comprehensive database seeding completed successfully!\n")
         except Exception as e:
             print(f"\n❌ Error during seeding: {e}")
             db.session.rollback()

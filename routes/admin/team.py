@@ -3,22 +3,11 @@ Admin Team Management Routes
 CRUD for /api/admin/team
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
 from datetime import datetime
+from .auth import admin_required
 from models import db, TeamMember
 
 team_bp = Blueprint('admin_team', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 @team_bp.route('/team', methods=['GET'])

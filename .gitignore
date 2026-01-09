@@ -14,4 +14,5 @@ venv/
 .DS_Store
 
 # VS Code settings
-.vscode/
+config.bat
+node_modules

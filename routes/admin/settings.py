@@ -3,22 +3,11 @@ Admin Settings Routes
 CRUD for /api/admin/settings
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
 from datetime import datetime
+from .auth import admin_required
 from models import db, Settings, Appearance
 
 settings_bp = Blueprint('admin_settings', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 # ============ SETTINGS ============
