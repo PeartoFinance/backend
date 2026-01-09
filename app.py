@@ -60,6 +60,8 @@ from routes.verification import verification_bp
 from routes.devices import devices_bp
 from routes.tools import tools_bp
 from routes.admin import admin_bp
+from routes.activity import activity_bp
+from routes.pages import pages_bp
 from routes.media import media_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -77,6 +79,8 @@ app.register_blueprint(verification_bp, url_prefix='/api/user/verification')
 app.register_blueprint(devices_bp, url_prefix='/api/devices')
 app.register_blueprint(tools_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(activity_bp, url_prefix='/api')
+app.register_blueprint(pages_bp, url_prefix='/api')
 app.register_blueprint(media_bp)
 
 

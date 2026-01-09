@@ -1,0 +1,17 @@
+# Python Virtual Environment (DO NOT SHARE)
+.venv/
+venv/
+
+# Python Cache (DO NOT SHARE)
+**/__pycache__/
+*.py[cod]
+
+# Environment Variables
+# .env             <-- Commented out so it IS shared with your group
+.flaskenv
+
+# macOS System Files
+.DS_Store
+
+# VS Code settings
+.vscode/

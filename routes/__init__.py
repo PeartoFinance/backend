@@ -15,12 +15,15 @@ from .user import user_bp
 from .verification import verification_bp
 from .devices import devices_bp
 from .tools import tools_bp
+from .activity import activity_bp
+from .dashboard import dashboard_api_bp
+from .pages import pages_bp
 
 __all__ = [
-    'auth_bp', 
-    'stocks_bp', 
-    'crypto_bp', 
-    'news_bp', 
+    'auth_bp',
+    'stocks_bp',
+    'crypto_bp',
+    'news_bp',
     'geo_bp',
     'market_bp',
     'portfolio_bp',
@@ -30,7 +33,10 @@ __all__ = [
     'user_bp',
     'verification_bp',
     'devices_bp',
-    'tools_bp'
+    'tools_bp',
+    'activity_bp',
+    'dashboard_api_bp',
+    'pages_bp',
 ]
 
 
