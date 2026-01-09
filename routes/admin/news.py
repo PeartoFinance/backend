@@ -3,22 +3,11 @@ Admin News Management Routes
 CRUD for /api/admin/news
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
 from datetime import datetime
+from .auth import admin_required
 from models import db, NewsItem
 
 news_bp = Blueprint('admin_news', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 @news_bp.route('/news', methods=['GET'])

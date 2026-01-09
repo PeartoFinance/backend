@@ -3,21 +3,10 @@ Admin Tools Management Routes
 CRUD for /api/admin/tools
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
+from .auth import admin_required
 from models import db, ToolSettings
 
 tools_bp = Blueprint('admin_tools', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 @tools_bp.route('/tools', methods=['GET'])
@@ -28,24 +17,25 @@ def get_tools():
         tools = ToolSettings.query.order_by(ToolSettings.order_index).all()
         return jsonify({
             'tools': [{
-                'id': t.id,
                 'tool_slug': t.tool_slug,
+                'tool_name': t.tool_name,
                 'enabled': t.enabled,
                 'is_implemented': t.is_implemented,
                 'order_index': t.order_index,
-                'category': t.category,
+                'category': t.category or 'General',
+                'country_code': t.country_code,
             } for t in tools]
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
-@tools_bp.route('/tools/<int:tool_id>', methods=['PATCH'])
+@tools_bp.route('/tools/<tool_slug>', methods=['PATCH', 'PUT'])
 @admin_required
-def update_tool(tool_id):
-    """Update tool settings"""
+def update_tool(tool_slug):
+    """Update tool settings by slug"""
     try:
-        tool = ToolSettings.query.get_or_404(tool_id)
+        tool = ToolSettings.query.get_or_404(tool_slug)
         data = request.get_json()
         
         if 'enabled' in data:
@@ -58,26 +48,29 @@ def update_tool(tool_id):
             tool.category = data['category']
         
         db.session.commit()
-        return jsonify({'ok': True})
+        return jsonify({'ok': True, 'tool_slug': tool_slug, 'enabled': tool.enabled})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
-@tools_bp.route('/tools/bulk-toggle', methods=['POST'])
+@tools_bp.route('/tools/bulk', methods=['PUT', 'POST'])
 @admin_required
 def bulk_toggle_tools():
-    """Enable/disable multiple tools"""
+    """Enable/disable multiple tools by slugs"""
     try:
         data = request.get_json()
-        tool_ids = data.get('tool_ids', [])
+        slugs = data.get('slugs', [])
         enabled = data.get('enabled', True)
         
-        ToolSettings.query.filter(ToolSettings.id.in_(tool_ids)).update(
+        if not slugs:
+            return jsonify({'error': 'No slugs provided'}), 400
+        
+        ToolSettings.query.filter(ToolSettings.tool_slug.in_(slugs)).update(
             {'enabled': enabled}, synchronize_session=False
         )
         db.session.commit()
-        return jsonify({'ok': True, 'updated': len(tool_ids)})
+        return jsonify({'ok': True, 'updated': len(slugs)})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
