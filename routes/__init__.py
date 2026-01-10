@@ -40,5 +40,3 @@ __all__ = [
     'media_bp',
     'education_bp',
 ]
-
-
