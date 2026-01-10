@@ -5,7 +5,8 @@ Endpoints for market data, indices, commodities, and stock offers
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, asc
 from models import (
-    db, MarketData, MarketIndices, CommodityData, StockOffer
+    db, MarketData, MarketIndices, CommodityData, StockOffer,
+    Dividend, BulkTransaction
 )
 
 market_bp = Blueprint('market', __name__)
@@ -165,4 +166,32 @@ def get_market_stats():
         'totalVolume': total_volume,
         'totalCount': len(all_stocks),
     })
+
+
+@market_bp.route('/dividends', methods=['GET'])
+def get_dividends():
+    """Get proposed dividends from database."""
+    status = request.args.get('status')  # 'proposed', 'approved', 'paid'
+    limit = min(int(request.args.get('limit', 50)), 100)
+    
+    query = Dividend.query
+    if status:
+        query = query.filter(Dividend.status == status)
+    
+    dividends = query.order_by(desc(Dividend.created_at)).limit(limit).all()
+    return jsonify([d.to_dict() for d in dividends])
+
+
+@market_bp.route('/bulk-transactions', methods=['GET'])
+def get_bulk_transactions():
+    """Get bulk transactions from database."""
+    limit = min(int(request.args.get('limit', 50)), 100)
+    symbol = request.args.get('symbol')
+    
+    query = BulkTransaction.query
+    if symbol:
+        query = query.filter(BulkTransaction.symbol == symbol.upper())
+    
+    transactions = query.order_by(desc(BulkTransaction.transaction_date)).limit(limit).all()
+    return jsonify([t.to_dict() for t in transactions])
 
