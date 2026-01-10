@@ -1,0 +1,97 @@
+"""
+Admin Jobs Routes - Job listings management
+With country-specific filtering
+"""
+from flask import Blueprint, jsonify, request
+from .auth import admin_required
+from .country_filter import apply_country_filter, get_country_for_create
+from models import db, JobListing
+from datetime import datetime
+
+jobs_bp = Blueprint('admin_jobs', __name__)
+
+
+@jobs_bp.route('/jobs', methods=['GET'])
+@admin_required
+def get_jobs():
+    """List all job listings (country-filtered)"""
+    try:
+        query = JobListing.query.order_by(JobListing.created_at.desc())
+        query = apply_country_filter(query, JobListing)
+        jobs = query.all()
+        return jsonify({
+            'jobs': [{
+                'id': j.id,
+                'title': j.title,
+                'department': j.department,
+                'location': j.location,
+                'type': j.type,
+                'description': j.description,
+                'requirements': j.requirements,
+                'salary_range': j.salary_range,
+                'is_remote': j.is_remote,
+                'is_active': j.is_active,
+                'country_code': j.country_code,
+                'created_at': j.created_at.isoformat() if j.created_at else None
+            } for j in jobs]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@jobs_bp.route('/jobs', methods=['POST'])
+@admin_required
+def create_job():
+    """Create a job listing"""
+    try:
+        data = request.get_json()
+        job = JobListing(
+            title=data['title'],
+            department=data.get('department'),
+            location=data.get('location'),
+            type=data.get('type', 'full-time'),
+            description=data.get('description'),
+            requirements=data.get('requirements'),
+            salary_range=data.get('salary_range'),
+            is_remote=data.get('is_remote', False),
+            is_active=data.get('is_active', True),
+            country_code=data.get('country_code') or get_country_for_create()
+        )
+        db.session.add(job)
+        db.session.commit()
+        return jsonify({'ok': True, 'id': job.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@jobs_bp.route('/jobs/<int:id>', methods=['PUT', 'PATCH'])
+@admin_required
+def update_job(id):
+    """Update a job listing"""
+    try:
+        job = JobListing.query.get_or_404(id)
+        data = request.get_json()
+        for key in ['title', 'department', 'location', 'type', 'description', 
+                    'requirements', 'salary_range', 'is_remote', 'is_active']:
+            if key in data:
+                setattr(job, key, data[key])
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@jobs_bp.route('/jobs/<int:id>', methods=['DELETE'])
+@admin_required
+def delete_job(id):
+    """Delete a job listing"""
+    try:
+        job = JobListing.query.get_or_404(id)
+        db.session.delete(job)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

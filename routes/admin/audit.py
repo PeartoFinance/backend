@@ -3,21 +3,10 @@ Admin Audit Log Routes
 GET /api/admin/audit
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
+from .auth import admin_required
 from models import db, AuditEvent
 
 audit_bp = Blueprint('admin_audit', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return decorated
 
 
 @audit_bp.route('/audit', methods=['GET'])

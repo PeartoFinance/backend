@@ -33,6 +33,12 @@ from .market import (
     CommodityData,
     EconomicEvent,
     StockOffer,
+    StockPriceHistory,
+    EarningsCalendar,
+    AnalystRecommendation,
+    StockSplit,
+    Dividend,
+    BulkTransaction,
 )
 
 # Article/News models
@@ -102,6 +108,7 @@ from .media import (
     RadioStation,
     ForexRate,
     TrendingTopic,
+    SportsEvent,
 )
 
 # Admin/Vendor models
@@ -150,6 +157,8 @@ __all__ = [
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
+    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 'StockSplit',
+    'Dividend', 'BulkTransaction',
     # Article
     'Article', 'Post', 'PostCategory', 'NewsItem', 'RssFeed', 'RssItem', 'ContentProvider',
     # Education

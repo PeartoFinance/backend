@@ -1,0 +1,161 @@
+"""
+Education API Routes (Public)
+Courses, Instructors, and Learning resources
+"""
+from flask import Blueprint, jsonify, request
+from models import Course, Instructor, CourseModule
+from models.base import db
+
+education_bp = Blueprint('education', __name__)
+
+
+@education_bp.route('/courses', methods=['GET'])
+def get_courses():
+    """Get all published courses with optional filtering"""
+    try:
+        category = request.args.get('category')
+        level = request.args.get('level')
+        is_free = request.args.get('free')
+        search = request.args.get('search')
+        
+        query = Course.query.filter(Course.is_published == True)
+        
+        if category:
+            query = query.filter(Course.category == category)
+        if level:
+            query = query.filter(Course.level == level)
+        if is_free == 'true':
+            query = query.filter(Course.is_free == True)
+        if search:
+            query = query.filter(Course.title.ilike(f'%{search}%'))
+        
+        courses = query.order_by(Course.created_at.desc()).all()
+        
+        return jsonify({
+            'courses': [{
+                'id': c.id,
+                'title': c.title,
+                'slug': c.slug,
+                'description': c.description,
+                'category': c.category,
+                'level': c.level,
+                'durationHours': c.duration_hours,
+                'durationWeeks': c.duration_weeks,
+                'price': float(c.price) if c.price else 0,
+                'discountPrice': float(c.discount_price) if c.discount_price else None,
+                'thumbnailUrl': c.thumbnail_url,
+                'isFree': c.is_free,
+                'enrollmentCount': c.enrollment_count or 0,
+                'rating': float(c.rating) if c.rating else 0,
+                'ratingCount': c.rating_count or 0,
+                'instructorId': c.instructor_id
+            } for c in courses],
+            'total': len(courses)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@education_bp.route('/courses/<slug>', methods=['GET'])
+def get_course(slug):
+    """Get single course by slug with modules"""
+    try:
+        course = Course.query.filter(
+            Course.slug == slug,
+            Course.is_published == True
+        ).first()
+        
+        if not course:
+            return jsonify({'error': 'Course not found'}), 404
+        
+        # Get modules
+        modules = CourseModule.query.filter(
+            CourseModule.course_id == course.id
+        ).order_by(CourseModule.order_index).all()
+        
+        # Get instructor
+        instructor = None
+        if course.instructor_id:
+            inst = Instructor.query.get(course.instructor_id)
+            if inst:
+                instructor = {
+                    'id': inst.id,
+                    'name': inst.name,
+                    'title': inst.title,
+                    'bio': inst.bio,
+                    'avatarUrl': inst.avatar_url,
+                    'rating': float(inst.rating) if inst.rating else None
+                }
+        
+        return jsonify({
+            'id': course.id,
+            'title': course.title,
+            'slug': course.slug,
+            'description': course.description,
+            'longDescription': course.long_description,
+            'category': course.category,
+            'level': course.level,
+            'durationHours': course.duration_hours,
+            'durationWeeks': course.duration_weeks,
+            'price': float(course.price) if course.price else 0,
+            'discountPrice': float(course.discount_price) if course.discount_price else None,
+            'thumbnailUrl': course.thumbnail_url,
+            'videoUrl': course.video_url,
+            'isFree': course.is_free,
+            'enrollmentCount': course.enrollment_count or 0,
+            'rating': float(course.rating) if course.rating else 0,
+            'ratingCount': course.rating_count or 0,
+            'requirements': course.requirements or [],
+            'whatYouLearn': course.what_you_learn or [],
+            'instructor': instructor,
+            'modules': [{
+                'id': m.id,
+                'title': m.title,
+                'description': m.description,
+                'durationMinutes': m.duration_minutes,
+                'isFree': m.is_free
+            } for m in modules]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@education_bp.route('/instructors', methods=['GET'])
+def get_instructors():
+    """Get all active instructors"""
+    try:
+        instructors = Instructor.query.filter(
+            Instructor.is_active == True
+        ).order_by(Instructor.courses_count.desc()).all()
+        
+        return jsonify({
+            'instructors': [{
+                'id': i.id,
+                'name': i.name,
+                'title': i.title,
+                'bio': i.bio,
+                'avatarUrl': i.avatar_url,
+                'expertise': i.expertise,
+                'rating': float(i.rating) if i.rating else 0,
+                'studentsTaught': i.students_taught or 0,
+                'coursesCount': i.courses_count or 0
+            } for i in instructors]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@education_bp.route('/categories', methods=['GET'])
+def get_categories():
+    """Get unique course categories"""
+    try:
+        categories = db.session.query(Course.category).filter(
+            Course.is_published == True,
+            Course.category != None
+        ).distinct().all()
+        
+        return jsonify({
+            'categories': [c[0] for c in categories if c[0]]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

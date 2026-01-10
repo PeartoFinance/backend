@@ -5,7 +5,8 @@ Endpoints for market data, indices, commodities, and stock offers
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, asc
 from models import (
-    db, MarketData, MarketIndices, CommodityData, StockOffer
+    db, MarketData, MarketIndices, CommodityData, StockOffer,
+    Dividend, BulkTransaction
 )
 
 market_bp = Blueprint('market', __name__)
@@ -122,3 +123,75 @@ def get_all_stocks():
     
     stocks = query.limit(limit).all()
     return jsonify([s.to_dict() for s in stocks])
+
+
+@market_bp.route('/crypto', methods=['GET'])
+def get_crypto_markets():
+    """Alias for crypto markets under /api/market/crypto."""
+    limit = min(int(request.args.get('limit', 100)), 250)
+    page = max(int(request.args.get('page', 1)), 1)
+    sort_by = request.args.get('sort', 'market_cap')
+
+    offset = (page - 1) * limit
+
+    sort_map = {
+        'market_cap': MarketData.market_cap,
+        'price': MarketData.price,
+        'change': MarketData.change_percent,
+        'volume': MarketData.volume,
+    }
+    sort_column = sort_map.get(sort_by, MarketData.market_cap)
+
+    cryptos = MarketData.query.filter(
+        MarketData.asset_type == 'crypto'
+    ).order_by(desc(sort_column)).offset(offset).limit(limit).all()
+
+    return jsonify([c.to_dict() for c in cryptos])
+
+
+@market_bp.route('/stats', methods=['GET'])
+def get_market_stats():
+    """High-level market breadth stats for /api/market/stats."""
+    all_stocks = MarketData.query.filter(MarketData.asset_type == 'stock').all()
+
+    advancers = sum(1 for s in all_stocks if s.change_percent and s.change_percent > 0)
+    decliners = sum(1 for s in all_stocks if s.change_percent and s.change_percent < 0)
+    unchanged = len(all_stocks) - advancers - decliners
+    total_volume = sum(s.volume or 0 for s in all_stocks)
+
+    return jsonify({
+        'advancers': advancers,
+        'decliners': decliners,
+        'unchanged': unchanged,
+        'totalVolume': total_volume,
+        'totalCount': len(all_stocks),
+    })
+
+
+@market_bp.route('/dividends', methods=['GET'])
+def get_dividends():
+    """Get proposed dividends from database."""
+    status = request.args.get('status')  # 'proposed', 'approved', 'paid'
+    limit = min(int(request.args.get('limit', 50)), 100)
+    
+    query = Dividend.query
+    if status:
+        query = query.filter(Dividend.status == status)
+    
+    dividends = query.order_by(desc(Dividend.created_at)).limit(limit).all()
+    return jsonify([d.to_dict() for d in dividends])
+
+
+@market_bp.route('/bulk-transactions', methods=['GET'])
+def get_bulk_transactions():
+    """Get bulk transactions from database."""
+    limit = min(int(request.args.get('limit', 50)), 100)
+    symbol = request.args.get('symbol')
+    
+    query = BulkTransaction.query
+    if symbol:
+        query = query.filter(BulkTransaction.symbol == symbol.upper())
+    
+    transactions = query.order_by(desc(BulkTransaction.transaction_date)).limit(limit).all()
+    return jsonify([t.to_dict() for t in transactions])
+

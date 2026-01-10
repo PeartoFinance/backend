@@ -131,3 +131,47 @@ class TrendingTopic(db.Model):
             'sentiment': self.sentiment,
             'relatedSymbols': self.related_symbols
         }
+
+
+class SportsEvent(db.Model):
+    """Sports events - matches pearto.sports_events"""
+    __tablename__ = 'sports_events'
+    __table_args__ = {'extend_existing': True}
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(255), nullable=False)
+    sport_type = db.Column(db.String(50))  # cricket, football, basketball, etc.
+    league = db.Column(db.String(100))
+    team_home = db.Column(db.String(100))
+    team_away = db.Column(db.String(100))
+    score_home = db.Column(db.String(20))
+    score_away = db.Column(db.String(20))
+    event_date = db.Column(db.DateTime)
+    venue = db.Column(db.String(255))
+    status = db.Column(db.String(50), default='scheduled')  # scheduled, live, completed
+    stream_url = db.Column(db.Text)
+    thumbnail_url = db.Column(db.Text)
+    country_code = db.Column(db.String(10))
+    is_active = db.Column(db.Boolean, default=True)
+    is_live = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'sportType': self.sport_type,
+            'league': self.league,
+            'teamHome': self.team_home,
+            'teamAway': self.team_away,
+            'scoreHome': self.score_home,
+            'scoreAway': self.score_away,
+            'eventDate': self.event_date.isoformat() if self.event_date else None,
+            'venue': self.venue,
+            'status': self.status,
+            'streamUrl': self.stream_url,
+            'thumbnailUrl': self.thumbnail_url,
+            'countryCode': self.country_code,
+            'isActive': self.is_active,
+            'isLive': self.is_live
+        }

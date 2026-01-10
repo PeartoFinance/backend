@@ -18,8 +18,13 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config.SQLALCHEMY_ENGINE_OPTIONS
 # Initialize SQLAlchemy
 db.init_app(app)
 
-# Configure CORS - allow all origins
-CORS(app, origins="*", supports_credentials=True)
+# Configure CORS - allow all origins with explicit headers
+CORS(app, 
+     origins="*",
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country"],
+     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+     expose_headers=["Content-Type", "Authorization"])
 
 
 # Middleware to extract country from headers
@@ -55,6 +60,11 @@ from routes.verification import verification_bp
 from routes.devices import devices_bp
 from routes.tools import tools_bp
 from routes.admin import admin_bp
+from routes.activity import activity_bp
+from routes.pages import pages_bp
+from routes.media import media_bp
+from routes.education import education_bp
+from routes.ai import ai_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -71,6 +81,11 @@ app.register_blueprint(verification_bp, url_prefix='/api/user/verification')
 app.register_blueprint(devices_bp, url_prefix='/api/devices')
 app.register_blueprint(tools_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(activity_bp, url_prefix='/api')
+app.register_blueprint(pages_bp, url_prefix='/api')
+app.register_blueprint(media_bp)
+app.register_blueprint(education_bp, url_prefix='/api/education')
+app.register_blueprint(ai_bp, url_prefix='/api/ai')
 
 
 # Error handlers

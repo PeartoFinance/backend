@@ -4,6 +4,8 @@ News API Routes with SQLAlchemy
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, or_
+import random
+from urllib.parse import urlparse
 from models.article import NewsItem
 from models.base import db
 
@@ -49,14 +51,48 @@ def get_published_news():
 
 @news_bp.route('/headlines', methods=['GET'])
 def get_headlines():
-    """Get latest news headlines with country filtering"""
+    """Get latest news headlines with country filtering.
+
+    When the 'queries' param is present, returns grouped headlines per section:
+      /api/news/headlines?queries=business,markets&limitEach=6
+    Otherwise behaves like the original single list endpoint.
+    """
+    queries_param = request.args.get('queries')
+    if queries_param:
+        categories = [q.strip() for q in queries_param.split(',') if q.strip()]
+        limit_each = min(int(request.args.get('limitEach', 6)), 50)
+        country = getattr(request, 'user_country', 'US')
+
+        sections = {}
+        for category in categories:
+            query = NewsItem.query.filter(
+                NewsItem.curated_status == 'published',
+                NewsItem.category == category,
+                or_(
+                    NewsItem.country_code == country,
+                    NewsItem.country_code == 'GLOBAL',
+                    NewsItem.country_code == None,
+                ),
+            )
+            articles = query.order_by(
+                desc(NewsItem.featured),
+                desc(NewsItem.published_at),
+            ).limit(limit_each).all()
+            sections[category] = [a.to_dict() for a in articles]
+
+        return jsonify({
+            'sections': sections,
+            'limitEach': limit_each,
+        })
+
+    # --- original simple behaviour (unchanged) ---
     limit = min(int(request.args.get('limit', 20)), 100)
     page = max(int(request.args.get('page', 1)), 1)
     category = request.args.get('category')
     country = getattr(request, 'user_country', 'US')
-    
+
     offset = (page - 1) * limit
-    
+
     query = NewsItem.query.filter(
         NewsItem.curated_status == 'published',
         or_(
@@ -65,15 +101,15 @@ def get_headlines():
             NewsItem.country_code == None
         )
     )
-    
+
     if category:
         query = query.filter(NewsItem.category == category)
-    
+
     articles = query.order_by(
         desc(NewsItem.featured),
         desc(NewsItem.published_at)
     ).offset(offset).limit(limit).all()
-    
+
     return jsonify({
         'articles': [a.to_dict() for a in articles],
         'page': page,
@@ -197,3 +233,96 @@ def get_article_by_id(article_id):
         'featured': article.featured,
         'publishedAt': article.published_at.isoformat() if article.published_at else None
     })
+
+
+@news_bp.route('/sections', methods=['GET'])
+def get_sections():
+    """
+    Sectioned news endpoint for homepage.
+
+    Example:
+      /api/news/sections?queries=business,technology,world,markets&limit=12&random=8
+    """
+    queries_param = request.args.get('queries', '')
+    categories = [q.strip() for q in queries_param.split(',') if q.strip()]
+    limit_per_section = min(int(request.args.get('limit', 12)), 50)
+    random_count = int(request.args.get('random', 0))
+    country = getattr(request, 'user_country', 'US')
+
+    sections = {}
+    pool = []
+
+    for category in categories:
+        query = NewsItem.query.filter(
+            NewsItem.curated_status == 'published',
+            NewsItem.category == category,
+            or_(
+                NewsItem.country_code == country,
+                NewsItem.country_code == 'GLOBAL',
+                NewsItem.country_code == None,
+            ),
+        )
+        articles = query.order_by(
+            desc(NewsItem.featured),
+            desc(NewsItem.published_at),
+        ).limit(limit_per_section).all()
+
+        items = [a.to_dict() for a in articles]
+        sections[category] = items
+        pool.extend(items)
+
+    random_items = []
+    if random_count > 0 and pool:
+        random_items = random.sample(pool, k=min(random_count, len(pool)))
+
+    return jsonify({
+        'sections': sections,
+        'random': random_items,
+        'limit': limit_per_section,
+    })
+
+
+@news_bp.route('/global-latest', methods=['GET'])
+def get_global_latest():
+    """
+    Get latest global news with per-host cap.
+
+    /api/news/global-latest?limit=50&perHost=4
+    """
+    limit = min(int(request.args.get('limit', 50)), 200)
+    per_host = max(int(request.args.get('perHost', 4)), 1)
+
+    query = NewsItem.query.filter(
+        NewsItem.curated_status == 'published',
+        or_(
+            NewsItem.country_code == 'GLOBAL',
+            NewsItem.country_code == None,
+        ),
+    ).order_by(desc(NewsItem.published_at)).all()
+
+    seen_per_host = {}
+    items = []
+
+    for article in query:
+        canonical_url = getattr(article, 'canonical_url', None) or getattr(article, 'url', None)
+        if canonical_url:
+            host = urlparse(canonical_url).netloc or 'unknown'
+        else:
+            host = getattr(article, 'source', None) or 'unknown'
+
+        count = seen_per_host.get(host, 0)
+        if count >= per_host:
+            continue
+
+        seen_per_host[host] = count + 1
+        items.append(article.to_dict())
+
+        if len(items) >= limit:
+            break
+
+    return jsonify({
+        'items': items,
+        'limit': limit,
+        'perHost': per_host,
+    })
+

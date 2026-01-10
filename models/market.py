@@ -1,13 +1,13 @@
 """
 Market Data Models (Stocks, Crypto, Forex, Commodities)
-PeartoFinance Backend - Matches actual database schema
+PeartoFinance Backend - Enhanced for yfinance integration
 """
 from datetime import datetime
 from .base import db
 
 
 class MarketData(db.Model):
-    """General market data - matches sina_finance.market_data table exactly"""
+    """General market data - enhanced for yfinance integration"""
     __tablename__ = 'market_data'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -29,6 +29,29 @@ class MarketData(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
     country_code = db.Column(db.String(2), default='US')
     
+    # Additional fields for yfinance data
+    sector = db.Column(db.String(100))
+    industry = db.Column(db.String(100))
+    open_price = db.Column(db.Numeric(18, 6))
+    previous_close = db.Column(db.Numeric(18, 6))
+    day_high = db.Column(db.Numeric(18, 6))
+    day_low = db.Column(db.Numeric(18, 6))
+    avg_volume = db.Column(db.BigInteger)
+    beta = db.Column(db.Numeric(10, 4))
+    forward_pe = db.Column(db.Numeric(10, 4))
+    trailing_pe = db.Column(db.Numeric(10, 4))
+    eps = db.Column(db.Numeric(18, 6))
+    dividend_yield = db.Column(db.Numeric(10, 4))
+    dividend_rate = db.Column(db.Numeric(18, 6))
+    book_value = db.Column(db.Numeric(18, 6))
+    price_to_book = db.Column(db.Numeric(10, 4))
+    shares_outstanding = db.Column(db.BigInteger)
+    float_shares = db.Column(db.BigInteger)
+    short_ratio = db.Column(db.Numeric(10, 4))
+    logo_url = db.Column(db.String(500))
+    website = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -46,8 +69,31 @@ class MarketData(db.Model):
             'exchange': self.exchange,
             'assetType': self.asset_type,
             'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
-            'countryCode': self.country_code
+            'countryCode': self.country_code,
+            # Additional fields
+            'sector': self.sector,
+            'industry': self.industry,
+            'open': float(self.open_price) if self.open_price else None,
+            'previousClose': float(self.previous_close) if self.previous_close else None,
+            'dayHigh': float(self.day_high) if self.day_high else None,
+            'dayLow': float(self.day_low) if self.day_low else None,
+            'avgVolume': self.avg_volume,
+            'beta': float(self.beta) if self.beta else None,
+            'forwardPe': float(self.forward_pe) if self.forward_pe else None,
+            'trailingPe': float(self.trailing_pe) if self.trailing_pe else None,
+            'eps': float(self.eps) if self.eps else None,
+            'dividendYield': float(self.dividend_yield) if self.dividend_yield else None,
+            'dividendRate': float(self.dividend_rate) if self.dividend_rate else None,
+            'bookValue': float(self.book_value) if self.book_value else None,
+            'priceToBook': float(self.price_to_book) if self.price_to_book else None,
+            'sharesOutstanding': self.shares_outstanding,
+            'floatShares': self.float_shares,
+            'shortRatio': float(self.short_ratio) if self.short_ratio else None,
+            'logoUrl': self.logo_url,
+            'website': self.website,
+            'description': self.description,
         }
+
 
 
 class MarketIndices(db.Model):
@@ -208,7 +254,7 @@ class EconomicEvent(db.Model):
 
 
 class StockOffer(db.Model):
-    """Stock offerings (IPO, FPO, etc.)"""
+    """Stock offerings (IPO, FPO, etc.) - enhanced for yfinance IPO calendar"""
     __tablename__ = 'stock_offers'
     
     id = db.Column(db.String(255), primary_key=True)
@@ -224,4 +270,241 @@ class StockOffer(db.Model):
     status = db.Column(db.Enum('upcoming', 'open', 'closed', 'listed'))
     prospectus_url = db.Column(db.Text)
     country_code = db.Column(db.String(10))
+    exchange = db.Column(db.String(50))
+    deal_type = db.Column(db.String(50))  # From yfinance: 'Priced', 'Filed', etc.
+    shares_offered = db.Column(db.BigInteger)
+    offer_price = db.Column(db.Numeric(18, 6))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'companyName': self.company_name,
+            'offerType': self.offer_type,
+            'priceRange': self.price_range,
+            'units': self.units,
+            'openDate': self.open_date.isoformat() if self.open_date else None,
+            'closeDate': self.close_date.isoformat() if self.close_date else None,
+            'listingDate': self.listing_date.isoformat() if self.listing_date else None,
+            'status': self.status,
+            'exchange': self.exchange,
+            'dealType': self.deal_type,
+            'sharesOffered': self.shares_offered,
+            'offerPrice': float(self.offer_price) if self.offer_price else None,
+        }
+
+
+class StockPriceHistory(db.Model):
+    """Historical OHLCV price data from yfinance"""
+    __tablename__ = 'stock_price_history'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False, index=True)
+    open_price = db.Column(db.Numeric(18, 6))
+    high = db.Column(db.Numeric(18, 6))
+    low = db.Column(db.Numeric(18, 6))
+    close = db.Column(db.Numeric(18, 6))
+    adj_close = db.Column(db.Numeric(18, 6))
+    volume = db.Column(db.BigInteger)
+    interval = db.Column(db.String(10), default='1d')  # 1d, 1h, 5m, etc.
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.UniqueConstraint('symbol', 'date', 'interval', name='uq_symbol_date_interval'),
+    )
+
+    def to_dict(self):
+        return {
+            'symbol': self.symbol,
+            'date': self.date.isoformat() if self.date else None,
+            'open': float(self.open_price) if self.open_price else None,
+            'high': float(self.high) if self.high else None,
+            'low': float(self.low) if self.low else None,
+            'close': float(self.close) if self.close else None,
+            'adjClose': float(self.adj_close) if self.adj_close else None,
+            'volume': self.volume,
+            'interval': self.interval,
+        }
+
+
+class EarningsCalendar(db.Model):
+    """Earnings calendar events from yfinance"""
+    __tablename__ = 'earnings_calendar'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    company_name = db.Column(db.String(255))
+    earnings_date = db.Column(db.DateTime, nullable=False)
+    eps_estimate = db.Column(db.Numeric(18, 6))
+    eps_actual = db.Column(db.Numeric(18, 6))
+    surprise_percent = db.Column(db.Numeric(10, 4))
+    revenue_estimate = db.Column(db.BigInteger)
+    revenue_actual = db.Column(db.BigInteger)
+    market_cap = db.Column(db.BigInteger)
+    before_after_market = db.Column(db.String(20))  # 'BMO', 'AMC', 'TNS'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'companyName': self.company_name,
+            'earningsDate': self.earnings_date.isoformat() if self.earnings_date else None,
+            'epsEstimate': float(self.eps_estimate) if self.eps_estimate else None,
+            'epsActual': float(self.eps_actual) if self.eps_actual else None,
+            'surprisePercent': float(self.surprise_percent) if self.surprise_percent else None,
+            'revenueEstimate': self.revenue_estimate,
+            'revenueActual': self.revenue_actual,
+            'marketCap': self.market_cap,
+            'beforeAfterMarket': self.before_after_market,
+        }
+
+
+class AnalystRecommendation(db.Model):
+    """Analyst recommendations and price targets from yfinance"""
+    __tablename__ = 'analyst_recommendations'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    firm = db.Column(db.String(100))
+    to_grade = db.Column(db.String(50))  # 'Buy', 'Hold', 'Sell', etc.
+    from_grade = db.Column(db.String(50))
+    action = db.Column(db.String(50))  # 'up', 'down', 'main', 'init'
+    date = db.Column(db.Date)
+    # Price targets
+    target_high = db.Column(db.Numeric(18, 6))
+    target_low = db.Column(db.Numeric(18, 6))
+    target_mean = db.Column(db.Numeric(18, 6))
+    target_median = db.Column(db.Numeric(18, 6))
+    current_price = db.Column(db.Numeric(18, 6))
+    # Summary counts
+    strong_buy = db.Column(db.Integer, default=0)
+    buy = db.Column(db.Integer, default=0)
+    hold = db.Column(db.Integer, default=0)
+    sell = db.Column(db.Integer, default=0)
+    strong_sell = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'firm': self.firm,
+            'toGrade': self.to_grade,
+            'fromGrade': self.from_grade,
+            'action': self.action,
+            'date': self.date.isoformat() if self.date else None,
+            'targetHigh': float(self.target_high) if self.target_high else None,
+            'targetLow': float(self.target_low) if self.target_low else None,
+            'targetMean': float(self.target_mean) if self.target_mean else None,
+            'targetMedian': float(self.target_median) if self.target_median else None,
+            'currentPrice': float(self.current_price) if self.current_price else None,
+            'strongBuy': self.strong_buy,
+            'buy': self.buy,
+            'hold': self.hold,
+            'sell': self.sell,
+            'strongSell': self.strong_sell,
+        }
+
+
+class StockSplit(db.Model):
+    """Stock split events from yfinance calendar"""
+    __tablename__ = 'stock_splits'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    company_name = db.Column(db.String(255))
+    split_date = db.Column(db.Date, nullable=False)
+    split_ratio = db.Column(db.String(20))  # e.g., '4:1', '2:1'
+    numerator = db.Column(db.Integer)
+    denominator = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'companyName': self.company_name,
+            'splitDate': self.split_date.isoformat() if self.split_date else None,
+            'splitRatio': self.split_ratio,
+            'numerator': self.numerator,
+            'denominator': self.denominator,
+        }
+
+
+class Dividend(db.Model):
+    """Proposed dividend announcements"""
+    __tablename__ = 'dividends'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    company_name = db.Column(db.String(255))
+    dividend_type = db.Column(db.Enum('cash', 'bonus', 'both'), default='cash')
+    cash_percent = db.Column(db.Numeric(10, 4), default=0)
+    bonus_percent = db.Column(db.Numeric(10, 4), default=0)
+    total_percent = db.Column(db.Numeric(10, 4), default=0)
+    dividend_amount = db.Column(db.Numeric(18, 6))  # Per share amount
+    ex_dividend_date = db.Column(db.Date)
+    record_date = db.Column(db.Date)
+    payment_date = db.Column(db.Date)
+    book_closure_date = db.Column(db.Date)
+    fiscal_year = db.Column(db.String(20))
+    status = db.Column(db.Enum('proposed', 'approved', 'paid'), default='proposed')
+    country_code = db.Column(db.String(5), default='US')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'companyName': self.company_name,
+            'dividendType': self.dividend_type,
+            'cashPercent': float(self.cash_percent) if self.cash_percent else 0,
+            'bonusPercent': float(self.bonus_percent) if self.bonus_percent else 0,
+            'totalPercent': float(self.total_percent) if self.total_percent else 0,
+            'dividendAmount': float(self.dividend_amount) if self.dividend_amount else None,
+            'exDividendDate': self.ex_dividend_date.isoformat() if self.ex_dividend_date else None,
+            'recordDate': self.record_date.isoformat() if self.record_date else None,
+            'paymentDate': self.payment_date.isoformat() if self.payment_date else None,
+            'bookClosureDate': self.book_closure_date.isoformat() if self.book_closure_date else None,
+            'fiscalYear': self.fiscal_year,
+            'status': self.status,
+        }
+
+
+class BulkTransaction(db.Model):
+    """Bulk/block transactions - large institutional trades"""
+    __tablename__ = 'bulk_transactions'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    company_name = db.Column(db.String(255))
+    transaction_date = db.Column(db.DateTime, default=datetime.utcnow)
+    buyer_broker = db.Column(db.Integer)  # Broker number
+    seller_broker = db.Column(db.Integer)  # Broker number
+    quantity = db.Column(db.BigInteger)
+    price = db.Column(db.Numeric(18, 6))
+    amount = db.Column(db.Numeric(20, 2))  # Total transaction value
+    change_percent = db.Column(db.Numeric(10, 4))
+    transaction_type = db.Column(db.Enum('bulk', 'block', 'cross'), default='bulk')
+    exchange = db.Column(db.String(50))
+    country_code = db.Column(db.String(5), default='US')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'companyName': self.company_name,
+            'transactionDate': self.transaction_date.isoformat() if self.transaction_date else None,
+            'buyerBroker': self.buyer_broker,
+            'sellerBroker': self.seller_broker,
+            'quantity': self.quantity,
+            'price': float(self.price) if self.price else None,
+            'amount': float(self.amount) if self.amount else None,
+            'changePercent': float(self.change_percent) if self.change_percent else None,
+            'transactionType': self.transaction_type,
+            'exchange': self.exchange,
+        }

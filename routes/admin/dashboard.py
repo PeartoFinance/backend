@@ -3,23 +3,10 @@ Admin Dashboard Routes
 GET /api/admin/stats - Dashboard statistics
 """
 from flask import Blueprint, jsonify, request
-from functools import wraps
+from .auth import admin_required
 from models import db, User, NewsItem, ToolSettings, Post, Page, Subscriber, AuditEvent
 
 dashboard_bp = Blueprint('admin_dashboard', __name__)
-
-
-def admin_required(f):
-    """Decorator to require admin authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        # Check for admin secret header or session
-        admin_secret = request.headers.get('X-Admin-Secret')
-        if not admin_secret:
-            return jsonify({'error': 'Unauthorized'}), 401
-        # TODO: Validate against actual admin secret from config
-        return f(*args, **kwargs)
-    return decorated
 
 
 @dashboard_bp.route('/stats', methods=['GET'])
