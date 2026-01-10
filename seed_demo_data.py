@@ -16,6 +16,8 @@ from models.article import NewsItem
 from models.settings import ToolSettings, Country
 from models.misc import FAQ, FAQItem, GlossaryTerm, Job, TeamMember, Testimonial, MarketingCampaign
 from models.education import Course, CourseModule, Instructor, HelpCategory, HelpArticle
+from models.user import User, Role
+import bcrypt
 
 # Try to import SportsEvent if it exists
 try:
@@ -787,7 +789,67 @@ def seed_help_articles():
             count += 1
     
     db.session.commit()
+    db.session.commit()
     print(f"✓ Seeded {categories_created} help categories and {count} help articles")
+
+def seed_roles():
+    """Create user roles"""
+    roles = [
+        {'name': 'admin', 'description': 'Administrator with full access', 'is_system': True, 'permissions': {'all': True}},
+        {'name': 'user', 'description': 'Standard user', 'is_system': True, 'permissions': {'read': True}},
+        {'name': 'editor', 'description': 'Content editor', 'is_system': False, 'permissions': {'read': True, 'write': True}},
+    ]
+    
+    count = 0
+    for r in roles:
+        existing = Role.query.filter_by(name=r['name']).first()
+        if not existing:
+            role = Role(
+                name=r['name'],
+                description=r['description'],
+                is_system=r['is_system'],
+                permissions=r['permissions']
+            )
+            db.session.add(role)
+            count += 1
+            
+    db.session.commit()
+    print(f"✓ Seeded {count} roles")
+
+def seed_users():
+    """Create initial users"""
+    # Default password for all seeded users: 'password123'
+    # Admin password: 'admin123'
+    
+    users = [
+        {'name': 'Admin User', 'email': 'admin@pearto.com', 'password': 'admin123', 'role': 'admin', 'country': 'US'},
+        {'name': 'John Doe', 'email': 'john@example.com', 'password': 'password123', 'role': 'user', 'country': 'US'},
+        {'name': 'Jane Smith', 'email': 'jane@example.com', 'password': 'password123', 'role': 'user', 'country': 'UK'},
+        {'name': 'Rahul Sharma', 'email': 'rahul@example.com', 'password': 'password123', 'role': 'user', 'country': 'IN'},
+    ]
+    
+    count = 0
+    for u in users:
+        existing = User.query.filter_by(email=u['email']).first()
+        if not existing:
+            # Hash password
+            salt = bcrypt.gensalt()
+            hashed = bcrypt.hashpw(u['password'].encode('utf-8'), salt).decode('utf-8')
+            
+            user = User(
+                name=u['name'],
+                email=u['email'],
+                password=hashed,
+                role=u['role'],
+                country_code=u['country'],
+                active=1,
+                email_verified=True
+            )
+            db.session.add(user)
+            count += 1
+            
+    db.session.commit()
+    print(f"✓ Seeded {count} users")
 
 def run_seed():
     """Run all seed functions"""
@@ -797,31 +859,102 @@ def run_seed():
         
         try:
             # Market Data
-            seed_market_data()
-            seed_forex_rates()
-            seed_market_indices()
-            seed_commodities()
-            seed_stock_offers()
+            try:
+                seed_market_data()
+            except Exception as e:
+                print(f"❌ Market Data failed: {e}")
+                
+            try:
+                seed_forex_rates()
+            except Exception as e:
+                print(f"❌ Forex Rates failed: {e}")
+
+            try:
+                seed_market_indices()
+            except Exception as e:
+                print(f"❌ Market Indices failed: {e}")
+
+            try:
+                seed_commodities()
+            except Exception as e:
+                print(f"❌ Commodities failed: {e}")
+
+            try:
+                seed_stock_offers()
+            except Exception as e:
+                print(f"❌ Stock Offers failed: {e}")
             
             # Content
-            seed_news()
-            seed_trending_topics()
+            try:
+                seed_news()
+            except Exception as e:
+                print(f"❌ News failed: {e}")
+
+            try:
+                seed_trending_topics()
+            except Exception as e:
+                print(f"❌ Trending Topics failed: {e}")
             
             # Media
-            seed_tv_channels()
-            seed_radio_stations()
-            seed_sports_events()
+            try:
+                seed_tv_channels()
+            except Exception as e:
+                print(f"❌ TV Channels failed: {e}")
+
+            try:
+                seed_radio_stations()
+            except Exception as e:
+                print(f"❌ Radio Stations failed: {e}")
+
+            try:
+                seed_sports_events()
+            except Exception as e:
+                print(f"❌ Sports Events failed: {e}")
             
             # Settings & Config
-            seed_countries()
-            seed_tool_settings()
+            try:
+                seed_countries()
+            except Exception as e:
+                print(f"❌ Countries failed: {e}")
+
+            try:
+                seed_tool_settings()
+            except Exception as e:
+                print(f"❌ Tool Settings failed: {e}")
             
             # Education
-            seed_instructors()
-            seed_courses()
-            seed_course_modules()
+            try:
+                seed_instructors()
+            except Exception as e:
+                print(f"❌ Instructors failed: {e}")
+
+            try:
+                seed_courses()
+            except Exception as e:
+                print(f"❌ Courses failed: {e}")
+
+            try:
+                seed_course_modules()
+            except Exception as e:
+                print(f"❌ Course Modules failed: {e}")
             
-            print("\n✅ Comprehensive database seeding completed successfully!\n")
+            try:
+                seed_help_articles()
+            except Exception as e:
+                print(f"❌ Help Articles failed: {e}")
+            
+            # Users & Roles
+            try:
+                seed_roles()
+            except Exception as e:
+                print(f"❌ Roles failed: {e}")
+
+            try:
+                seed_users()
+            except Exception as e:
+                print(f"❌ Users failed: {e}")
+            
+            print("\n✅ Seeding process finished!")
         except Exception as e:
             print(f"\n❌ Error during seeding: {e}")
             db.session.rollback()

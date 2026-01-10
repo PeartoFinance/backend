@@ -2,7 +2,7 @@
 User-related Database Models
 PeartoFinance Backend
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from .base import db
 
 
@@ -16,13 +16,13 @@ class User(db.Model):
     password = db.Column(db.String(255))
     role = db.Column(db.String(50), nullable=False, default='user')
     active = db.Column(db.SmallInteger, default=1)
-    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
-    updatedAt = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    createdAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updatedAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     forceReset = db.Column(db.SmallInteger, default=0)
     firebase_uid = db.Column(db.String(255))
     avatar_url = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login_at = db.Column(db.DateTime)
     account_status = db.Column(db.Enum('active', 'deactivated', 'suspended', 'deleted'), default='active')
     deactivated_at = db.Column(db.DateTime)
@@ -72,7 +72,7 @@ class PasswordResetToken(db.Model):
     token = db.Column(db.String(255), nullable=False, unique=True)
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserSession(db.Model):
@@ -85,8 +85,8 @@ class UserSession(db.Model):
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.Text)
     expires_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    last_activity = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserDevice(db.Model):
@@ -101,7 +101,7 @@ class UserDevice(db.Model):
     platform = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, default=True)
     last_used_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserActivity(db.Model):
@@ -115,7 +115,7 @@ class UserActivity(db.Model):
     entity_id = db.Column(db.String(255))
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserAlert(db.Model):
@@ -133,7 +133,7 @@ class UserAlert(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     notify_email = db.Column(db.Boolean, default=True)
     notify_push = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserNotificationPref(db.Model):
@@ -148,8 +148,8 @@ class UserNotificationPref(db.Model):
     push_alerts = db.Column(db.Boolean, default=True)
     push_news = db.Column(db.Boolean, default=True)
     sms_alerts = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class UserDashboardConfig(db.Model):
@@ -161,8 +161,8 @@ class UserDashboardConfig(db.Model):
     layout = db.Column(db.JSON)
     widgets = db.Column(db.JSON)
     theme = db.Column(db.String(50), default='dark')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class UserDocument(db.Model):
@@ -177,7 +177,7 @@ class UserDocument(db.Model):
     reviewed_by = db.Column(db.Integer)
     reviewed_at = db.Column(db.DateTime)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserSavedTerm(db.Model):
@@ -187,7 +187,7 @@ class UserSavedTerm(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     term_id = db.Column(db.Integer, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class UserEconomicEvent(db.Model):
@@ -198,7 +198,7 @@ class UserEconomicEvent(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     event_id = db.Column(db.String(255), nullable=False)
     notify_before = db.Column(db.Integer, default=30)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class LoginEvent(db.Model):
@@ -213,7 +213,7 @@ class LoginEvent(db.Model):
     location = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=True)
     failure_reason = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Role(db.Model):
@@ -225,4 +225,4 @@ class Role(db.Model):
     description = db.Column(db.Text)
     permissions = db.Column(db.JSON)
     is_system = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))

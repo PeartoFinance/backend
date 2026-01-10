@@ -2,12 +2,15 @@
 Admin User Management Routes
 CRUD for /api/admin/users
 """
+import bcrypt
 from flask import Blueprint, jsonify, request
-from datetime import datetime
-from .auth import admin_required
+from datetime import datetime, timezone
 from models import db, User, Role
 
 users_bp = Blueprint('admin_users', __name__)
+
+
+from ..decorators import admin_required
 
 
 @users_bp.route('/users', methods=['GET'])
@@ -17,16 +20,7 @@ def get_users():
     try:
         users = User.query.order_by(User.created_at.desc()).limit(500).all()
         return jsonify({
-            'users': [{
-                'id': u.id,
-                'name': u.name,
-                'email': u.email,
-                'role': u.role,
-                'is_active': u.is_active,
-                'is_verified': u.is_verified,
-                'avatar_url': u.avatar_url,
-                'created_at': u.created_at.isoformat() if u.created_at else None,
-            } for u in users]
+            'users': [u.to_dict() for u in users]
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -38,18 +32,7 @@ def get_user(user_id):
     """Get single user"""
     try:
         user = User.query.get_or_404(user_id)
-        return jsonify({
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'role': user.role,
-            'is_active': user.is_active,
-            'is_verified': user.is_verified,
-            'avatar_url': user.avatar_url,
-            'phone': user.phone,
-            'country_code': user.country_code,
-            'created_at': user.created_at.isoformat() if user.created_at else None,
-        })
+        return jsonify(user.to_dict())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -60,14 +43,21 @@ def create_user():
     """Create new user"""
     try:
         data = request.get_json()
+        password = data.get('password')
+        if not password:
+            return jsonify({'error': 'Password is required'}), 400
+            
+        # Hash password
+        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         user = User(
             name=data.get('name'),
             email=data.get('email'),
-            password_hash=data.get('password', ''),  # Should hash this
+            password=password_hash,
             role=data.get('role', 'user'),
-            is_active=data.get('is_active', True),
+            active=data.get('is_active', 1),
             country_code=data.get('country_code', 'US'),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.session.add(user)
         db.session.commit()
@@ -90,11 +80,11 @@ def update_user(user_id):
         if 'role' in data:
             user.role = data['role']
         if 'is_active' in data:
-            user.is_active = data['is_active']
+            user.active = 1 if data['is_active'] else 0
         if 'is_verified' in data:
-            user.is_verified = data['is_verified']
+            user.email_verified = data['is_verified']
         
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.session.commit()
         return jsonify({'ok': True})
     except Exception as e:

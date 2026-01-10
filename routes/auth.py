@@ -7,10 +7,11 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 import jwt
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from config import config
 from models import db, User, PasswordResetToken
 from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email
+from .decorators import auth_required
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -40,12 +41,12 @@ def login():
         'user_id': user.id,
         'email': user.email,
         'role': user.role,
-        'exp': datetime.utcnow() + timedelta(hours=config.JWT_EXPIRY_HOURS)
+        'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
     token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
     
     # Update last login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     db.session.commit()
     
     # Send login notification email (async, don't block response)
@@ -124,7 +125,7 @@ def forgot_password():
         reset_token = PasswordResetToken(
             user_id=user.id,
             token=token_value,
-            expires_at=datetime.utcnow() + timedelta(hours=1)
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
         )
         db.session.add(reset_token)
         db.session.commit()
@@ -154,7 +155,7 @@ def reset_password():
     # Find valid token
     reset_token = PasswordResetToken.query.filter(
         PasswordResetToken.token == token,
-        PasswordResetToken.expires_at > datetime.utcnow(),
+        PasswordResetToken.expires_at > datetime.now(timezone.utc),
         PasswordResetToken.used == False
     ).first()
     
@@ -172,27 +173,10 @@ def reset_password():
 
 
 @auth_bp.route('/me', methods=['GET'])
+@auth_required
 def get_current_user():
     """Get current user from token"""
-    auth_header = request.headers.get('Authorization', '')
-    
-    if not auth_header.startswith('Bearer '):
-        return jsonify({'error': 'No token provided'}), 401
-    
-    token = auth_header.split(' ')[1]
-    
-    try:
-        payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
-        user = User.query.get(payload['user_id'])
-        
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-        
-        return jsonify(user.to_dict())
-    except jwt.ExpiredSignatureError:
-        return jsonify({'error': 'Token expired'}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({'error': 'Invalid token'}), 401
+    return jsonify(request.user.to_dict())
 
 
 @auth_bp.route('/google-signin', methods=['POST'])
@@ -219,7 +203,7 @@ def google_signin():
         if avatar_url and not user.avatar_url:
             user.avatar_url = avatar_url
         
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         db.session.commit()
         
         print(f'[Auth] ✅ Google login: {email}')
@@ -233,7 +217,7 @@ def google_signin():
             firebase_uid=firebase_uid,
             avatar_url=avatar_url,
             email_verified=True,  # Google verified
-            email_verified_at=datetime.utcnow(),
+            email_verified_at=datetime.now(timezone.utc),
             country_code=request.user_country
         )
         db.session.add(user)
@@ -252,7 +236,7 @@ def google_signin():
         'user_id': user.id,
         'email': user.email,
         'role': user.role,
-        'exp': datetime.utcnow() + timedelta(hours=config.JWT_EXPIRY_HOURS)
+        'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
     token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
     
