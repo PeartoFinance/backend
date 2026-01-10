@@ -102,6 +102,7 @@ from .media import (
     RadioStation,
     ForexRate,
     TrendingTopic,
+    SportsEvent,
 )
 
 # Admin/Vendor models

@@ -63,6 +63,8 @@ from routes.admin import admin_bp
 from routes.activity import activity_bp
 from routes.pages import pages_bp
 from routes.media import media_bp
+from routes.education import education_bp
+from routes.ai import ai_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -82,6 +84,8 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(activity_bp, url_prefix='/api')
 app.register_blueprint(pages_bp, url_prefix='/api')
 app.register_blueprint(media_bp)
+app.register_blueprint(education_bp, url_prefix='/api/education')
+app.register_blueprint(ai_bp, url_prefix='/api/ai')
 
 
 # Error handlers

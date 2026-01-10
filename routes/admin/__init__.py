@@ -17,6 +17,7 @@ from .support import support_bp
 from .jobs import jobs_bp
 from .market import market_bp
 from .media import media_bp
+from .education import education_admin_bp
 
 # Main admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -36,5 +37,6 @@ admin_bp.register_blueprint(support_bp)
 admin_bp.register_blueprint(jobs_bp)
 admin_bp.register_blueprint(market_bp)
 admin_bp.register_blueprint(media_bp)
+admin_bp.register_blueprint(education_admin_bp)
 
 __all__ = ['admin_bp']

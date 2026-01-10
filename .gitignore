@@ -15,3 +15,5 @@ venv/
 
 # VS Code settings
 .vscode/
+*.zip
+*.zip

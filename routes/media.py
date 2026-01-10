@@ -148,23 +148,23 @@ def get_sports_events():
         return jsonify([{
             'id': str(e.id),
             'name': e.name,
-            'description': e.description,
-            'category': e.category,
+            'sportType': e.sport_type,
+            'league': e.league,
             'status': e.status,
-            'logo': e.logo_url,
-            'embed_url': e.embed_url,
             'venue': e.venue,
-            'match_type': e.match_type,
-            'team_home': e.team_home,
-            'team_away': e.team_away,
-            'score_home': e.score_home,
-            'score_away': e.score_away,
-            'event_date': e.event_date.isoformat() if e.event_date else None,
-            'result': e.result,
-            'series': e.series
+            'teamHome': e.team_home,
+            'teamAway': e.team_away,
+            'scoreHome': e.score_home,
+            'scoreAway': e.score_away,
+            'eventDate': e.event_date.isoformat() if e.event_date else None,
+            'streamUrl': e.stream_url,
+            'thumbnailUrl': e.thumbnail_url,
+            'countryCode': e.country_code,
+            'isLive': e.is_live
         } for e in events])
     except ImportError:
         # SportsEvent model doesn't exist yet, return empty list
         return jsonify([])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+

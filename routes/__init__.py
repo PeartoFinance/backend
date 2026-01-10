@@ -16,8 +16,9 @@ from .verification import verification_bp
 from .devices import devices_bp
 from .tools import tools_bp
 from .activity import activity_bp
-from .dashboard import dashboard_api_bp
 from .pages import pages_bp
+from .media import media_bp
+from .education import education_bp
 
 __all__ = [
     'auth_bp',
@@ -35,8 +36,9 @@ __all__ = [
     'devices_bp',
     'tools_bp',
     'activity_bp',
-    'dashboard_api_bp',
     'pages_bp',
+    'media_bp',
+    'education_bp',
 ]
 
 

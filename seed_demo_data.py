@@ -335,12 +335,33 @@ def seed_sports_events():
         return
     
     events = [
-        {'name': 'India vs Australia - 3rd Test', 'description': 'Border-Gavaskar Trophy 2024-25', 'category': 'Cricket', 'status': 'Live', 'venue': 'Melbourne Cricket Ground', 'team_home': 'India', 'team_away': 'Australia', 'series': 'Border-Gavaskar Trophy'},
-        {'name': 'Manchester United vs Liverpool', 'description': 'Premier League 2024-25', 'category': 'Football', 'status': 'Upcoming', 'venue': 'Old Trafford', 'team_home': 'Manchester United', 'team_away': 'Liverpool', 'match_type': 'League'},
-        {'name': 'Nepal vs UAE - T20', 'description': 'ACC Premier Cup 2024', 'category': 'Cricket', 'status': 'Upcoming', 'venue': 'TU Cricket Ground', 'team_home': 'Nepal', 'team_away': 'UAE', 'series': 'ACC Premier Cup'},
-        {'name': 'Real Madrid vs Barcelona', 'description': 'La Liga 2024-25', 'category': 'Football', 'status': 'Upcoming', 'venue': 'Santiago Bernabéu', 'team_home': 'Real Madrid', 'team_away': 'Barcelona', 'match_type': 'League'},
-        {'name': 'NBA: Lakers vs Warriors', 'description': 'NBA Regular Season', 'category': 'Basketball', 'status': 'Live', 'venue': 'Crypto.com Arena', 'team_home': 'Lakers', 'team_away': 'Warriors', 'match_type': 'Regular'},
-        {'name': 'Australian Open Finals', 'description': 'Grand Slam 2024', 'category': 'Tennis', 'status': 'Upcoming', 'venue': 'Rod Laver Arena', 'match_type': 'Final'},
+        # Cricket Events
+        {'name': 'India vs Australia - 3rd Test', 'sport_type': 'cricket', 'league': 'Border-Gavaskar Trophy', 'status': 'live', 'venue': 'Melbourne Cricket Ground', 'team_home': 'India', 'team_away': 'Australia', 'score_home': '250/6', 'score_away': '474', 'country_code': 'GLOBAL', 'is_live': True},
+        {'name': 'Nepal vs UAE - T20', 'sport_type': 'cricket', 'league': 'ACC Premier Cup', 'status': 'scheduled', 'venue': 'TU Cricket Ground', 'team_home': 'Nepal', 'team_away': 'UAE', 'country_code': 'NP', 'is_live': False},
+        {'name': 'England vs New Zealand - ODI', 'sport_type': 'cricket', 'league': 'ODI Series', 'status': 'scheduled', 'venue': 'Lords Cricket Ground', 'team_home': 'England', 'team_away': 'New Zealand', 'country_code': 'GB', 'is_live': False},
+        {'name': 'Pakistan vs South Africa - Test', 'sport_type': 'cricket', 'league': 'Test Championship', 'status': 'completed', 'venue': 'National Stadium Karachi', 'team_home': 'Pakistan', 'team_away': 'South Africa', 'score_home': '320', 'score_away': '295', 'country_code': 'GLOBAL', 'is_live': False},
+        
+        # Football Events
+        {'name': 'Manchester United vs Liverpool', 'sport_type': 'football', 'league': 'Premier League', 'status': 'scheduled', 'venue': 'Old Trafford', 'team_home': 'Manchester United', 'team_away': 'Liverpool', 'country_code': 'GB', 'is_live': False},
+        {'name': 'Real Madrid vs Barcelona', 'sport_type': 'football', 'league': 'La Liga', 'status': 'scheduled', 'venue': 'Santiago Bernabéu', 'team_home': 'Real Madrid', 'team_away': 'Barcelona', 'country_code': 'ES', 'is_live': False},
+        {'name': 'Bayern Munich vs Dortmund', 'sport_type': 'football', 'league': 'Bundesliga', 'status': 'live', 'venue': 'Allianz Arena', 'team_home': 'Bayern Munich', 'team_away': 'Borussia Dortmund', 'score_home': '2', 'score_away': '1', 'country_code': 'DE', 'is_live': True},
+        {'name': 'PSG vs Marseille', 'sport_type': 'football', 'league': 'Ligue 1', 'status': 'scheduled', 'venue': 'Parc des Princes', 'team_home': 'Paris Saint-Germain', 'team_away': 'Olympique Marseille', 'country_code': 'FR', 'is_live': False},
+        {'name': 'Inter Milan vs AC Milan', 'sport_type': 'football', 'league': 'Serie A', 'status': 'completed', 'venue': 'San Siro', 'team_home': 'Inter Milan', 'team_away': 'AC Milan', 'score_home': '3', 'score_away': '2', 'country_code': 'IT', 'is_live': False},
+        
+        # Basketball Events
+        {'name': 'Lakers vs Warriors', 'sport_type': 'basketball', 'league': 'NBA', 'status': 'live', 'venue': 'Crypto.com Arena', 'team_home': 'Los Angeles Lakers', 'team_away': 'Golden State Warriors', 'score_home': '87', 'score_away': '92', 'country_code': 'US', 'is_live': True},
+        {'name': 'Celtics vs Bucks', 'sport_type': 'basketball', 'league': 'NBA', 'status': 'scheduled', 'venue': 'TD Garden', 'team_home': 'Boston Celtics', 'team_away': 'Milwaukee Bucks', 'country_code': 'US', 'is_live': False},
+        {'name': 'Bulls vs 76ers', 'sport_type': 'basketball', 'league': 'NBA', 'status': 'completed', 'venue': 'United Center', 'team_home': 'Chicago Bulls', 'team_away': 'Philadelphia 76ers', 'score_home': '105', 'score_away': '112', 'country_code': 'US', 'is_live': False},
+        
+        # Tennis Events
+        {'name': 'Australian Open - Mens Final', 'sport_type': 'tennis', 'league': 'Grand Slam', 'status': 'scheduled', 'venue': 'Rod Laver Arena', 'team_home': 'Djokovic', 'team_away': 'Sinner', 'country_code': 'GLOBAL', 'is_live': False},
+        {'name': 'Wimbledon - Womens Semifinal', 'sport_type': 'tennis', 'league': 'Grand Slam', 'status': 'completed', 'venue': 'Centre Court', 'team_home': 'Swiatek', 'team_away': 'Sabalenka', 'score_home': '6-4, 6-3', 'score_away': '-', 'country_code': 'GLOBAL', 'is_live': False},
+        
+        # Hockey Events
+        {'name': 'India vs Pakistan - Asia Cup', 'sport_type': 'hockey', 'league': 'Asia Cup', 'status': 'scheduled', 'venue': 'Dhaka Hockey Stadium', 'team_home': 'India', 'team_away': 'Pakistan', 'country_code': 'GLOBAL', 'is_live': False},
+        
+        # Rugby Events
+        {'name': 'New Zealand vs Australia', 'sport_type': 'rugby', 'league': 'Bledisloe Cup', 'status': 'scheduled', 'venue': 'Eden Park', 'team_home': 'All Blacks', 'team_away': 'Wallabies', 'country_code': 'GLOBAL', 'is_live': False},
     ]
     
     count = 0
@@ -349,17 +370,18 @@ def seed_sports_events():
         if not existing:
             sports_event = SportsEvent(
                 name=event['name'],
-                description=event['description'],
-                category=event['category'],
-                status=event['status'],
+                sport_type=event.get('sport_type'),
+                league=event.get('league'),
+                status=event.get('status', 'scheduled'),
                 venue=event.get('venue'),
                 team_home=event.get('team_home'),
                 team_away=event.get('team_away'),
-                series=event.get('series'),
-                match_type=event.get('match_type'),
+                score_home=event.get('score_home'),
+                score_away=event.get('score_away'),
                 is_active=True,
+                is_live=event.get('is_live', False),
                 event_date=datetime.now() + timedelta(days=random.randint(-2, 7)),
-                country_code='GLOBAL'
+                country_code=event.get('country_code', 'GLOBAL')
             )
             db.session.add(sports_event)
             count += 1
@@ -607,15 +629,57 @@ def seed_tool_settings():
     db.session.commit()
     print(f"✓ Seeded {count} tool settings")
 
+def seed_instructors():
+    """Create instructor data"""
+    from models.education import Instructor
+    
+    instructors = [
+        {'name': 'Dr. Sarah Chen', 'title': 'Investment Strategist', 'bio': 'Former Goldman Sachs portfolio manager with 15+ years of experience in equity research and portfolio management.', 'expertise': 'Stocks, ETFs, Portfolio Management'},
+        {'name': 'Michael Rodriguez', 'title': 'Trading Expert', 'bio': 'Professional day trader and technical analyst. Has trained over 5,000 students worldwide.', 'expertise': 'Technical Analysis, Day Trading'},
+        {'name': 'Emma Thompson', 'title': 'Crypto Educator', 'bio': 'Early Bitcoin adopter and blockchain consultant. Former lead at Coinbase education team.', 'expertise': 'Cryptocurrency, DeFi, Blockchain'},
+        {'name': 'James Wilson', 'title': 'Financial Planner', 'bio': 'Certified Financial Planner (CFP) with expertise in retirement planning and wealth management.', 'expertise': 'Personal Finance, Retirement'},
+    ]
+    
+    count = 0
+    for item in instructors:
+        existing = Instructor.query.filter_by(name=item['name']).first()
+        if not existing:
+            instructor = Instructor(
+                name=item['name'],
+                title=item['title'],
+                bio=item['bio'],
+                expertise=item['expertise'],
+                is_active=True,
+                rating=4.5 + random.random() * 0.5,
+                students_taught=random.randint(500, 5000),
+                courses_count=random.randint(2, 8)
+            )
+            db.session.add(instructor)
+            count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} instructors")
+
 def seed_courses():
     """Create course data"""
+    from models.education import Instructor
+    
     courses = [
-        {'title': 'Investing 101: Getting Started', 'description': 'Learn the basics of investing, from stocks to mutual funds.', 'level': 'Beginner', 'duration': 2, 'category': 'Investing'},
-        {'title': 'Technical Analysis Masterclass', 'description': 'Master chart patterns, indicators, and trading strategies.', 'level': 'Intermediate', 'duration': 5, 'category': 'Trading'},
-        {'title': 'Cryptocurrency Fundamentals', 'description': 'Understand blockchain, Bitcoin, and the crypto ecosystem.', 'level': 'Beginner', 'duration': 3, 'category': 'Crypto'},
-        {'title': 'Options Trading Strategies', 'description': 'Advanced options strategies for income and hedging.', 'level': 'Advanced', 'duration': 4, 'category': 'Trading'},
-        {'title': 'Personal Finance Basics', 'description': 'Budgeting, saving, and building wealth from scratch.', 'level': 'Beginner', 'duration': 2, 'category': 'Finance'},
+        {'title': 'Investing 101: Getting Started', 'description': 'Learn the basics of investing, from stocks to mutual funds. This comprehensive course covers everything you need to know to start your investment journey.', 'level': 'Beginner', 'duration': 4, 'category': 'Investing', 'free': True},
+        {'title': 'Technical Analysis Masterclass', 'description': 'Master chart patterns, indicators, and trading strategies used by professional traders.', 'level': 'Intermediate', 'duration': 8, 'category': 'Trading', 'free': False, 'price': 99},
+        {'title': 'Cryptocurrency Fundamentals', 'description': 'Understand blockchain technology, Bitcoin, Ethereum, and the entire crypto ecosystem.', 'level': 'Beginner', 'duration': 5, 'category': 'Crypto', 'free': True},
+        {'title': 'Options Trading Strategies', 'description': 'Advanced options strategies for income generation and portfolio hedging.', 'level': 'Advanced', 'duration': 10, 'category': 'Trading', 'free': False, 'price': 149},
+        {'title': 'Personal Finance Basics', 'description': 'Master budgeting, saving, and building wealth from scratch with practical strategies.', 'level': 'Beginner', 'duration': 3, 'category': 'Finance', 'free': True},
+        {'title': 'Stock Market Fundamentals', 'description': 'Deep dive into how the stock market works, valuation methods, and stock picking.', 'level': 'Beginner', 'duration': 6, 'category': 'Investing', 'free': True},
+        {'title': 'Forex Trading Essentials', 'description': 'Learn currency trading, pip calculations, and forex market dynamics.', 'level': 'Intermediate', 'duration': 7, 'category': 'Trading', 'free': False, 'price': 79},
+        {'title': 'Retirement Planning Guide', 'description': 'Plan for a secure retirement with strategies for 401k, IRA, and pension optimization.', 'level': 'Intermediate', 'duration': 4, 'category': 'Finance', 'free': True},
+        {'title': 'DeFi & Web3 Deep Dive', 'description': 'Explore decentralized finance, smart contracts, and the future of web3.', 'level': 'Advanced', 'duration': 8, 'category': 'Crypto', 'free': False, 'price': 129},
+        {'title': 'Value Investing Like Warren Buffett', 'description': 'Learn the principles of value investing from the greatest investor of all time.', 'level': 'Intermediate', 'duration': 6, 'category': 'Investing', 'free': False, 'price': 89},
     ]
+    
+    # Get first instructor for assigning
+    first_instructor = Instructor.query.first()
+    instructor_id = first_instructor.id if first_instructor else None
     
     count = 0
     for item in courses:
@@ -623,19 +687,61 @@ def seed_courses():
         if not existing:
             course = Course(
                 title=item['title'],
-                slug=item['title'].lower().replace(' ', '-').replace(':', ''),
+                slug=item['title'].lower().replace(' ', '-').replace(':', '').replace("'", ''),
                 description=item['description'],
                 level=item['level'],
                 category=item['category'],
                 duration_hours=item['duration'],
                 is_published=True,
-                is_free=True
+                is_free=item.get('free', True),
+                price=item.get('price', 0),
+                instructor_id=instructor_id,
+                enrollment_count=random.randint(100, 2000),
+                rating=4.0 + random.random() * 1.0,
+                rating_count=random.randint(20, 200)
             )
             db.session.add(course)
             count += 1
     
     db.session.commit()
     print(f"✓ Seeded {count} courses")
+
+
+def seed_course_modules():
+    """Create course modules for curriculum"""
+    from models.education import CourseModule
+    
+    # Get all courses
+    courses = Course.query.all()
+    
+    module_templates = [
+        {'title': 'Introduction & Overview', 'description': 'Get started with the fundamentals and understand the course structure.', 'duration': 30, 'free': True},
+        {'title': 'Core Concepts', 'description': 'Deep dive into the essential concepts you need to master.', 'duration': 45, 'free': False},
+        {'title': 'Practical Application', 'description': 'Apply what you learned through hands-on exercises.', 'duration': 60, 'free': False},
+        {'title': 'Advanced Strategies', 'description': 'Take your skills to the next level with advanced techniques.', 'duration': 55, 'free': False},
+        {'title': 'Real-World Case Studies', 'description': 'Learn from real examples and case studies.', 'duration': 40, 'free': False},
+        {'title': 'Final Project & Assessment', 'description': 'Complete your learning with a comprehensive project.', 'duration': 50, 'free': False},
+    ]
+    
+    count = 0
+    for course in courses:
+        # Check if course already has modules
+        existing = CourseModule.query.filter_by(course_id=course.id).first()
+        if not existing:
+            for idx, template in enumerate(module_templates):
+                module = CourseModule(
+                    course_id=course.id,
+                    title=template['title'],
+                    description=template['description'],
+                    order_index=idx,
+                    duration_minutes=template['duration'],
+                    is_free=template['free']
+                )
+                db.session.add(module)
+                count += 1
+    
+    db.session.commit()
+    print(f"✓ Seeded {count} course modules")
 
 def seed_help_articles():
     """Create help center articles"""
@@ -704,13 +810,16 @@ def run_seed():
             # Media
             seed_tv_channels()
             seed_radio_stations()
+            seed_sports_events()
             
             # Settings & Config
             seed_countries()
             seed_tool_settings()
             
             # Education
+            seed_instructors()
             seed_courses()
+            seed_course_modules()
             
             print("\n✅ Comprehensive database seeding completed successfully!\n")
         except Exception as e:
