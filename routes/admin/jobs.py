@@ -3,8 +3,7 @@ Admin Jobs Routes - Job listings management
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
-from .country_filter import apply_country_filter, get_country_for_create
+from ..decorators import admin_required
 from models import db, JobListing
 from datetime import datetime
 
@@ -16,9 +15,11 @@ jobs_bp = Blueprint('admin_jobs', __name__)
 def get_jobs():
     """List all job listings (country-filtered)"""
     try:
-        query = JobListing.query.order_by(JobListing.created_at.desc())
-        query = apply_country_filter(query, JobListing)
-        jobs = query.all()
+        country = getattr(request, 'user_country', 'US')
+        jobs = JobListing.query.filter(
+            (JobListing.country_code == country) | 
+            (JobListing.country_code == 'GLOBAL')
+        ).order_by(JobListing.created_at.desc()).all()
         return jsonify({
             'jobs': [{
                 'id': j.id,
@@ -55,7 +56,7 @@ def create_job():
             salary_range=data.get('salary_range'),
             is_remote=data.get('is_remote', False),
             is_active=data.get('is_active', True),
-            country_code=data.get('country_code') or get_country_for_create()
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(job)
         db.session.commit()
@@ -73,7 +74,7 @@ def update_job(id):
         job = JobListing.query.get_or_404(id)
         data = request.get_json()
         for key in ['title', 'department', 'location', 'type', 'description', 
-                    'requirements', 'salary_range', 'is_remote', 'is_active']:
+                    'requirements', 'salary_range', 'is_remote', 'is_active', 'country_code']:
             if key in data:
                 setattr(job, key, data[key])
         db.session.commit()

@@ -4,7 +4,7 @@ CRUD for pages, posts, categories
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from .auth import admin_required
+from ..decorators import admin_required
 from models import db, Page, Post, PostCategory
 
 content_bp = Blueprint('admin_content', __name__)
@@ -17,7 +17,11 @@ content_bp = Blueprint('admin_content', __name__)
 def get_pages():
     """List all pages"""
     try:
-        pages = Page.query.order_by(Page.created_at.desc()).all()
+        country = getattr(request, 'user_country', 'US')
+        pages = Page.query.filter(
+            (Page.country_code == country) | 
+            (Page.country_code == 'GLOBAL')
+        ).order_by(Page.created_at.desc()).all()
         return jsonify({
             'pages': [{
                 'id': p.id,
@@ -43,7 +47,8 @@ def create_page():
             slug=data.get('slug'),
             content=data.get('content'),
             is_published=data.get('is_published', False),
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(page)
         db.session.commit()
@@ -69,6 +74,8 @@ def update_page(page_id):
             page.content = data['content']
         if 'is_published' in data:
             page.is_published = data['is_published']
+        if 'country_code' in data:
+            page.country_code = data['country_code']
         
         page.updated_at = datetime.utcnow()
         db.session.commit()
@@ -99,7 +106,11 @@ def delete_page(page_id):
 def get_posts():
     """List all posts"""
     try:
-        posts = Post.query.order_by(Post.created_at.desc()).limit(500).all()
+        country = getattr(request, 'user_country', 'US')
+        posts = Post.query.filter(
+            (Post.country_code == country) | 
+            (Post.country_code == 'GLOBAL')
+        ).order_by(Post.created_at.desc()).limit(500).all()
         return jsonify({
             'posts': [{
                 'id': p.id,
@@ -128,7 +139,8 @@ def create_post():
             excerpt=data.get('excerpt'),
             status=data.get('status', 'draft'),
             featured_image=data.get('featured_image'),
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(post)
         db.session.commit()
@@ -146,7 +158,7 @@ def update_post(post_id):
         post = Post.query.get_or_404(post_id)
         data = request.get_json()
         
-        for field in ['title', 'slug', 'content', 'excerpt', 'status', 'featured_image']:
+        for field in ['title', 'slug', 'content', 'excerpt', 'status', 'featured_image', 'country_code']:
             if field in data:
                 setattr(post, field, data[field])
         

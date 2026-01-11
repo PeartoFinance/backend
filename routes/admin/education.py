@@ -4,37 +4,30 @@ Admin Education Routes (CRUD for Courses, Instructors)
 from flask import Blueprint, jsonify, request
 from models import Course, Instructor, CourseModule
 from models.base import db
-from routes.admin.country_filter import get_country_context, apply_country_filter
+from ..decorators import admin_required
+from routes.admin.country_filter import get_country_context
 
-education_admin_bp = Blueprint('education_admin', __name__, url_prefix='/api/admin/education')
-
-
-def require_admin():
-    """Simple admin auth check"""
-    secret = request.headers.get('X-Admin-Secret')
-    import os
-    if secret != os.getenv('ADMIN_SECRET_KEY', 'pearto-admin-secret-2024'):
-        return False
-    return True
-
+education_admin_bp = Blueprint('education_admin', __name__, url_prefix='/education')
 
 # ===== COURSES =====
 
 @education_admin_bp.route('/courses', methods=['GET'])
+@admin_required
 def list_courses():
     """List all courses with filtering"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
-        country, is_global = get_country_context(request)
-        query = Course.query
-        
-        if not is_global:
-            query = apply_country_filter(query, Course, country)
-        
+        is_global, header_country = get_country_context()
+        if not is_global and header_country:
+            country = header_country
+        else:
+            country = getattr(request, 'user_country', 'US')
+
+        query = Course.query.filter(
+            (Course.country_code == country) | (Course.country_code == 'GLOBAL')
+        )
+
         courses = query.order_by(Course.created_at.desc()).all()
-        
+
         return jsonify({
             'courses': [{
                 'id': c.id,
@@ -60,15 +53,25 @@ def list_courses():
 
 
 @education_admin_bp.route('/courses', methods=['POST'])
+@admin_required
 def create_course():
     """Create a new course"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         data = request.get_json()
-        country, _ = get_country_context(request)
-        
+        payload_country = data.get('countryCode')
+        if payload_country:
+            country = payload_country
+        else:
+            is_global, header_country = get_country_context()
+            if not is_global and header_country:
+                country = header_country
+            else:
+                country = getattr(request, 'user_country', 'US')
+        instructor_id = data.get("instructorId")
+
+        if not Instructor.query.get(instructor_id):
+            return jsonify({"error": "Instructor does not exist"}), 400
+
         course = Course(
             title=data.get('title'),
             slug=data.get('slug') or data.get('title', '').lower().replace(' ', '-'),
@@ -103,11 +106,9 @@ def create_course():
 
 
 @education_admin_bp.route('/courses/<int:course_id>', methods=['PUT'])
+@admin_required
 def update_course(course_id):
     """Update a course"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         course = Course.query.get(course_id)
         if not course:
@@ -140,11 +141,9 @@ def update_course(course_id):
 
 
 @education_admin_bp.route('/courses/<int:course_id>', methods=['DELETE'])
+@admin_required
 def delete_course(course_id):
     """Delete a course"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         course = Course.query.get(course_id)
         if not course:
@@ -161,20 +160,22 @@ def delete_course(course_id):
 # ===== INSTRUCTORS =====
 
 @education_admin_bp.route('/instructors', methods=['GET'])
+@admin_required
 def list_instructors():
     """List all instructors"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
-        country, is_global = get_country_context(request)
-        query = Instructor.query
-        
-        if not is_global:
-            query = apply_country_filter(query, Instructor, country)
-        
+        is_global, header_country = get_country_context()
+        if not is_global and header_country:
+            country = header_country
+        else:
+            country = getattr(request, 'user_country', 'US')
+
+        query = Instructor.query.filter(
+            (Instructor.country_code == country) | (Instructor.country_code == 'GLOBAL')
+        )
+
         instructors = query.order_by(Instructor.name).all()
-        
+
         return jsonify({
             'instructors': [{
                 'id': i.id,
@@ -195,15 +196,20 @@ def list_instructors():
 
 
 @education_admin_bp.route('/instructors', methods=['POST'])
+@admin_required
 def create_instructor():
     """Create a new instructor"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         data = request.get_json()
-        country, _ = get_country_context(request)
-        
+        payload_country = data.get('countryCode')
+        if payload_country:
+            country = payload_country
+        else:
+            is_global, header_country = get_country_context()
+            if not is_global and header_country:
+                country = header_country
+            else:
+                country = getattr(request, 'user_country', 'US')
         instructor = Instructor(
             name=data.get('name'),
             title=data.get('title'),
@@ -227,11 +233,9 @@ def create_instructor():
 
 
 @education_admin_bp.route('/instructors/<int:instructor_id>', methods=['PUT'])
+@admin_required
 def update_instructor(instructor_id):
     """Update an instructor"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         instructor = Instructor.query.get(instructor_id)
         if not instructor:
@@ -260,11 +264,9 @@ def update_instructor(instructor_id):
 
 
 @education_admin_bp.route('/instructors/<int:instructor_id>', methods=['DELETE'])
+@admin_required
 def delete_instructor(instructor_id):
     """Delete an instructor"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         instructor = Instructor.query.get(instructor_id)
         if not instructor:
@@ -281,28 +283,30 @@ def delete_instructor(instructor_id):
 # ===== STATS =====
 
 @education_admin_bp.route('/stats', methods=['GET'])
+@admin_required
 def get_stats():
     """Get education stats"""
-    if not require_admin():
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
-        country, is_global = get_country_context(request)
-        
-        courses_query = Course.query
-        instructors_query = Instructor.query
-        
-        if not is_global:
-            courses_query = apply_country_filter(courses_query, Course, country)
-            instructors_query = apply_country_filter(instructors_query, Instructor, country)
-        
+        is_global, header_country = get_country_context()
+        if not is_global and header_country:
+            country = header_country
+        else:
+            country = getattr(request, 'user_country', 'US')
+
+        courses_query = Course.query.filter(
+            (Course.country_code == country) | (Course.country_code == 'GLOBAL')
+        )
+        instructors_query = Instructor.query.filter(
+            (Instructor.country_code == country) | (Instructor.country_code == 'GLOBAL')
+        )
+
         total_courses = courses_query.count()
         published_courses = courses_query.filter(Course.is_published == True).count()
         total_instructors = instructors_query.count()
         total_enrollments = db.session.query(
             db.func.sum(Course.enrollment_count)
         ).scalar() or 0
-        
+
         return jsonify({
             'totalCourses': total_courses,
             'publishedCourses': published_courses,

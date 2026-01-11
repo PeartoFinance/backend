@@ -3,8 +3,7 @@ Admin Marketing Routes - Subscribers, Affiliates, Campaigns
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
-from .country_filter import get_country_context, apply_country_filter, get_country_for_create
+from ..decorators import admin_required
 from models import db, Subscriber, Affiliate, MarketingCampaign
 import uuid
 from datetime import datetime
@@ -21,9 +20,11 @@ marketing_bp = Blueprint('admin_marketing', __name__)
 def get_subscribers():
     """List all subscribers (country-filtered)"""
     try:
-        query = Subscriber.query.order_by(Subscriber.subscribed_at.desc())
-        query = apply_country_filter(query, Subscriber)
-        subs = query.limit(500).all()
+        country = getattr(request, 'user_country', 'US')
+        subs = Subscriber.query.filter(
+            (Subscriber.country_code == country) | 
+            (Subscriber.country_code == 'GLOBAL')
+        ).order_by(Subscriber.subscribed_at.desc()).limit(500).all()
         return jsonify({
             'subscribers': [{
                 'id': s.id,
@@ -52,7 +53,7 @@ def create_subscriber():
             is_verified=data.get('is_verified', False),
             is_active=data.get('is_active', True),
             source=data.get('source', 'admin'),
-            country_code=data.get('country_code') or get_country_for_create()
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(sub)
         db.session.commit()
@@ -75,6 +76,8 @@ def update_subscriber(id):
             sub.is_active = data['is_active']
         if 'is_verified' in data:
             sub.is_verified = data['is_verified']
+        if 'country_code' in data:
+            sub.country_code = data['country_code']
         db.session.commit()
         return jsonify({'ok': True})
     except Exception as e:
@@ -105,9 +108,11 @@ def delete_subscriber(id):
 def get_affiliates():
     """List all affiliates (country-filtered)"""
     try:
-        query = Affiliate.query
-        query = apply_country_filter(query, Affiliate)
-        affs = query.all()
+        country = getattr(request, 'user_country', 'US')
+        affs = Affiliate.query.filter(
+            (Affiliate.country_code == country) | 
+            (Affiliate.country_code == 'GLOBAL')
+        ).all()
         return jsonify({
             'affiliates': [{
                 'id': a.id,
@@ -138,7 +143,7 @@ def create_affiliate():
             linkName=data.get('linkName'),
             priority=data.get('priority', 0),
             active=1 if data.get('active', True) else 0,
-            country_code=data.get('country_code') or get_country_for_create(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US')),
             updatedAt=datetime.utcnow().isoformat()
         )
         db.session.add(aff)
@@ -168,6 +173,8 @@ def update_affiliate(id):
             aff.priority = data['priority']
         if 'active' in data:
             aff.active = 1 if data['active'] else 0
+        if 'country_code' in data:
+            aff.country_code = data['country_code']
         aff.updatedAt = datetime.utcnow().isoformat()
         db.session.commit()
         return jsonify({'ok': True})
@@ -199,7 +206,11 @@ def delete_affiliate(id):
 def get_campaigns():
     """List all campaigns"""
     try:
-        camps = MarketingCampaign.query.order_by(MarketingCampaign.created_at.desc()).all()
+        country = getattr(request, 'user_country', 'US')
+        camps = MarketingCampaign.query.filter(
+            (MarketingCampaign.country_code == country) | 
+            (MarketingCampaign.country_code == 'GLOBAL')
+        ).order_by(MarketingCampaign.created_at.desc()).all()
         return jsonify({
             'campaigns': [{
                 'id': c.id,
@@ -229,7 +240,8 @@ def create_campaign():
             description=data.get('description'),
             type=data.get('type'),
             status=data.get('status', 'draft'),
-            budget=data.get('budget')
+            budget=data.get('budget'),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(camp)
         db.session.commit()

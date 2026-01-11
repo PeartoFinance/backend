@@ -175,6 +175,7 @@ class Webinar(db.Model):
     is_free = db.Column(db.Boolean, default=False)
     price = db.Column(db.Numeric(10, 2))
     thumbnail_url = db.Column(db.Text)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -202,6 +203,7 @@ class HelpCategory(db.Model):
     description = db.Column(db.Text)
     order_index = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+    country_code = db.Column(db.String(10), default='US')
 
 
 class HelpArticle(db.Model):
@@ -217,5 +219,6 @@ class HelpArticle(db.Model):
     view_count = db.Column(db.Integer, default=0)
     helpful_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

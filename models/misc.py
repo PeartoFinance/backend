@@ -122,7 +122,24 @@ class TeamMember(db.Model):
     twitter = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, default=True)
     sort_order = db.Column(db.Integer, default=0)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'title': self.title,
+            'bio': self.bio,
+            'photo_url': self.photo_url,
+            'email': self.email,
+            'linkedin': self.linkedin,
+            'twitter': self.twitter,
+            'is_active': self.is_active,
+            'sort_order': self.sort_order,
+            'country_code': self.country_code,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
 
 
 class Job(db.Model):
@@ -155,6 +172,7 @@ class JobListing(db.Model):
     is_remote = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     expires_at = db.Column(db.Date)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -188,6 +206,7 @@ class MarketingCampaign(db.Model):
     budget = db.Column(db.Numeric(10, 2))
     target_audience = db.Column(db.JSON)
     metrics = db.Column(db.JSON)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

@@ -4,7 +4,7 @@ CRUD for /api/admin/news
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from .auth import admin_required
+from ..decorators import admin_required
 from models import db, NewsItem
 
 news_bp = Blueprint('admin_news', __name__)
@@ -15,7 +15,12 @@ news_bp = Blueprint('admin_news', __name__)
 def get_news():
     """List all news articles"""
     try:
-        articles = NewsItem.query.order_by(NewsItem.published_at.desc()).limit(500).all()
+        country = getattr(request, 'user_country', 'US')
+        articles = NewsItem.query.filter(
+            (NewsItem.country_code == country) | 
+            (NewsItem.country_code == 'GLOBAL')
+        ).order_by(NewsItem.published_at.desc()).limit(500).all()
+        
         return jsonify({
             'news': [a.to_dict() for a in articles]
         })
@@ -53,7 +58,8 @@ def create_news():
             is_published=data.get('is_published', False),
             featured=data.get('featured', False),
             published_at=datetime.utcnow() if data.get('is_published') else None,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(article)
         db.session.commit()
