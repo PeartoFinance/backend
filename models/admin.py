@@ -202,5 +202,6 @@ class Task(db.Model):
     priority = db.Column(db.Enum('low', 'medium', 'high', 'urgent'), default='medium')
     due_date = db.Column(db.Date)
     created_by = db.Column(db.Integer)
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)

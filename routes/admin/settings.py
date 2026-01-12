@@ -4,7 +4,7 @@ CRUD for /api/admin/settings
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from .auth import admin_required
+from ..decorators import admin_required
 from models import db, Settings, Appearance
 
 settings_bp = Blueprint('admin_settings', __name__)
@@ -17,7 +17,11 @@ settings_bp = Blueprint('admin_settings', __name__)
 def get_settings():
     """List all settings"""
     try:
-        settings = Settings.query.all()
+        country = getattr(request, 'user_country', 'US')
+        settings = Settings.query.filter(
+            (Settings.country_code == country) | 
+            (Settings.country_code == 'GLOBAL')
+        ).all()
         return jsonify({
             'settings': [{
                 'id': s.id,
@@ -42,6 +46,7 @@ def create_setting():
             value=data.get('value'),
             category=data.get('category'),
             description=data.get('description'),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(setting)
         db.session.commit()
@@ -67,6 +72,8 @@ def update_setting(setting_id):
             setting.category = data['category']
         if 'description' in data:
             setting.description = data['description']
+        if 'country_code' in data:
+            setting.country_code = data['country_code']
         
         db.session.commit()
         return jsonify({'ok': True})
@@ -96,7 +103,11 @@ def delete_setting(setting_id):
 def get_appearance():
     """Get appearance settings"""
     try:
-        themes = Appearance.query.all()
+        country = getattr(request, 'user_country', 'US')
+        themes = Appearance.query.filter(
+            (Appearance.country_code == country) | 
+            (Appearance.country_code == 'GLOBAL')
+        ).all()
         return jsonify({
             'themes': [{
                 'id': t.id,
@@ -119,7 +130,7 @@ def update_appearance(appearance_id):
         appearance = Appearance.query.get_or_404(appearance_id)
         data = request.get_json()
         
-        for field in ['name', 'primary_color', 'secondary_color', 'logo_url', 'is_active']:
+        for field in ['name', 'primary_color', 'secondary_color', 'logo_url', 'is_active', 'country_code']:
             if field in data:
                 setattr(appearance, field, data[field])
         

@@ -231,16 +231,11 @@ def seed_stock_offers():
 def seed_news():
     """Create news items for all categories"""
     news_items = [
-        {'title': 'Fed Signals Potential Rate Cuts in 2024 Amid Cooling Inflation Data', 'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling.', 'source': 'Bloomberg', 'category': 'business', 'featured': True, 'slug': 'fed-signals-rate-cuts-2024'},
-        {'title': 'Major Merger Announced Between Tech Giants Worth $50 Billion', 'summary': 'Two leading technology companies announce historic merger deal.', 'source': 'Financial Times', 'category': 'business', 'featured': False, 'slug': 'tech-giants-merger-50b'},
-        {'title': 'Tech Stocks Rally on Strong Q4 Earnings Reports', 'summary': 'Major technology companies exceed earnings expectations.', 'source': 'CNBC', 'category': 'markets', 'featured': True, 'slug': 'tech-stocks-rally-q4'},
-        {'title': 'Bitcoin Surges Past $90,000 on ETF Momentum', 'summary': 'Cryptocurrency markets rally as institutional adoption grows.', 'source': 'CoinDesk', 'category': 'crypto', 'featured': True, 'slug': 'bitcoin-surges-90k-etf'},
-        {'title': 'NVIDIA Announces Next-Gen AI Chips at CES', 'summary': 'Chip giant reveals breakthrough GPU architecture for AI applications.', 'source': 'TechCrunch', 'category': 'technology', 'featured': True, 'slug': 'nvidia-next-gen-ai-chips-ces'},
-        {'title': 'Oil Prices Surge Amid Middle East Tensions', 'summary': 'Crude oil prices rise sharply as geopolitical concerns affect supply.', 'source': 'Reuters', 'category': 'energy', 'featured': True, 'slug': 'oil-prices-surge-middle-east'},
-        {'title': 'Renewable Energy Investment Hits Record $500 Billion', 'summary': 'Global investment in solar and wind power reaches new highs.', 'source': 'Bloomberg Green', 'category': 'energy', 'featured': False, 'slug': 'renewable-energy-record-500b'},
-        {'title': 'Electric Vehicle Sales Double Year Over Year', 'summary': 'EV adoption accelerates globally as prices fall.', 'source': 'Electrek', 'category': 'auto', 'featured': False, 'slug': 'ev-sales-double-yoy'},
-        {'title': 'S&P 500 Hits Record High as Investors Eye Rate Cuts', 'summary': 'Stock market reaches new all-time highs.', 'source': 'Wall Street Journal', 'category': 'markets', 'featured': False, 'slug': 'sp500-record-high-rate-cuts'},
-        {'title': 'Global Trade Tensions Ease as New Agreements Signed', 'summary': 'Major economies reach new trade deals.', 'source': 'Reuters', 'category': 'world', 'featured': True, 'slug': 'global-trade-tensions-ease'},
+        {'title': 'Fed Signals Potential Rate Cuts in 2024 Amid Cooling Inflation Data', 'summary': 'Federal Reserve officials hint at possible interest rate reductions as inflation shows signs of cooling.', 'source': 'Bloomberg', 'category': 'business', 'featured': True, 'slug': 'fed-signals-rate-cuts-2024', 'country': 'US'},
+        {'title': 'Major Merger Announced Between Tech Giants Worth $50 Billion', 'summary': 'Two leading technology companies announce historic merger deal.', 'source': 'Financial Times', 'category': 'business', 'featured': False, 'slug': 'tech-giants-merger-50b', 'country': 'US'},
+        {'title': 'Nepal Rastra Bank Issues New Monetary Policy Guidelines', 'summary': 'The central bank of Nepal announces updates to its monetary policy to stabilize the economy.', 'source': 'The Kathmandu Post', 'category': 'business', 'featured': True, 'slug': 'nrb-monetary-policy-2024', 'country': 'NP'},
+        {'title': 'India Becomes Third Largest Economy in Terms of Purchasing Power', 'summary': 'India continues its rapid economic growth, reaching a new milestone in global rankings.', 'source': 'The Economic Times', 'category': 'business', 'featured': True, 'slug': 'india-economy-milestone', 'country': 'IN'},
+        {'title': 'Kathmandu Stock Exchange (NEPSE) Hits All-Time High', 'summary': 'Investors cheer as the Nepalese stock market reaches new heights.', 'source': 'MyRepublica', 'category': 'markets', 'featured': True, 'slug': 'nepse-all-time-high', 'country': 'NP'},
     ]
     
     count = 0
@@ -257,7 +252,7 @@ def seed_news():
                 curated_status='published',
                 source_type='admin',
                 published_at=datetime.now() - timedelta(hours=random.randint(1, 72)),
-                country_code='US'
+                country_code=item.get('country', 'US')
             )
             db.session.add(news)
             count += 1
@@ -515,25 +510,25 @@ def seed_glossary():
 def seed_jobs():
     """Create job listings"""
     jobs = [
-        {'title': 'Senior Software Engineer', 'department': 'Engineering', 'location': 'Remote', 'type': 'Full-time', 'description': 'We are looking for experienced engineers to build our next-generation financial platform.'},
-        {'title': 'Product Manager', 'department': 'Product', 'location': 'San Francisco', 'type': 'Full-time', 'description': 'Lead product development for our investment tools and user experience.'},
-        {'title': 'Data Scientist', 'department': 'Data', 'location': 'Remote', 'type': 'Full-time', 'description': 'Build ML models to power market predictions and personalized recommendations.'},
-        {'title': 'UX Designer', 'department': 'Design', 'location': 'New York', 'type': 'Full-time', 'description': 'Design beautiful, intuitive interfaces for complex financial data.'},
-        {'title': 'Content Writer', 'department': 'Marketing', 'location': 'Remote', 'type': 'Part-time', 'description': 'Create engaging financial education content for our blog and social channels.'},
+        {'title': 'Senior Software Engineer', 'department': 'Engineering', 'location': 'Remote', 'type': 'full-time', 'description': 'We are looking for experienced engineers to build our next-generation financial platform.', 'country': 'US'},
+        {'title': 'Product Manager', 'department': 'Product', 'location': 'San Francisco', 'type': 'full-time', 'description': 'Lead product development for our investment tools and user experience.', 'country': 'US'},
+        {'title': 'Financial Analyst', 'department': 'Finance', 'location': 'Kathmandu', 'type': 'full-time', 'description': 'Analyze Nepalese market trends and investment opportunities.', 'country': 'NP'},
+        {'title': 'Marketing Specialist', 'department': 'Marketing', 'location': 'Mumbai', 'type': 'full-time', 'description': 'Drive growth and brand awareness in the Indian market.', 'country': 'IN'},
     ]
     
     count = 0
     for item in jobs:
-        existing = Job.query.filter_by(title=item['title']).first()
+        existing = JobListing.query.filter_by(title=item['title']).first()
         if not existing:
-            job = Job(
+            job = JobListing(
                 title=item['title'],
                 department=item['department'],
                 location=item['location'],
-                employment_type=item['type'],
+                type=item['type'],
                 description=item['description'],
                 is_active=True,
-                posted_at=datetime.now() - timedelta(days=random.randint(1, 30))
+                country_code=item['country'],
+                created_at=datetime.now() - timedelta(days=random.randint(1, 30))
             )
             db.session.add(job)
             count += 1
@@ -544,11 +539,10 @@ def seed_jobs():
 def seed_team():
     """Create team member data"""
     team = [
-        {'name': 'John Smith', 'role': 'CEO & Co-founder', 'bio': 'Former Goldman Sachs, 15 years in fintech.', 'image': 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400'},
-        {'name': 'Sarah Johnson', 'role': 'CTO', 'bio': 'Ex-Google engineer, AI/ML specialist.', 'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400'},
-        {'name': 'Michael Chen', 'role': 'Head of Product', 'bio': 'Product leader from Robinhood and Coinbase.', 'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400'},
-        {'name': 'Emily Davis', 'role': 'Head of Design', 'bio': 'Award-winning designer, formerly at Apple.', 'image': 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400'},
-        {'name': 'David Kim', 'role': 'Head of Data', 'bio': 'Data scientist with experience at hedge funds.', 'image': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400'},
+        {'name': 'John Smith', 'role': 'CEO & Co-founder', 'bio': 'Former Goldman Sachs, 15 years in fintech.', 'image': 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400', 'country': 'US'},
+        {'name': 'Sarah Johnson', 'role': 'CTO', 'bio': 'Ex-Google engineer, AI/ML specialist.', 'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400', 'country': 'US'},
+        {'name': 'Binod Adhikari', 'role': 'Country Manager - Nepal', 'bio': 'Expert in Nepalese financial markets and regulations.', 'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400', 'country': 'NP'},
+        {'name': 'Rajesh Kumar', 'role': 'Head of Operations - India', 'bio': 'Experienced operations leader in the Indian fintech space.', 'image': 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400', 'country': 'IN'},
     ]
     
     count = 0
@@ -557,11 +551,12 @@ def seed_team():
         if not existing:
             tm = TeamMember(
                 name=member['name'],
-                role=member['role'],
+                title=member['role'],
                 bio=member['bio'],
-                image_url=member['image'],
+                photo_url=member['image'],
                 is_active=True,
-                order_index=count
+                sort_order=count,
+                country_code=member['country']
             )
             db.session.add(tm)
             count += 1
@@ -572,10 +567,9 @@ def seed_team():
 def seed_testimonials():
     """Create testimonial data"""
     testimonials = [
-        {'name': 'Alex Thompson', 'role': 'Day Trader', 'content': 'PeartoFinance has transformed how I analyze markets. The AI insights are incredibly accurate.', 'rating': 5},
-        {'name': 'Priya Sharma', 'role': 'Investor', 'content': 'The portfolio tracking tools are exceptional. I love the clean interface and real-time updates.', 'rating': 5},
-        {'name': 'James Wilson', 'role': 'Financial Advisor', 'content': 'I recommend this platform to all my clients. The educational content is top-notch.', 'rating': 4},
-        {'name': 'Maria Garcia', 'role': 'Beginner Investor', 'content': 'As someone new to investing, the learning resources helped me get started with confidence.', 'rating': 5},
+        {'name': 'Alex Thompson', 'role': 'Day Trader', 'content': 'PeartoFinance has transformed how I analyze markets. The AI insights are incredibly accurate.', 'rating': 5, 'country': 'US'},
+        {'name': 'Priya Sharma', 'role': 'Investor', 'content': 'The portfolio tracking tools are exceptional. I love the clean interface and real-time updates.', 'rating': 5, 'country': 'IN'},
+        {'name': 'Suman Gurung', 'role': 'Local Trader', 'content': 'Finally a platform that understands the Nepalese market context. Very helpful!', 'rating': 5, 'country': 'NP'},
     ]
     
     count = 0
@@ -584,11 +578,12 @@ def seed_testimonials():
         if not existing:
             testimonial = Testimonial(
                 name=item['name'],
-                role=item['role'],
+                title=item['role'],
                 content=item['content'],
                 rating=item['rating'],
                 is_featured=True,
-                is_approved=True
+                is_active=True,
+                country_code=item['country']
             )
             db.session.add(testimonial)
             count += 1

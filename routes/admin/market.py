@@ -2,7 +2,7 @@
 Admin Market Routes - Market data management
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
+from ..decorators import admin_required
 from models import db, MarketData, MarketIndices, MarketSentiment, CryptoMarketData, CommodityData
 from datetime import datetime
 
@@ -18,7 +18,11 @@ def get_market_data():
         search = request.args.get('search', '')
         limit = int(request.args.get('limit', 100))
         
-        query = MarketData.query.filter(MarketData.asset_type == asset_type)
+        country = getattr(request, 'user_country', 'US')
+        query = MarketData.query.filter(
+            MarketData.asset_type == asset_type,
+            (MarketData.country_code == country) | (MarketData.country_code == 'GLOBAL')
+        )
         if search:
             query = query.filter(
                 db.or_(
@@ -71,10 +75,21 @@ def get_market_data():
 def get_market_stats():
     """Get market data statistics"""
     try:
-        stocks = MarketData.query.filter(MarketData.asset_type == 'stock').count()
-        crypto = MarketData.query.filter(MarketData.asset_type == 'crypto').count()
-        indices_count = MarketIndices.query.count()
-        commodities_count = CommodityData.query.count()
+        country = getattr(request, 'user_country', 'US')
+        stocks = MarketData.query.filter(
+            MarketData.asset_type == 'stock',
+            (MarketData.country_code == country) | (MarketData.country_code == 'GLOBAL')
+        ).count()
+        crypto = MarketData.query.filter(
+            MarketData.asset_type == 'crypto',
+            (MarketData.country_code == country) | (MarketData.country_code == 'GLOBAL')
+        ).count()
+        indices_count = MarketIndices.query.filter(
+            (MarketIndices.country_code == country) | (MarketIndices.country_code == 'GLOBAL')
+        ).count()
+        commodities_count = CommodityData.query.filter(
+            (CommodityData.country_code == country) | (CommodityData.country_code == 'GLOBAL')
+        ).count()
         
         return jsonify({
             'stocks': stocks,
@@ -124,6 +139,7 @@ def import_market_data():
                     volume=item.get('volume'),
                     market_cap=item.get('market_cap'),
                     asset_type=asset_type,
+                    country_code=item.get('country_code', getattr(request, 'user_country', 'US')),
                     last_updated=datetime.utcnow()
                 )
                 db.session.add(new_item)
@@ -159,7 +175,10 @@ def delete_market_data(id):
 def get_indices():
     """List market indices"""
     try:
-        indices = MarketIndices.query.all()
+        country = getattr(request, 'user_country', 'US')
+        indices = MarketIndices.query.filter(
+            (MarketIndices.country_code == country) | (MarketIndices.country_code == 'GLOBAL')
+        ).all()
         return jsonify({
             'items': [{
                 'id': i.id,
@@ -192,7 +211,10 @@ def get_stock_offers():
     """List stock offers (IPOs, FPOs)"""
     try:
         from models import StockOffer
-        offers = StockOffer.query.order_by(StockOffer.created_at.desc()).all()
+        country = getattr(request, 'user_country', 'US')
+        offers = StockOffer.query.filter(
+            (StockOffer.country_code == country) | (StockOffer.country_code == 'GLOBAL')
+        ).order_by(StockOffer.created_at.desc()).all()
         return jsonify({
             'items': [o.to_dict() for o in offers]
         })
@@ -209,7 +231,10 @@ def get_stock_offers():
 def get_commodities():
     """List all commodities"""
     try:
-        commodities = CommodityData.query.all()
+        country = getattr(request, 'user_country', 'US')
+        commodities = CommodityData.query.filter(
+            (CommodityData.country_code == country) | (CommodityData.country_code == 'GLOBAL')
+        ).all()
         return jsonify({
             'items': [{
                 'id': c.id,
@@ -242,7 +267,10 @@ def get_earnings_calendar():
     try:
         from models import EarningsCalendar
         limit = int(request.args.get('limit', 50))
-        events = EarningsCalendar.query.order_by(EarningsCalendar.earnings_date.asc()).limit(limit).all()
+        country = getattr(request, 'user_country', 'US')
+        events = EarningsCalendar.query.filter(
+            (EarningsCalendar.country_code == country) | (EarningsCalendar.country_code == 'GLOBAL')
+        ).order_by(EarningsCalendar.earnings_date.asc()).limit(limit).all()
         return jsonify({
             'items': [{
                 'id': e.id,
@@ -271,7 +299,10 @@ def get_earnings_calendar():
 def get_sentiment():
     """Get market sentiment data"""
     try:
-        sentiment = MarketSentiment.query.order_by(MarketSentiment.last_updated.desc()).all()
+        country = getattr(request, 'user_country', 'US')
+        sentiment = MarketSentiment.query.filter(
+            (MarketSentiment.country_code == country) | (MarketSentiment.country_code == 'GLOBAL')
+        ).order_by(MarketSentiment.last_updated.desc()).all()
         return jsonify({
             'sentiment': [{
                 'id': s.id,
@@ -295,6 +326,7 @@ def add_sentiment():
             indicator_type=data.get('indicator_type', 'fear_greed'),
             value=data['value'],
             classification=data.get('classification'),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US')),
             last_updated=datetime.utcnow()
         )
         db.session.add(s)
@@ -578,8 +610,11 @@ def get_dividends():
         
         status = request.args.get('status')
         limit = min(int(request.args.get('limit', 100)), 500)
+        country = getattr(request, 'user_country', 'US')
         
-        query = Dividend.query
+        query = Dividend.query.filter(
+            (Dividend.country_code == country) | (Dividend.country_code == 'GLOBAL')
+        )
         if status:
             query = query.filter(Dividend.status == status)
         
@@ -664,8 +699,11 @@ def get_bulk_transactions():
         
         limit = min(int(request.args.get('limit', 100)), 500)
         symbol = request.args.get('symbol')
+        country = getattr(request, 'user_country', 'US')
         
-        query = BulkTransaction.query
+        query = BulkTransaction.query.filter(
+            (BulkTransaction.country_code == country) | (BulkTransaction.country_code == 'GLOBAL')
+        )
         if symbol:
             query = query.filter(BulkTransaction.symbol == symbol.upper())
         
@@ -700,7 +738,7 @@ def add_bulk_transaction():
             change_percent=data.get('changePercent'),
             transaction_type=data.get('transactionType', 'bulk'),
             exchange=data.get('exchange'),
-            country_code=data.get('countryCode', 'US')
+            country_code=data.get('countryCode', getattr(request, 'user_country', 'US'))
         )
         
         db.session.add(tx)

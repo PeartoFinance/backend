@@ -18,7 +18,8 @@ from ..decorators import admin_required
 def get_users():
     """List all users"""
     try:
-        users = User.query.order_by(User.created_at.desc()).limit(500).all()
+        country = getattr(request, 'user_country', 'US')
+        users = User.query.filter_by(country_code=country).order_by(User.created_at.desc()).limit(500).all()
         return jsonify({
             'users': [u.to_dict() for u in users]
         })
@@ -56,7 +57,7 @@ def create_user():
             password=password_hash,
             role=data.get('role', 'user'),
             active=data.get('is_active', 1),
-            country_code=data.get('country_code', 'US'),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US')),
             created_at=datetime.now(timezone.utc)
         )
         db.session.add(user)

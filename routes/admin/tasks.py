@@ -3,8 +3,7 @@ Admin Tasks Routes - Task management
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
-from .country_filter import apply_country_filter, get_country_for_create
+from ..decorators import admin_required
 from models import db, Task
 from datetime import datetime
 import uuid
@@ -18,8 +17,10 @@ def get_tasks():
     """List all tasks (country-filtered)"""
     try:
         status = request.args.get('status')
-        query = Task.query.order_by(Task.created_at.desc())
-        query = apply_country_filter(query, Task)
+        country = getattr(request, 'user_country', 'US')
+        query = Task.query.filter(
+            (Task.country_code == country) | (Task.country_code == 'GLOBAL')
+        ).order_by(Task.created_at.desc())
         if status:
             query = query.filter(Task.status == status)
         tasks = query.limit(500).all()
@@ -39,6 +40,28 @@ def get_tasks():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@tasks_bp.route('/tasks/<id>', methods=['GET'])
+@admin_required
+def get_task(id):
+    """Get a task detail by id"""
+    try:
+        task = Task.query.get_or_404(id)
+        return jsonify({
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'status': task.status,
+                'priority': task.priority,
+                'due_date': task.due_date.isoformat() if task.due_date else None,
+                'country_code': task.country_code,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'completed_at': task.completed_at.isoformat() if task.completed_at else None
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @tasks_bp.route('/tasks', methods=['POST'])
 @admin_required
@@ -53,7 +76,7 @@ def create_task():
             status=data.get('status', 'pending'),
             priority=data.get('priority', 'medium'),
             due_date=datetime.fromisoformat(data['due_date']) if data.get('due_date') else None,
-            country_code=data.get('country_code') or get_country_for_create()
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(task)
         db.session.commit()
@@ -78,6 +101,8 @@ def update_task(id):
             task.status = data['status']
             if data['status'] == 'completed':
                 task.completed_at = datetime.utcnow()
+        if 'country_code' in data:
+            task.country_code = data['country_code']
         if 'priority' in data:
             task.priority = data['priority']
         if 'due_date' in data:

@@ -3,8 +3,7 @@ Admin Media Routes - TV Channels and Radio Stations
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
-from .country_filter import apply_country_filter, get_country_for_create
+from ..decorators import admin_required
 from models import db, TVChannel, RadioStation
 import uuid
 from datetime import datetime
@@ -21,9 +20,11 @@ media_bp = Blueprint('admin_media', __name__)
 def get_tv_channels():
     """List all TV channels (country-filtered)"""
     try:
-        query = TVChannel.query.order_by(TVChannel.sort_order, TVChannel.name)
-        query = apply_country_filter(query, TVChannel)
-        channels = query.all()
+        country = getattr(request, 'user_country', 'US')
+        channels = TVChannel.query.filter(
+            (TVChannel.country_code == country) | 
+            (TVChannel.country_code == 'GLOBAL')
+        ).order_by(TVChannel.sort_order, TVChannel.name).all()
         return jsonify([{
             'id': c.id,
             'name': c.name,
@@ -54,7 +55,7 @@ def create_tv_channel():
             category=data.get('category'),
             logo_url=data.get('logo_url'),
             stream_url=data.get('stream_url'),
-            country_code=data.get('country_code') or get_country_for_create(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US')),
             language=data.get('language'),
             description=data.get('description'),
             is_live=data.get('is_live', False),
@@ -111,9 +112,11 @@ def delete_tv_channel(id):
 def get_radio_stations():
     """List all radio stations (country-filtered)"""
     try:
-        query = RadioStation.query.order_by(RadioStation.position, RadioStation.name)
-        query = apply_country_filter(query, RadioStation, 'country_code')
-        stations = query.all()
+        country = getattr(request, 'user_country', 'US')
+        stations = RadioStation.query.filter(
+            (RadioStation.country_code == country) | 
+            (RadioStation.country_code == 'GLOBAL')
+        ).order_by(RadioStation.position, RadioStation.name).all()
         return jsonify([{
             'id': s.id,
             'name': s.name,
@@ -150,7 +153,7 @@ def create_radio_station():
             bitrate=data.get('bitrate'),
             description=data.get('description'),
             is_active=data.get('is_active', True),
-            country_code=data.get('country_code') or get_country_for_create()
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(station)
         db.session.commit()
@@ -199,7 +202,7 @@ def import_radio_stations():
     try:
         data = request.get_json()
         stations = data.get('stations', [])
-        country_code = get_country_for_create()
+        country_code = getattr(request, 'user_country', 'US')
         imported = 0
         
         for s in stations:

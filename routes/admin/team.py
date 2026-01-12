@@ -4,7 +4,7 @@ CRUD for /api/admin/team
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from .auth import admin_required
+from ..decorators import admin_required
 from models import db, TeamMember
 
 team_bp = Blueprint('admin_team', __name__)
@@ -15,7 +15,12 @@ team_bp = Blueprint('admin_team', __name__)
 def get_team_members():
     """List all team members"""
     try:
-        members = TeamMember.query.order_by(TeamMember.sort_order).all()
+        country = getattr(request, 'user_country', 'US')
+        members = TeamMember.query.filter(
+            (TeamMember.country_code == country) | 
+            (TeamMember.country_code == 'GLOBAL')
+        ).order_by(TeamMember.sort_order).all()
+        
         return jsonify({
             'team': [{
                 'id': m.id,
@@ -29,6 +34,7 @@ def get_team_members():
                 'is_active': m.is_active,
                 'sort_order': m.sort_order,
                 'created_at': m.created_at.isoformat() if m.created_at else None,
+                'country_code': m.country_code
             } for m in members]
         })
     except Exception as e:
@@ -52,6 +58,7 @@ def get_team_member(member_id):
             'twitter': member.twitter,
             'is_active': member.is_active,
             'sort_order': member.sort_order,
+            'country_code': member.country_code
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -71,9 +78,10 @@ def create_team_member():
             email=data.get('email'),
             linkedin=data.get('linkedin'),
             twitter=data.get('twitter'),
-            is_active=data.get('is_active', True),
+            is_active=data.get('is_active') if isinstance(data.get('is_active'), bool) else data.get('is_active', 'true').lower() in ['true', '1', 'yes'],
             sort_order=data.get('sort_order', 0),
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(member)
         db.session.commit()
@@ -91,9 +99,17 @@ def update_team_member(member_id):
         member = TeamMember.query.get_or_404(member_id)
         data = request.get_json()
         
-        for field in ['name', 'title', 'bio', 'photo_url', 'email', 'linkedin', 'twitter', 'is_active', 'sort_order']:
+        for field in ['name', 'title', 'bio', 'photo_url', 'email', 'linkedin', 'twitter', 'sort_order', 'country_code']:
             if field in data:
                 setattr(member, field, data[field])
+        
+        # Handle is_active separately to convert string to boolean
+        if 'is_active' in data:
+            is_active_value = data['is_active']
+            if isinstance(is_active_value, bool):
+                member.is_active = is_active_value
+            else:
+                member.is_active = str(is_active_value).lower() in ['true', '1', 'yes']
         
         db.session.commit()
         return jsonify({'ok': True})

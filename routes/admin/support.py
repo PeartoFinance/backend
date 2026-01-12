@@ -3,8 +3,7 @@ Admin Support Routes - Contact messages, support
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from .auth import admin_required
-from .country_filter import apply_country_filter
+from ..decorators import admin_required
 from models import db, ContactMessage
 from datetime import datetime
 
@@ -17,8 +16,11 @@ def get_contact_messages():
     """List all contact messages (country-filtered)"""
     try:
         status = request.args.get('status')
-        query = ContactMessage.query.order_by(ContactMessage.created_at.desc())
-        query = apply_country_filter(query, ContactMessage)
+        country = getattr(request, 'user_country', 'US')
+        query = ContactMessage.query.filter(
+            (ContactMessage.country_code == country) | 
+            (ContactMessage.country_code == 'GLOBAL')
+        ).order_by(ContactMessage.created_at.desc())
         if status:
             query = query.filter(ContactMessage.status == status)
         msgs = query.limit(500).all()

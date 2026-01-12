@@ -16,7 +16,13 @@ tools_bp = Blueprint('admin_tools', __name__)
 def get_tools():
     """List all tool settings"""
     try:
-        tools = ToolSettings.query.order_by(ToolSettings.order_index).all()
+        # Filter by user's country or GLOBAL settings
+        country = getattr(request, 'user_country', 'US')
+        tools = ToolSettings.query.filter(
+            (ToolSettings.country_code == country) | 
+            (ToolSettings.country_code == 'GLOBAL')
+        ).order_by(ToolSettings.order_index).all()
+        
         return jsonify({
             'tools': [{
                 'id': t.tool_slug, # Use slug as ID
@@ -26,6 +32,7 @@ def get_tools():
                 'is_implemented': t.is_implemented,
                 'order_index': t.order_index,
                 'category': t.category,
+                'country_code': t.country_code
             } for t in tools]
         })
     except Exception as e:
@@ -53,7 +60,8 @@ def create_tool():
             enabled=data.get('enabled', True),
             is_implemented=data.get('is_implemented', False),
             order_index=data.get('order_index', 0),
-            category=data.get('category', 'general')
+            category=data.get('category', 'general'),
+            country_code=data.get('country_code', getattr(request, 'user_country', 'GLOBAL'))
         )
         
         db.session.add(tool)
@@ -87,6 +95,8 @@ def update_tool(tool_slug):
             tool.order_index = data['order_index']
         if 'category' in data:
             tool.category = data['category']
+        if 'country_code' in data:
+            tool.country_code = data['country_code']
         
         db.session.commit()
         return jsonify({'ok': True})
