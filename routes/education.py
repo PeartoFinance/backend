@@ -18,7 +18,15 @@ def get_courses():
         is_free = request.args.get('free')
         search = request.args.get('search')
         
-        query = Course.query.filter(Course.is_published == True)
+        # Determine country filter: header-driven. If no header -> US; if header GLOBAL -> GLOBAL; else only header country
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            country_filter = (Course.country_code == 'US')
+        else:
+            hc = header_country.strip().upper()
+            country_filter = (Course.country_code == 'GLOBAL') if hc == 'GLOBAL' else (Course.country_code == hc)
+
+        query = Course.query.filter(Course.is_published == True, country_filter)
         
         if category:
             query = query.filter(Course.category == category)
@@ -60,9 +68,17 @@ def get_courses():
 def get_course(slug):
     """Get single course by slug with modules"""
     try:
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            country_filter = (Course.country_code == 'US')
+        else:
+            hc = header_country.strip().upper()
+            country_filter = (Course.country_code == 'GLOBAL') if hc == 'GLOBAL' else (Course.country_code == hc)
+
         course = Course.query.filter(
             Course.slug == slug,
-            Course.is_published == True
+            Course.is_published == True,
+            country_filter
         ).first()
         
         if not course:
@@ -124,8 +140,17 @@ def get_course(slug):
 def get_instructors():
     """Get all active instructors"""
     try:
+        # Apply same header-based country scoping for instructors
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            instructor_filter = (Instructor.country_code == 'US')
+        else:
+            hc = header_country.strip().upper()
+            instructor_filter = (Instructor.country_code == 'GLOBAL') if hc == 'GLOBAL' else (Instructor.country_code == hc)
+
         instructors = Instructor.query.filter(
-            Instructor.is_active == True
+            Instructor.is_active == True,
+            instructor_filter
         ).order_by(Instructor.courses_count.desc()).all()
         
         return jsonify({
@@ -149,9 +174,17 @@ def get_instructors():
 def get_categories():
     """Get unique course categories"""
     try:
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            cat_filter = (Course.country_code == 'US')
+        else:
+            hc = header_country.strip().upper()
+            cat_filter = (Course.country_code == 'GLOBAL') if hc == 'GLOBAL' else (Course.country_code == hc)
+
         categories = db.session.query(Course.category).filter(
             Course.is_published == True,
-            Course.category != None
+            Course.category != None,
+            cat_filter
         ).distinct().all()
         
         return jsonify({

@@ -10,16 +10,26 @@ media_bp = Blueprint('media', __name__, url_prefix='/api/media')
 
 def get_user_country():
     """Get country from X-User-Country header"""
-    return request.headers.get('X-User-Country', '').strip().upper() or None
+    hc = request.headers.get('X-User-Country')
+    if hc is None:
+        return None
+    return hc.strip().upper() or None
 
 
 def apply_country_filter(query, model, country_code_field='country_code'):
     """Apply country filter if header is present"""
-    country = get_user_country()
-    if country:
-        column = getattr(model, country_code_field, None)
-        if column is not None:
-            return query.filter(column == country)
+    # Determine filter country: header overrides; if no header, default to 'US'
+    header_country = get_user_country()
+    if header_country is None:
+        filter_country = 'US'
+    else:
+        filter_country = 'GLOBAL' if header_country == 'GLOBAL' else header_country
+
+    # support models that use either 'country_code' or 'country'
+    column = getattr(model, country_code_field, None) or getattr(model, 'country', None)
+    if column is not None:
+        return query.filter(column == filter_country)
+
     return query
 
 
@@ -52,12 +62,24 @@ def get_tv_channels():
         return jsonify({'error': str(e)}), 500
 
 
+
 @media_bp.route('/tv-channels/<id>', methods=['GET'])
 def get_tv_channel(id):
     """Get single TV channel by ID"""
     try:
         channel = TVChannel.query.filter(TVChannel.id == id, TVChannel.is_active == True).first()
         if not channel:
+            return jsonify({'error': 'Channel not found'}), 404
+
+        # enforce country scoping for single item
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            filter_country = 'US'
+        else:
+            hc = header_country.strip().upper()
+            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
+
+        if getattr(channel, 'country_code', None) and channel.country_code != filter_country:
             return jsonify({'error': 'Channel not found'}), 404
         
         return jsonify({
@@ -112,6 +134,18 @@ def get_radio_station(id):
         station = RadioStation.query.filter(RadioStation.id == id, RadioStation.is_active == True).first()
         if not station:
             return jsonify({'error': 'Station not found'}), 404
+
+        # enforce country scoping for single item
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            filter_country = 'US'
+        else:
+            hc = header_country.strip().upper()
+            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
+
+        station_country = getattr(station, 'country', None) or getattr(station, 'country_code', None)
+        if station_country and station_country != filter_country:
+            return jsonify({'error': 'Station not found'}), 404
         
         return jsonify({
             'id': station.id,
@@ -165,6 +199,51 @@ def get_sports_events():
     except ImportError:
         # SportsEvent model doesn't exist yet, return empty list
         return jsonify([])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@media_bp.route('/sports-events/<id>', methods=['GET'])
+def get_sports_event(id):
+    """Get single sports event by ID with country scoping"""
+    try:
+        from models import SportsEvent
+
+        event = SportsEvent.query.filter(SportsEvent.id == id, SportsEvent.is_active == True).first()
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+
+        # enforce country scoping for single item
+        header_country = request.headers.get('X-User-Country')
+        if header_country is None:
+            filter_country = 'US'
+        else:
+            hc = header_country.strip().upper()
+            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
+
+        event_country = getattr(event, 'country_code', None) or getattr(event, 'country', None)
+        if event_country and event_country != filter_country:
+            return jsonify({'error': 'Event not found'}), 404
+
+        return jsonify({
+            'id': str(event.id),
+            'name': event.name,
+            'sportType': event.sport_type,
+            'league': event.league,
+            'status': event.status,
+            'venue': event.venue,
+            'teamHome': event.team_home,
+            'teamAway': event.team_away,
+            'scoreHome': event.score_home,
+            'scoreAway': event.score_away,
+            'eventDate': event.event_date.isoformat() if event.event_date else None,
+            'streamUrl': event.stream_url,
+            'thumbnailUrl': event.thumbnail_url,
+            'countryCode': event.country_code,
+            'isLive': event.is_live
+        })
+    except ImportError:
+        return jsonify({'error': 'SportsEvent model not available'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

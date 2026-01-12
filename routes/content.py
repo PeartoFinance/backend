@@ -16,12 +16,17 @@ def get_news():
     """Get news items"""
     limit = min(int(request.args.get('limit', 10)), 50)
     category = request.args.get('category')
-    
-    query = NewsItem.query
-    
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        news_filter = (NewsItem.country_code == 'US')
+    else:
+        hc = header_country.strip().upper()
+        news_filter = (NewsItem.country_code == 'GLOBAL') if hc == 'GLOBAL' else (NewsItem.country_code == hc)
+
+    query = NewsItem.query.filter(news_filter)
     if category:
         query = query.filter(NewsItem.category == category)
-    
+
     items = query.order_by(desc(NewsItem.published_at)).limit(limit).all()
     
     return jsonify([n.to_dict() for n in items])
@@ -31,8 +36,14 @@ def get_news():
 def get_featured_news():
     """Get featured news items"""
     limit = min(int(request.args.get('limit', 5)), 20)
-    
-    items = NewsItem.query.order_by(desc(NewsItem.published_at)).limit(limit).all()
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        news_filter = (NewsItem.country_code == 'US')
+    else:
+        hc = header_country.strip().upper()
+        news_filter = (NewsItem.country_code == 'GLOBAL') if hc == 'GLOBAL' else (NewsItem.country_code == hc)
+
+    items = NewsItem.query.filter(news_filter).order_by(desc(NewsItem.published_at)).limit(limit).all()
     
     return jsonify([n.to_dict() for n in items])
 
@@ -42,12 +53,20 @@ def get_tv_channels():
     """Get TV channels"""
     limit = min(int(request.args.get('limit', 20)), 50)
     category = request.args.get('category')
-    
+    header_country = request.headers.get('X-User-Country')
     query = TVChannel.query.filter(TVChannel.is_active == True)
-    
+    if header_country is None:
+        query = query.filter(TVChannel.country_code == 'US')
+    else:
+        hc = header_country.strip().upper()
+        if hc == 'GLOBAL':
+            query = query.filter(TVChannel.country_code == 'GLOBAL')
+        else:
+            query = query.filter(TVChannel.country_code == hc)
+
     if category:
         query = query.filter(TVChannel.category == category)
-    
+
     channels = query.order_by(TVChannel.sort_order).limit(limit).all()
     
     return jsonify([c.to_dict() for c in channels])
@@ -58,12 +77,31 @@ def get_radio_stations():
     """Get radio stations"""
     limit = min(int(request.args.get('limit', 20)), 50)
     genre = request.args.get('genre')
-    
+    header_country = request.headers.get('X-User-Country')
     query = RadioStation.query.filter(RadioStation.is_active == True)
-    
+    if header_country is None:
+        # prefer country_code field when present, fall back to 'country'
+        if hasattr(RadioStation, 'country_code'):
+            query = query.filter(RadioStation.country_code == 'US')
+        else:
+            # if model uses 'country' field
+            query = query.filter(RadioStation.country == 'United States')
+    else:
+        hc = header_country.strip().upper()
+        if hasattr(RadioStation, 'country_code'):
+            if hc == 'GLOBAL':
+                query = query.filter(RadioStation.country_code == 'GLOBAL')
+            else:
+                query = query.filter(RadioStation.country_code == hc)
+        else:
+            # try to match by country name for older models
+            # Map common codes to names if necessary; default to leaving unfiltered
+            if hc == 'US':
+                query = query.filter(RadioStation.country == 'United States')
+
     if genre:
         query = query.filter(RadioStation.genre.ilike(f'%{genre}%'))
-    
+
     stations = query.order_by(RadioStation.position).limit(limit).all()
     
     return jsonify([s.to_dict() for s in stations])
@@ -73,10 +111,18 @@ def get_radio_stations():
 def get_trending_topics():
     """Get trending topics"""
     limit = min(int(request.args.get('limit', 10)), 20)
-    
+    header_country = request.headers.get('X-User-Country')
+    query = TrendingTopic.query
+    if header_country is None:
+        if hasattr(TrendingTopic, 'country_code'):
+            query = query.filter(TrendingTopic.country_code == 'US')
+    else:
+        hc = header_country.strip().upper()
+        if hasattr(TrendingTopic, 'country_code'):
+            query = query.filter(TrendingTopic.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+
     try:
-        topics = TrendingTopic.query.order_by(TrendingTopic.rank).limit(limit).all()
-        
+        topics = query.order_by(TrendingTopic.rank).limit(limit).all()
         if topics:
             return jsonify([t.to_dict() for t in topics])
     except Exception:

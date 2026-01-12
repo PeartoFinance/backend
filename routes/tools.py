@@ -33,7 +33,7 @@ def deduplicate_tools(tools, user_country):
     tool_map = {}
     
     def get_priority(code):
-        if code == user_country:
+        if code and code.upper() == user_country:
             return 3
         if code == 'GLOBAL':
             return 2
@@ -43,7 +43,7 @@ def deduplicate_tools(tools, user_country):
     
     for tool in tools:
         slug = tool.tool_slug
-        cc = (tool.country_code or 'US').upper()
+        cc = (tool.country_code).upper()
         priority = get_priority(cc)
         
         if slug not in tool_map or priority > tool_map[slug]['priority']:
@@ -51,67 +51,55 @@ def deduplicate_tools(tools, user_country):
                 'tool': tool,
                 'priority': priority
             }
+        elif priority > tool_map[slug]['priority']:
+            tool_map[slug] = {'tool': tool, 'priority': priority}
+        
     
     # Sort by category then order_index
     result = [item['tool'] for item in tool_map.values()]
     result.sort(key=lambda t: (t.category or '', t.order_index or 0))
     return result
 
+def get_country_from_header():
+    country = request.headers.get('X-User-Country') or request.headers.get('X-Admin-Country')
+    return country.upper() if country else None
+
 
 @tools_bp.route('/settings', methods=['GET'])
 def get_tools_settings():
     """List all tool settings (admin view, country-filtered)"""
-    ctx = get_country_context()
-    
+    country = get_country_from_header()
+
     query = ToolSettings.query
-    
-    if not ctx['is_global'] and ctx['country_code']:
-        # Filter by user country or GLOBAL
-        query = query.filter(
-            db.or_(
-                ToolSettings.country_code == ctx['country_code'],
-                ToolSettings.country_code == 'GLOBAL'
-            )
-        )
+
+    if country:
+        query = query.filter(ToolSettings.country_code == country.upper())
     else:
-        # Show GLOBAL and US
         query = query.filter(
-            db.or_(
-                ToolSettings.country_code == 'GLOBAL',
-                ToolSettings.country_code == 'US'
-            )
+            ToolSettings.country_code == 'US'
         )
-    
+
     tools = query.all()
-    unique_tools = deduplicate_tools(tools, ctx['country_code'])
-    
-    return jsonify([t.to_dict() for t in unique_tools])
+    return jsonify([t.to_dict() for t in tools])
 
 
 @tools_bp.route('/settings/enabled', methods=['GET'])
 def get_enabled_tools():
     """List only enabled tools (public, country-filtered)"""
-    ctx = get_country_context()
-    
+    country = get_country_from_header()
+
     query = ToolSettings.query.filter(ToolSettings.enabled == True)
-    
-    if not ctx['is_global'] and ctx['country_code']:
-        query = query.filter(
-            db.or_(
-                ToolSettings.country_code == ctx['country_code'],
-                ToolSettings.country_code == 'GLOBAL'
-            )
-        )
+
+    if country:
+        query = query.filter(ToolSettings.country_code == country)
     else:
         query = query.filter(
-            db.or_(
-                ToolSettings.country_code == 'GLOBAL',
-                ToolSettings.country_code == 'US'
-            )
+            ToolSettings.country_code == 'US'
         )
-    
+
     tools = query.all()
-    unique_tools = deduplicate_tools(tools, ctx['country_code'])
-    
-    return jsonify([t.to_dict() for t in unique_tools])
+    return jsonify([t.to_dict() for t in tools])
+
+
+
 
