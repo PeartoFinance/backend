@@ -6,13 +6,42 @@ Based on old/Frontend/server/src/userPreferencesApi.js
 from flask import Blueprint, request, jsonify
 import bcrypt
 from datetime import datetime
+import jwt
+from config import config
 from models import db, User, UserPortfolio, UserWatchlist, MarketData
 
 user_bp = Blueprint('user', __name__)
 
 
 def get_current_user():
-    """Helper to get current user from email header"""
+    """Resolve current user from Authorization Bearer JWT or X-User-Email header.
+
+    Priority:
+    1. Authorization: Bearer <token> (JWT with `user_id` claim)
+    2. X-User-Email header (compatibility fallback)
+    """
+    # If another middleware/decorator already set request.user, use it
+    if hasattr(request, 'user') and getattr(request, 'user'):
+        return request.user
+
+    # Try Bearer token
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ', 1)[1].strip()
+        try:
+            payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
+            user_id = payload.get('user_id')
+            if user_id:
+                user = User.query.get(user_id)
+                if user:
+                    return user
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            # Invalid token -> fall through to header fallback
+            pass
+
+    # Compatibility fallback: X-User-Email
     user_email = request.headers.get('X-User-Email')
     if not user_email:
         return None
