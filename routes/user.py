@@ -7,35 +7,23 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 from datetime import datetime
 from models import db, User, UserPortfolio, UserWatchlist, MarketData
+from .decorators import auth_required
 
 user_bp = Blueprint('user', __name__)
 
 
-def get_current_user():
-    """Helper to get current user from email header"""
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
-
-
 @user_bp.route('/profile', methods=['GET'])
+@auth_required
 def get_profile():
     """Get current user profile"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
-    return jsonify(user.to_dict())
+    return jsonify(request.user.to_dict())
 
 
 @user_bp.route('/profile', methods=['PUT'])
+@auth_required
 def update_profile():
     """Update user profile"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     
     # Update allowed fields
@@ -58,12 +46,10 @@ def update_profile():
 
 
 @user_bp.route('/preferences', methods=['GET'])
+@auth_required
 def get_preferences():
     """Get user preferences"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     return jsonify({
         'currency': user.currency or 'USD',
         'taxResidency': user.tax_residency or '',
@@ -73,12 +59,10 @@ def get_preferences():
 
 
 @user_bp.route('/preferences', methods=['PUT'])
+@auth_required
 def update_preferences():
     """Update user preferences"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     
     # Validate currency code
@@ -114,12 +98,10 @@ def update_preferences():
 
 
 @user_bp.route('/change-password', methods=['POST'])
+@auth_required
 def change_password():
     """Change user password"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     current_password = data.get('currentPassword', '')
     new_password = data.get('newPassword', '')
@@ -146,12 +128,10 @@ def change_password():
 
 
 @user_bp.route('/portfolio', methods=['GET'])
+@auth_required
 def get_user_portfolio_summary():
     """Return current user's portfolios summary for /api/user/portfolio."""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-
+    user = request.user
     portfolios = UserPortfolio.query.filter_by(user_id=user.id).all()
     return jsonify({
         'portfolios': [p.to_dict() for p in portfolios]
@@ -159,12 +139,10 @@ def get_user_portfolio_summary():
 
 
 @user_bp.route('/watchlist', methods=['GET'])
+@auth_required
 def get_user_watchlist():
     """Return current user's watchlist symbols with basic quote info."""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-
+    user = request.user
     user_symbols = UserWatchlist.query.filter_by(user_id=user.id).all()
     symbols = [w.symbol for w in user_symbols]
 

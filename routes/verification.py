@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify
 import random
 from datetime import datetime
 from models import db, User
+from .decorators import auth_required
 
 verification_bp = Blueprint('verification', __name__)
 
@@ -19,14 +20,6 @@ def generate_verification_code():
     return str(random.randint(100000, 999999))
 
 
-def get_current_user():
-    """Helper to get current user from email header"""
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
-
-
 def update_verified_badge(user):
     """Update verified badge based on verification status
     User gets badge when email + at least one other verification
@@ -36,12 +29,10 @@ def update_verified_badge(user):
 
 
 @verification_bp.route('/status', methods=['GET'])
+@auth_required
 def get_verification_status():
     """Get user's verification status"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     return jsonify({
         'emailVerified': user.email_verified or False,
         'emailVerifiedAt': user.email_verified_at.isoformat() if user.email_verified_at else None,
@@ -55,11 +46,10 @@ def get_verification_status():
 
 
 @verification_bp.route('/email/send', methods=['POST'])
+@auth_required
 def send_email_verification():
     """Send email verification code"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    user = request.user
     
     # Generate verification code
     code = generate_verification_code()
@@ -83,12 +73,10 @@ def send_email_verification():
 
 
 @verification_bp.route('/email/confirm', methods=['POST'])
+@auth_required
 def confirm_email_verification():
     """Confirm email with verification code"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     code = data.get('code', '')
     
@@ -126,12 +114,10 @@ def confirm_email_verification():
 
 
 @verification_bp.route('/phone/send', methods=['POST'])
+@auth_required
 def send_phone_verification():
     """Send phone verification code"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     phone = data.get('phone', '')
     
@@ -165,12 +151,10 @@ def send_phone_verification():
 
 
 @verification_bp.route('/phone/confirm', methods=['POST'])
+@auth_required
 def confirm_phone_verification():
     """Confirm phone with verification code"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     code = data.get('code', '')
     

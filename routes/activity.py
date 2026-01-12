@@ -6,20 +6,14 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 import uuid
 from models import db, User, UserActivity
+from .decorators import auth_required
 
 
 activity_bp = Blueprint('activity', __name__)
 
 
-def get_current_user():
-    """Helper to get current user from email header."""
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
-
-
 @activity_bp.route('/activity/page-view', methods=['POST'])
+@auth_required
 def track_page_view():
     """
     Track a page view event.
@@ -31,10 +25,7 @@ def track_page_view():
         "referrer": "Optional referrer"
     }
     """
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-
+    user = request.user
     data = request.get_json() or {}
     path = data.get('path') or request.path
     title = data.get('title')
@@ -54,5 +45,3 @@ def track_page_view():
     db.session.commit()
 
     return jsonify({'success': True}), 201
-
-

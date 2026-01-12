@@ -7,25 +7,16 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 from datetime import datetime
 from models import db, User, UserSession
+from .decorators import auth_required
 
 account_bp = Blueprint('account', __name__)
 
 
-def get_current_user():
-    """Helper to get current user from email header"""
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
-
-
 @account_bp.route('/status', methods=['GET'])
+@auth_required
 def get_account_status():
     """Get current account status"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     return jsonify({
         'status': user.account_status or 'active',
         'deactivatedAt': user.deactivated_at.isoformat() if user.deactivated_at else None,
@@ -35,12 +26,10 @@ def get_account_status():
 
 
 @account_bp.route('/deactivate', methods=['POST'])
+@auth_required
 def deactivate_account():
     """Deactivate user account"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     password = data.get('password', '')
     reason = data.get('reason', 'User requested')
@@ -109,12 +98,10 @@ def reactivate_account():
 
 
 @account_bp.route('/delete-permanently', methods=['POST'])
+@auth_required
 def delete_account_permanently():
     """Permanently delete account (soft delete)"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     password = data.get('password', '')
     confirmation = data.get('confirmation', '')
