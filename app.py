@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import config
 from models.base import db
+from flask_migrate import Migrate
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -17,6 +18,10 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config.SQLALCHEMY_ENGINE_OPTIONS
 
 # Initialize SQLAlchemy
 db.init_app(app)
+
+# For migration
+migrate = Migrate(app, db)
+
 
 # Configure CORS - allow all origins with explicit headers
 CORS(app, 

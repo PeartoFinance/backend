@@ -10,3 +10,6 @@ requests==2.31.0
 cryptography==41.0.7
 yfinance>=0.2.36
 pandas>=2.0.0
+
+# for migration
+flask-migrate-4.1.0

@@ -14,10 +14,13 @@ from models.market import MarketData, MarketIndices, CommodityData, StockOffer, 
 from models.media import TVChannel, RadioStation, TrendingTopic, ForexRate
 from models.article import NewsItem
 from models.settings import ToolSettings, Country
-from models.misc import FAQ, FAQItem, GlossaryTerm, Job, TeamMember, Testimonial, MarketingCampaign
+from models.misc import FAQ, FAQItem, GlossaryTerm, Job, JobListing, TeamMember, Testimonial, MarketingCampaign
 from models.education import Course, CourseModule, Instructor, HelpCategory, HelpArticle
 from models.user import User, Role
 import bcrypt
+from app import create_app
+from models.base import db
+
 
 # Try to import SportsEvent if it exists
 try:
@@ -26,16 +29,19 @@ try:
 except ImportError:
     HAS_SPORTS_EVENT = False
 
-def create_app():
-    """Create Flask app for seeding"""
-    app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    db.init_app(app)
-    return app
+# def create_app():
+#     """Create Flask app for seeding"""
+#     app = Flask(__name__)
+#     app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
+#     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+#     db.init_app(app)
+#     return app
 
-def seed_market_data():
-    """Create stock market data"""
+def seed_market_data(countries=('US', 'NP')):
+    """Create stock market data for given country codes (upserts by symbol+country).
+
+    By default seeds for US and NP so you can test header-scoped responses.
+    """
     stocks = [
         {'symbol': 'AAPL', 'name': 'Apple Inc.', 'exchange': 'NASDAQ'},
         {'symbol': 'GOOGL', 'name': 'Alphabet Inc.', 'exchange': 'NASDAQ'},
@@ -63,33 +69,55 @@ def seed_market_data():
         {'symbol': 'CAT', 'name': 'Caterpillar Inc.', 'exchange': 'NYSE'},
         {'symbol': 'DIS', 'name': 'Walt Disney Company', 'exchange': 'NYSE'},
     ]
-    
-    count = 0
-    for stock in stocks:
-        existing = MarketData.query.filter_by(symbol=stock['symbol']).first()
-        if not existing:
+
+    created = 0
+    updated = 0
+    now = datetime.utcnow()
+
+    for country in countries:
+        for stock in stocks:
+            # upsert by symbol + country_code
+            existing = MarketData.query.filter(
+                MarketData.symbol == stock['symbol'],
+                MarketData.country_code == country
+            ).first()
+
             base_price = random.uniform(50, 500)
             change = random.uniform(-5, 8)
             change_pct = change / base_price * 100
-            
-            market_data = MarketData(
-                symbol=stock['symbol'],
-                name=stock['name'],
-                price=Decimal(str(round(base_price, 2))),
-                change=Decimal(str(round(change, 2))),
-                change_percent=Decimal(str(round(change_pct, 2))),
-                volume=random.randint(1000000, 50000000),
-                market_cap=random.randint(10000000000, 3000000000000),
-                currency='USD',
-                exchange=stock['exchange'],
-                asset_type='stock',
-                country_code='US'
-            )
-            db.session.add(market_data)
-            count += 1
-    
+
+            if existing:
+                existing.name = stock['name']
+                existing.price = Decimal(str(round(base_price, 2)))
+                existing.change = Decimal(str(round(change, 2)))
+                existing.change_percent = Decimal(str(round(change_pct, 2)))
+                existing.volume = random.randint(1000000, 50000000)
+                existing.market_cap = random.randint(10000000000, 3000000000000)
+                existing.currency = 'USD'
+                existing.exchange = stock['exchange']
+                existing.asset_type = 'stock'
+                existing.last_updated = now
+                updated += 1
+            else:
+                market_data = MarketData(
+                    symbol=stock['symbol'],
+                    name=stock['name'],
+                    price=Decimal(str(round(base_price, 2))),
+                    change=Decimal(str(round(change, 2))),
+                    change_percent=Decimal(str(round(change_pct, 2))),
+                    volume=random.randint(1000000, 50000000),
+                    market_cap=random.randint(10000000000, 3000000000000),
+                    currency='USD',
+                    exchange=stock['exchange'],
+                    asset_type='stock',
+                    last_updated=now,
+                    country_code=country
+                )
+                db.session.add(market_data)
+                created += 1
+
     db.session.commit()
-    print(f"✓ Seeded {count} market stocks")
+    print(f"✓ Seeded {created} new and updated {updated} existing market stock rows for countries: {', '.join(countries)}")
 
 def seed_forex_rates():
     """Create forex exchange rates"""

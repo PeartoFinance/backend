@@ -3,8 +3,7 @@ Stocks API Routes with SQLAlchemy
 - Quotes, search, profile, history, movers
 """
 from flask import Blueprint, request, jsonify
-from sqlalchemy import desc, asc, func
-from datetime import datetime, timedelta
+from sqlalchemy import desc, asc
 from models.base import db
 from models.market import MarketData
 
@@ -20,10 +19,23 @@ def get_quotes():
         return jsonify({'error': 'symbols parameter required'}), 400
     
     symbols = [s.strip().upper() for s in symbols_param.split(',')]
+
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        # no header -> default to US only
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        if country == 'GLOBAL':
+            filter_condition = (MarketData.country_code == 'GLOBAL')
+        else:
+            filter_condition = (MarketData.country_code == country)
+
     prices = MarketData.query.filter(
         MarketData.symbol.in_(symbols),
-        MarketData.asset_type == 'stock'
+        MarketData.asset_type == 'stock',
+        filter_condition
     ).all()
     
     return jsonify([p.to_dict() for p in prices])
@@ -38,12 +50,20 @@ def search_stocks():
     if not query:
         return jsonify({'error': 'q parameter required'}), 400
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
     stocks = MarketData.query.filter(
         db.or_(
             MarketData.symbol.ilike(f'%{query}%'),
             MarketData.name.ilike(f'%{query}%')
         ),
-        MarketData.asset_type == 'stock'
+        MarketData.asset_type == 'stock',
+        filter_condition
     ).limit(limit).all()
     
     return jsonify([{
@@ -57,9 +77,17 @@ def search_stocks():
 @stocks_bp.route('/profile/<symbol>', methods=['GET'])
 def get_profile(symbol):
     """Get basic stock profile from market data"""
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
     stock = MarketData.query.filter(
         MarketData.symbol == symbol.upper(),
-        MarketData.asset_type == 'stock'
+        MarketData.asset_type == 'stock',
+        filter_condition
     ).first()
     
     if not stock:
@@ -76,17 +104,26 @@ def get_movers():
     
     result = {}
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
     if mover_type in ('gainers', 'both'):
         gainers = MarketData.query.filter(
             MarketData.asset_type == 'stock',
-            MarketData.change_percent > 0
+            MarketData.change_percent > 0,
+            filter_condition
         ).order_by(desc(MarketData.change_percent)).limit(limit).all()
         result['gainers'] = [g.to_dict() for g in gainers]
     
     if mover_type in ('losers', 'both'):
         losers = MarketData.query.filter(
             MarketData.asset_type == 'stock',
-            MarketData.change_percent < 0
+            MarketData.change_percent < 0,
+            filter_condition
         ).order_by(asc(MarketData.change_percent)).limit(limit).all()
         result['losers'] = [l.to_dict() for l in losers]
     
@@ -98,9 +135,17 @@ def get_most_active():
     """Get most actively traded stocks"""
     limit = min(int(request.args.get('limit', 10)), 50)
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
     stocks = MarketData.query.filter(
         MarketData.asset_type == 'stock',
-        MarketData.volume != None
+        MarketData.volume != None,
+        filter_condition
     ).order_by(desc(MarketData.volume)).limit(limit).all()
     
     return jsonify([{
