@@ -22,7 +22,7 @@ db.init_app(app)
 CORS(app, 
      origins="*",
      supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country"],
+     allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
      methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
      expose_headers=["Content-Type", "Authorization"])
 

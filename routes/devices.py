@@ -8,6 +8,7 @@ import uuid
 import re
 from datetime import datetime, timedelta
 from models import db, User, UserSession
+from .decorators import auth_required
 
 devices_bp = Blueprint('devices', __name__)
 
@@ -56,14 +57,6 @@ def parse_user_agent(user_agent):
     }
 
 
-def get_current_user():
-    """Helper to get current user from email header"""
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
-
-
 def get_client_ip():
     """Get client IP address"""
     return (
@@ -75,11 +68,10 @@ def get_client_ip():
 
 
 @devices_bp.route('/', methods=['GET'])
+@auth_required
 def get_devices():
     """Get all active sessions for the current user"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    user = request.user
     
     # Get current session token from headers
     current_token = request.headers.get('X-Session-Token', '')
@@ -107,11 +99,10 @@ def get_devices():
 
 
 @devices_bp.route('/track', methods=['POST'])
+@auth_required
 def track_device():
     """Track/create a new session (called on login or app start)"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    user = request.user
     
     # Parse device info
     user_agent = request.headers.get('User-Agent', '')
@@ -154,11 +145,10 @@ def track_device():
 
 
 @devices_bp.route('/<session_id>', methods=['DELETE'])
+@auth_required
 def revoke_session(session_id):
     """Revoke a specific session"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    user = request.user
     
     # Delete the session
     result = UserSession.query.filter_by(
@@ -178,11 +168,10 @@ def revoke_session(session_id):
 
 
 @devices_bp.route('/all/except-current', methods=['DELETE'])
+@auth_required
 def revoke_all_except_current():
     """Revoke all sessions except the current one"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
+    user = request.user
     
     # Get current session token
     current_token = request.headers.get('X-Session-Token', '')
@@ -203,12 +192,10 @@ def revoke_all_except_current():
 
 
 @devices_bp.route('/<session_id>/rename', methods=['PATCH'])
+@auth_required
 def rename_device(session_id):
     """Rename a device"""
-    user = get_current_user()
-    if not user:
-        return jsonify({'error': 'Authentication required'}), 401
-    
+    user = request.user
     data = request.get_json()
     device_name = data.get('deviceName')
     
