@@ -35,8 +35,13 @@ CORS(app,
 # Middleware to extract country from headers
 @app.before_request
 def extract_country():
-    """Extract user country from X-User-Country header"""
-    request.user_country = request.headers.get('X-User-Country', 'US')
+    """Extract user country from headers (admin or user)"""
+    # Admin routes use X-Admin-Country, user routes use X-User-Country
+    request.user_country = (
+        request.headers.get('X-Admin-Country') or
+        request.headers.get('X-User-Country') or
+        'US'
+    )
 
 
 # Health check endpoint

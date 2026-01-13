@@ -186,13 +186,14 @@ def get_top_cryptos(limit: int = 20) -> List[Dict[str, Any]]:
     return get_multiple_crypto_quotes(symbols)
 
 
-def import_cryptos_to_db(symbols: List[str] = None, db_session=None) -> Dict[str, int]:
+def import_cryptos_to_db(symbols: List[str] = None, db_session=None, country_code: str = 'GLOBAL') -> Dict[str, int]:
     """
     Import cryptocurrency data to database.
     
     Args:
         symbols: List of crypto ticker symbols (defaults to TOP_CRYPTOS)
         db_session: SQLAlchemy database session
+        country_code: Country code to assign (default: GLOBAL since crypto is global)
     
     Returns:
         Dictionary with counts of imported and updated records
@@ -262,6 +263,7 @@ def import_cryptos_to_db(symbols: List[str] = None, db_session=None) -> Dict[str
                     currency='USD',
                     exchange=quote.get('exchange'),
                     asset_type='crypto',
+                    country_code=country_code,
                     last_updated=datetime.utcnow(),
                 )
                 session.add(new_crypto)

@@ -151,13 +151,14 @@ def get_index_history(
         return []
 
 
-def import_indices_to_db(symbols: List[str] = None, db_session=None) -> Dict[str, int]:
+def import_indices_to_db(symbols: List[str] = None, db_session=None, country_code: str = None) -> Dict[str, int]:
     """
     Import market indices to database.
     
     Args:
         symbols: List of index symbols (defaults to MAJOR_INDICES)
         db_session: SQLAlchemy database session
+        country_code: Country code to assign (if None, auto-detect from symbol)
     
     Returns:
         Dictionary with counts of imported and updated records
@@ -209,7 +210,7 @@ def import_indices_to_db(symbols: List[str] = None, db_session=None) -> Dict[str
                     year_high=quote.get('yearHigh'),
                     year_low=quote.get('yearLow'),
                     market_status='closed',
-                    country_code='US' if symbol.startswith('^') else 'XX',
+                    country_code=country_code or ('US' if symbol.startswith('^') else 'GLOBAL'),
                     last_updated=datetime.utcnow(),
                 )
                 session.add(new_index)

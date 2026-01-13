@@ -3,8 +3,9 @@ Education API Routes (Public)
 Courses, Instructors, and Learning resources
 """
 from flask import Blueprint, jsonify, request
-from models import Course, Instructor, CourseModule
+from models import Course, Instructor, CourseModule, UserEnrollment
 from models.base import db
+from routes.decorators import auth_required
 
 education_bp = Blueprint('education', __name__)
 
@@ -189,6 +190,54 @@ def get_categories():
         
         return jsonify({
             'categories': [c[0] for c in categories if c[0]]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@education_bp.route('/my-courses', methods=['GET'])
+@auth_required
+def get_my_courses():
+    """Get authenticated user's enrolled courses with progress"""
+    try:
+        user_id = request.user_id
+        
+        # Get user's enrollments with course details
+        enrollments = db.session.query(
+            UserEnrollment, Course, CourseModule
+        ).join(
+            Course, UserEnrollment.course_id == Course.id
+        ).outerjoin(
+            CourseModule, UserEnrollment.current_module_id == CourseModule.id
+        ).filter(
+            UserEnrollment.user_id == user_id
+        ).order_by(
+            UserEnrollment.last_activity_at.desc()
+        ).all()
+        
+        courses = []
+        for enrollment, course, current_module in enrollments:
+            courses.append({
+                'enrollmentId': enrollment.id,
+                'courseId': course.id,
+                'title': course.title,
+                'slug': course.slug,
+                'thumbnailUrl': course.thumbnail_url,
+                'category': course.category,
+                'level': course.level,
+                'progress': enrollment.progress or 0,
+                'status': enrollment.status,
+                'currentModule': {
+                    'id': current_module.id,
+                    'title': current_module.title
+                } if current_module else None,
+                'enrolledAt': enrollment.enrolled_at.isoformat() if enrollment.enrolled_at else None,
+                'lastActivityAt': enrollment.last_activity_at.isoformat() if enrollment.last_activity_at else None
+            })
+        
+        return jsonify({
+            'courses': courses,
+            'total': len(courses)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -237,13 +237,14 @@ def get_analyst_price_targets(symbol: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def import_stocks_to_db(symbols: List[str], db_session=None) -> Dict[str, int]:
+def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str = 'US') -> Dict[str, int]:
     """
     Import stock data to database.
     
     Args:
         symbols: List of stock ticker symbols
         db_session: SQLAlchemy database session (optional, will import from models if not provided)
+        country_code: Country code to assign to imported stocks (default: US)
     
     Returns:
         Dictionary with counts of imported and updated records
@@ -338,6 +339,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None) -> Dict[str, int]:
                     exchange=quote.get('exchange'),
                     currency=quote.get('currency', 'USD'),
                     asset_type='stock',
+                    country_code=country_code,
                     website=quote.get('website'),
                     logo_url=quote.get('logoUrl'),
                     description=quote.get('description'),

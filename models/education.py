@@ -222,3 +222,31 @@ class HelpArticle(db.Model):
     country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserEnrollment(db.Model):
+    """User course enrollments with progress tracking"""
+    __tablename__ = 'user_enrollments'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    progress = db.Column(db.Integer, default=0)  # 0-100 percentage
+    current_module_id = db.Column(db.Integer, db.ForeignKey('course_modules.id'))
+    status = db.Column(db.Enum('enrolled', 'in_progress', 'completed', 'paused'), default='enrolled')
+    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'userId': self.user_id,
+            'courseId': self.course_id,
+            'progress': self.progress,
+            'currentModuleId': self.current_module_id,
+            'status': self.status,
+            'enrolledAt': self.enrolled_at.isoformat() if self.enrolled_at else None,
+            'lastActivityAt': self.last_activity_at.isoformat() if self.last_activity_at else None,
+            'completedAt': self.completed_at.isoformat() if self.completed_at else None
+        }

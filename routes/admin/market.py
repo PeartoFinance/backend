@@ -354,13 +354,14 @@ def import_stocks_yfinance():
         if not symbols:
             return jsonify({'error': 'symbols array required'}), 400
         
-        result = import_stocks_to_db(symbols)
+        country = getattr(request, 'user_country', 'US')
+        result = import_stocks_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
             'imported': result.get('imported', 0),
             'updated': result.get('updated', 0),
             'errors': result.get('errors', 0),
-            'message': f"Processed {len(symbols)} symbols"
+            'message': f"Processed {len(symbols)} symbols for {country}"
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -376,7 +377,8 @@ def import_crypto_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', TOP_CRYPTOS)
         
-        result = import_cryptos_to_db(symbols)
+        country = getattr(request, 'user_country', 'GLOBAL')
+        result = import_cryptos_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
             'imported': result.get('imported', 0),
@@ -398,7 +400,8 @@ def import_indices_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', list(MAJOR_INDICES.keys()))
         
-        result = import_indices_to_db(symbols)
+        country = getattr(request, 'user_country', None)
+        result = import_indices_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
             'imported': result.get('imported', 0),
@@ -420,7 +423,8 @@ def import_commodities_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', list(COMMODITIES.keys()))
         
-        result = import_commodities_to_db(symbols)
+        country = getattr(request, 'user_country', 'GLOBAL')
+        result = import_commodities_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
             'imported': result.get('imported', 0),

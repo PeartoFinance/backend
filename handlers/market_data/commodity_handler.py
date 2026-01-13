@@ -159,13 +159,14 @@ def get_commodity_history(
         return []
 
 
-def import_commodities_to_db(symbols: List[str] = None, db_session=None) -> Dict[str, int]:
+def import_commodities_to_db(symbols: List[str] = None, db_session=None, country_code: str = 'GLOBAL') -> Dict[str, int]:
     """
     Import commodities to database.
     
     Args:
         symbols: List of commodity symbols (defaults to all COMMODITIES)
         db_session: SQLAlchemy database session
+        country_code: Country code to assign (default: GLOBAL since commodities are global)
     
     Returns:
         Dictionary with counts of imported and updated records
@@ -218,6 +219,7 @@ def import_commodities_to_db(symbols: List[str] = None, db_session=None) -> Dict
                     year_low=quote.get('yearLow'),
                     unit=quote.get('unit'),
                     currency=quote.get('currency', 'USD'),
+                    country_code=country_code,
                     last_updated=datetime.utcnow(),
                 )
                 session.add(new_commodity)
