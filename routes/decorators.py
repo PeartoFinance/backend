@@ -7,6 +7,10 @@ from models import User
 def auth_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # Allow OPTIONS preflight requests to pass through for CORS
+        if request.method == 'OPTIONS':
+            return '', 200
+            
         auth_header = request.headers.get('Authorization', '')
         
         if not auth_header.startswith('Bearer '):

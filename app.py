@@ -75,6 +75,7 @@ from routes.pages import pages_bp
 from routes.media import media_bp
 from routes.education import education_bp
 from routes.ai import ai_bp
+from routes.jobs import jobs_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -96,6 +97,17 @@ app.register_blueprint(pages_bp, url_prefix='/api')
 app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
+app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
+
+# User feature routes
+from routes.alerts import alerts_bp
+from routes.documents import documents_bp
+app.register_blueprint(alerts_bp, url_prefix='/api/user/alerts')
+app.register_blueprint(documents_bp, url_prefix='/api/user/documents')
+
+# Cron routes for external cURL calls (cPanel)
+from routes.cron import cron_bp
+app.register_blueprint(cron_bp, url_prefix='/api/cron')
 
 
 # Error handlers
@@ -129,6 +141,13 @@ with app.app_context():
 
 
 if __name__ == '__main__':
+    # Initialize background job scheduler
+    import os
+    if os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true':
+        from jobs.scheduler import init_scheduler
+        init_scheduler(app)
+        print("[OK] Background scheduler started")
+    
     print(f"[INFO] Starting PeartoFinance API on port {config.PORT}")
     app.run(
         host='0.0.0.0',
