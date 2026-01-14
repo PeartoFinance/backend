@@ -1,9 +1,31 @@
 """
 Admin Education Routes (CRUD for Courses, Instructors)
 """
+"""
+Admin Education Routes
+
+Responsibilities:
+- Manage education content (courses, modules, instructors)
+- Control visibility and publishing
+- Observe enrollment and learning progress (read-only)
+
+Non-responsibilities:
+- Modifying user learning state
+- Enrolling or unenrolling users
+- Updating progress or completion
+
+IMPORTANT:
+Admin routes must not bypass learning rules enforced
+by user education endpoints.
+"""
+
+
+
 from flask import Blueprint, jsonify, request
 from models import Course, Instructor, CourseModule
 from models.base import db
+from models.education import UserEnrollment
+from models.user import User
 from ..decorators import admin_required
 from routes.admin.country_filter import get_country_context
 
@@ -23,7 +45,7 @@ def list_courses():
             country = getattr(request, 'user_country', 'US')
 
         query = Course.query.filter(
-            (Course.country_code == country) | (Course.country_code == 'GLOBAL')
+            (Course.country_code == country)
         )
 
         courses = query.order_by(Course.created_at.desc()).all()
@@ -55,51 +77,94 @@ def list_courses():
 @education_admin_bp.route('/courses', methods=['POST'])
 @admin_required
 def create_course():
-    """Create a new course"""
+    """
+    Create one or multiple courses.
+
+    Accepts:
+    - Single course payload
+    - Batch payload: { "courses": [ {...}, {...} ] }
+
+    Each course is stored as a separate DB row.
+    """
     try:
-        data = request.get_json()
-        payload_country = data.get('countryCode')
-        if payload_country:
-            country = payload_country
+        payload = request.get_json()
+
+        # ---- 1. Normalize input ----
+        if isinstance(payload, dict) and 'courses' in payload:
+            courses_data = payload.get('courses')
+        elif isinstance(payload, dict):
+            courses_data = [payload]
         else:
-            is_global, header_country = get_country_context()
-            if not is_global and header_country:
-                country = header_country
-            else:
-                country = getattr(request, 'user_country', 'US')
-        instructor_id = data.get("instructorId")
+            return jsonify({'error': 'Invalid request payload'}), 400
 
-        if not Instructor.query.get(instructor_id):
-            return jsonify({"error": "Instructor does not exist"}), 400
+        if not courses_data:
+            return jsonify({'error': 'No courses provided'}), 400
 
-        course = Course(
-            title=data.get('title'),
-            slug=data.get('slug') or data.get('title', '').lower().replace(' ', '-'),
-            description=data.get('description'),
-            long_description=data.get('longDescription'),
-            category=data.get('category'),
-            level=data.get('level', 'Beginner'),
-            duration_hours=data.get('durationHours'),
-            duration_weeks=data.get('durationWeeks'),
-            price=data.get('price', 0),
-            discount_price=data.get('discountPrice'),
-            thumbnail_url=data.get('thumbnailUrl'),
-            video_url=data.get('videoUrl'),
-            is_published=data.get('isPublished', False),
-            is_free=data.get('isFree', False),
-            instructor_id=data.get('instructorId'),
-            requirements=data.get('requirements'),
-            what_you_learn=data.get('whatYouLearn'),
-            country_code=data.get('countryCode') or country
+        # Safety guard (recommended)
+        if len(courses_data) > 20:
+            return jsonify({'error': 'Too many courses in one request'}), 400
+
+        created_courses = []
+
+        # ---- 2. Resolve country context once ----
+        is_global, header_country = get_country_context()
+        default_country = (
+            header_country if not is_global and header_country
+            else getattr(request, 'user_country', 'US')
         )
-        
-        db.session.add(course)
+
+        # ---- 3. Create courses ----
+        for index, data in enumerate(courses_data):
+            title = data.get('title')
+            if not title:
+                return jsonify({
+                    'error': f'Missing title for course at index {index}'
+                }), 400
+
+            instructor_id = data.get('instructorId')
+            if instructor_id and not Instructor.query.get(instructor_id):
+                return jsonify({
+                    'error': f'Instructor does not exist for course at index {index}'
+                }), 400
+
+            country = data.get('countryCode') or default_country
+
+            course = Course(
+                title=title,
+                slug=data.get('slug') or title.lower().replace(' ', '-'),
+                description=data.get('description'),
+                long_description=data.get('longDescription'),
+                category=data.get('category'),
+                level=data.get('level', 'Beginner'),
+                duration_hours=data.get('durationHours'),
+                duration_weeks=data.get('durationWeeks'),
+                price=data.get('price', 0),
+                discount_price=data.get('discountPrice'),
+                thumbnail_url=data.get('thumbnailUrl'),
+                video_url=data.get('videoUrl'),
+                is_published=data.get('isPublished', False),
+                is_free=data.get('isFree', False),
+                instructor_id=instructor_id,
+                requirements=data.get('requirements'),
+                what_you_learn=data.get('whatYouLearn'),
+                country_code=country
+            )
+
+            db.session.add(course)
+            created_courses.append(course)
+
+        # ---- 4. Commit once (atomic) ----
         db.session.commit()
-        
+
         return jsonify({
-            'message': 'Course created successfully',
-            'id': course.id
+            'message': 'Courses created successfully',
+            'count': len(created_courses),
+            'courses': [
+                {'id': c.id, 'title': c.title}
+                for c in created_courses
+            ]
         }), 201
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -315,3 +380,177 @@ def get_stats():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ============= Modules =============
+# Post request to create course modules
+@education_admin_bp.route('/courses/<int:course_id>/modules', methods=['POST'])
+@admin_required
+def create_module(course_id):
+    try:
+        course = Course.query.get(course_id)
+        if not course:
+            return jsonify({'error': 'Course not found'}), 404
+
+        data = request.get_json()
+        title = data.get('title')
+        if not title:
+            return jsonify({'error': 'Module title is required'}), 400
+
+        # calculate next order index
+        max_order = (
+            db.session.query(db.func.max(CourseModule.order_index))
+            .filter_by(course_id=course_id)
+            .scalar()
+        ) or 0
+
+        module = CourseModule(
+            course_id=course_id,
+            title=title,
+            description=data.get('description'),
+            duration_minutes=data.get('durationMinutes'),
+            video_url=data.get('videoUrl'),
+            content=data.get('content'),
+            is_free=data.get('isFree', False),
+            order_index=max_order + 1
+        )
+
+        db.session.add(module)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Module created successfully',
+            'id': module.id,
+            'orderIndex': module.order_index
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@education_admin_bp.route('/courses/<int:course_id>/modules', methods=['GET'])
+@admin_required
+def list_modules(course_id):
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({'error': 'Course not found'}), 404
+
+    modules = (
+        CourseModule.query
+        .filter_by(course_id=course_id)
+        .order_by(CourseModule.order_index)
+        .all()
+    )
+
+    return jsonify({
+        'modules': [{
+            'id': m.id,
+            'title': m.title,
+            'description': m.description,
+            'orderIndex': m.order_index,
+            'durationMinutes': m.duration_minutes,
+            'isFree': m.is_free
+        } for m in modules]
+    })
+
+
+
+@education_admin_bp.route('/modules/<int:module_id>', methods=['PUT'])
+@admin_required
+def update_module(module_id):
+    try:
+        module = CourseModule.query.get(module_id)
+        if not module:
+            return jsonify({'error': 'Module not found'}), 404
+
+        data = request.get_json()
+
+        if 'title' in data:
+            module.title = data['title']
+        if 'description' in data:
+            module.description = data['description']
+        if 'durationMinutes' in data:
+            module.duration_minutes = data['durationMinutes']
+        if 'videoUrl' in data:
+            module.video_url = data['videoUrl']
+        if 'content' in data:
+            module.content = data['content']
+        if 'isFree' in data:
+            module.is_free = data['isFree']
+
+        db.session.commit()
+
+        return jsonify({'message': 'Module updated successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@education_admin_bp.route('/modules/<int:module_id>', methods=['DELETE'])
+@admin_required
+def delete_module(module_id):
+    try:
+        module = CourseModule.query.get(module_id)
+        if not module:
+            return jsonify({'error': 'Module not found'}), 404
+
+        course_id = module.course_id
+        deleted_order = module.order_index
+
+        db.session.delete(module)
+
+        # reorder remaining modules
+        CourseModule.query.filter(
+            CourseModule.course_id == course_id,
+            CourseModule.order_index > deleted_order
+        ).update(
+            {CourseModule.order_index: CourseModule.order_index - 1},
+            synchronize_session=False
+        )
+
+        db.session.commit()
+
+        return jsonify({'message': 'Module deleted successfully'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+
+# ====== See User Enrollnment, progress, completed of course (Read only) ==========
+# admins should observe, not “learn on behalf of users”
+# mutations here easily corrupt analytics
+
+@education_admin_bp.route('/courses/<int:course_id>/enrollments', methods=['GET'])
+@admin_required
+def list_course_enrollments(course_id):
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({'error': 'Course not found'}), 404
+
+    enrollments = (
+        db.session.query(UserEnrollment, User)
+        .join(User, UserEnrollment.user_id == User.id)
+        .filter(UserEnrollment.course_id == course_id)
+        .order_by(UserEnrollment.enrolled_at.desc())
+        .all()
+    )
+
+    return jsonify({
+        'courseId': course.id,
+        'title': course.title,
+        'enrollments': [
+            {
+                'userId': user.id,
+                'email': user.email,
+                'status': e.status,
+                'progress': e.progress,
+                'enrolledAt': e.enrolled_at,
+                'lastActivityAt': e.last_activity_at
+            }
+            for e, user in enrollments
+        ]
+    })

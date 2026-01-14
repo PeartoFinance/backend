@@ -46,6 +46,8 @@ def upgrade():
         batch_op.add_column(sa.Column('deal_type', sa.String(length=50), nullable=True))
         batch_op.add_column(sa.Column('shares_offered', sa.BigInteger(), nullable=True))
         batch_op.add_column(sa.Column('offer_price', sa.Numeric(precision=18, scale=6), nullable=True))
+    
+   
 
     # ### end Alembic commands ###
 
