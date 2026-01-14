@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, g
 import jwt
 from config import config
 from models import User
@@ -21,7 +21,14 @@ def auth_required(f):
             if not user:
                 return jsonify({'error': 'User not found'}), 404
             
+            # ✅ NEW (correct)
+            g.user = user
+            g.user_id = user.id
+            g.user_country = getattr(user, 'country_code', 'US')
+            
+            # ✅ OLD (keep for compatibility)
             request.user = user
+            
             return f(*args, **kwargs)
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token expired'}), 401

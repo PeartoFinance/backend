@@ -233,7 +233,7 @@ class UserEnrollment(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     progress = db.Column(db.Integer, default=0)  # 0-100 percentage
     current_module_id = db.Column(db.Integer, db.ForeignKey('course_modules.id'))
-    status = db.Column(db.Enum('enrolled', 'in_progress', 'completed', 'paused'), default='enrolled')
+    status = db.Column(db.Enum('enrolled', 'in_progress', 'completed', 'paused','unenrolled'), default='enrolled')
     enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_activity_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
