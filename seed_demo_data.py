@@ -677,7 +677,8 @@ def seed_instructors():
                 is_active=True,
                 rating=4.5 + random.random() * 0.5,
                 students_taught=random.randint(500, 5000),
-                courses_count=random.randint(2, 8)
+                courses_count=random.randint(2, 8),
+                country_code='GLOBAL'
             )
             db.session.add(instructor)
             count += 1
@@ -723,7 +724,8 @@ def seed_courses():
                 instructor_id=instructor_id,
                 enrollment_count=random.randint(100, 2000),
                 rating=4.0 + random.random() * 1.0,
-                rating_count=random.randint(20, 200)
+                rating_count=random.randint(20, 200),
+                country_code='GLOBAL'
             )
             db.session.add(course)
             count += 1
@@ -806,7 +808,7 @@ def seed_help_articles():
                 content=item['content'],
                 slug=item['title'].lower().replace(' ', '-').replace("'", ''),
                 category_id=cat.id if cat else None,
-                is_published=True
+                is_active=True
             )
             db.session.add(article)
             count += 1
