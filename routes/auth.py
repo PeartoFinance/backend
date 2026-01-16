@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from config import config
 from models import db, User, PasswordResetToken
-from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email
+from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email, track_login, track_signup
 from .decorators import auth_required
 
 auth_bp = Blueprint('auth', __name__)
@@ -49,13 +49,14 @@ def login():
     user.last_login_at = datetime.now(timezone.utc)
     db.session.commit()
     
-    # Send login notification email (async, don't block response)
+    # Track login activity
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         user_agent = request.headers.get('User-Agent', 'Unknown device')
+        track_login(user.id, success=True, method='email', ip=ip_address)
         send_login_notification_email(user.email, user.name, ip_address, user_agent)
     except Exception as e:
-        print(f'[Auth] Login notification email failed: {e}')
+        print(f'[Auth] Login notification failed: {e}')
     
     return jsonify({
         'user': user.to_dict(),
@@ -98,11 +99,13 @@ def signup():
     db.session.add(user)
     db.session.commit()
     
-    # Send welcome email (async, don't block response)
+    # Track signup activity and send welcome email
     try:
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+        track_signup(user.id, method='email', ip=ip_address)
         send_welcome_email(user.email, user.name)
     except Exception as e:
-        print(f'[Auth] Welcome email failed: {e}')
+        print(f'[Auth] Signup tracking/email failed: {e}')
     
     return jsonify(user.to_dict()), 201
 

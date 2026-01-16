@@ -61,11 +61,18 @@ def upload_document():
         user_id=request.user.id,
         document_type=document_type,
         file_url=f"/uploads/documents/{filename}",
-        status='pending'
+        status='approved'
     )
     
     db.session.add(doc)
     db.session.commit()
+    
+    # Track document upload activity
+    try:
+        from handlers import track_document_upload
+        track_document_upload(request.user.id, doc.id, document_type)
+    except Exception as e:
+        print(f'[Documents] Activity tracking failed: {e}')
     
     return jsonify({
         'id': doc.id,

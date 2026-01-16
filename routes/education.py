@@ -390,6 +390,13 @@ def enroll_in_course(course_id):
         db.session.add(enrollment)
         db.session.commit()
 
+        # Track course enrollment activity
+        try:
+            from handlers import track_course_enroll
+            track_course_enroll(user_id, course_id, course.title or f'Course {course_id}')
+        except Exception as e:
+            print(f'[Education] Activity tracking failed: {e}')
+
         return (
             jsonify(
                 {
@@ -445,6 +452,13 @@ def unenroll_course(course_id):
         enrollment.last_activity_at = db.func.now()
 
         db.session.commit()
+
+        # Track course unenroll activity
+        try:
+            from handlers import track_course_unenroll
+            track_course_unenroll(user_id, course_id)
+        except Exception as e:
+            print(f'[Education] Activity tracking failed: {e}')
 
         return (
             jsonify(

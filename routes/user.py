@@ -80,6 +80,14 @@ def update_profile():
     user.updated_at = datetime.utcnow()
     db.session.commit()
     
+    # Track profile update activity
+    try:
+        from handlers import track_profile_update
+        changed_fields = [k for k in ['name', 'phone', 'avatarUrl'] if k in data]
+        track_profile_update(user.id, changed_fields)
+    except Exception as e:
+        print(f'[User] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'user': user.to_dict()
@@ -136,6 +144,13 @@ def update_preferences():
     user.updated_at = datetime.utcnow()
     db.session.commit()
     
+    # Track settings update activity
+    try:
+        from handlers import track_settings_update
+        track_settings_update(user.id, 'preferences')
+    except Exception as e:
+        print(f'[User] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'message': 'Preferences updated successfully'
@@ -167,6 +182,13 @@ def change_password():
     user.password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     user.updated_at = datetime.utcnow()
     db.session.commit()
+    
+    # Track password change activity
+    try:
+        from handlers import track_password_change
+        track_password_change(user.id)
+    except Exception as e:
+        print(f'[User] Activity tracking failed: {e}')
     
     return jsonify({
         'success': True,
@@ -218,3 +240,43 @@ def get_user_watchlist():
 
     return jsonify({'items': items})
 
+
+@user_bp.route('/net-worth', methods=['GET'])
+def get_net_worth():
+    """Get user's net worth calculated from portfolio holdings"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    from models import UserPortfolio, PortfolioHolding
+    
+    # Get all user portfolios
+    portfolios = UserPortfolio.query.filter_by(user_id=user.id).all()
+    
+    total_value = 0
+    total_cost = 0
+    total_gain = 0
+    
+    for portfolio in portfolios:
+        holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio.id).all()
+        for h in holdings:
+            shares = float(h.shares or 0)
+            avg_price = float(h.avg_buy_price or 0)
+            current_price = float(h.current_price or 0)
+            
+            value = shares * current_price
+            cost = shares * avg_price
+            
+            total_value += value
+            total_cost += cost
+            total_gain += (value - cost)
+    
+    # Calculate percentage change
+    change_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
+    
+    return jsonify({
+        'netWorth': round(total_value, 2),
+        'netWorthChange': round(total_gain, 2),
+        'netWorthChangePercent': round(change_percent, 2),
+        'portfolioCount': len(portfolios)
+    })

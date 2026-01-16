@@ -99,6 +99,13 @@ def add_to_watchlist():
     db.session.add(item)
     db.session.commit()
 
+    # Track watchlist add activity
+    try:
+        from handlers import track_watchlist_add
+        track_watchlist_add(request.user.id, symbol)
+    except Exception as e:
+        print(f'[Portfolio] Activity tracking failed: {e}')
+
     return jsonify({'message': f'{symbol} added to watchlist', 'id': item.id})
 
 
@@ -117,6 +124,14 @@ def remove_from_watchlist(symbol):
 
     db.session.delete(item)
     db.session.commit()
+
+    # Track watchlist remove activity
+    try:
+        from handlers import track_watchlist_remove
+        track_watchlist_remove(request.user.id, symbol)
+    except Exception as e:
+        print(f'[Portfolio] Activity tracking failed: {e}')
+
     return jsonify({'message': f'{symbol} removed from watchlist'})
 
 
@@ -142,30 +157,79 @@ def get_watchlists():
 @portfolio_bp.route('/list', methods=['GET'])
 @auth_required
 def get_portfolios():
-    """Get user's portfolios"""
-    portfolios = UserPortfolio.query.limit(5).all()
+    """Get user's portfolios with holdings"""
+    portfolios = UserPortfolio.query.filter_by(user_id=request.user.id).all()
     
-    return jsonify([{
-        'id': p.id,
-        'name': p.name,
-        'totalValue': float(p.total_value) if p.total_value else 0,
-        'totalGain': 0,
-        'totalGainPercent': 0,
-        'holdings': []
-    } for p in portfolios])
+    result = []
+    for p in portfolios:
+        # Get holdings for this portfolio
+        holdings = PortfolioHolding.query.filter_by(portfolio_id=p.id).all()
+        
+        # Calculate totals from holdings
+        total_value = sum(float(h.current_value or 0) for h in holdings)
+        total_gain = sum(float(h.gain_loss or 0) for h in holdings)
+        total_cost = sum(float(h.shares or 0) * float(h.avg_buy_price or 0) for h in holdings)
+        total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
+        
+        result.append({
+            'id': p.id,
+            'name': p.name,
+            'totalValue': total_value,
+            'totalGain': total_gain,
+            'totalGainPercent': round(total_gain_percent, 2),
+            'holdings': [_holding_to_dict(h) for h in holdings]
+        })
+    
+    return jsonify(result)
 
 
-@portfolio_bp.route('/<int:portfolio_id>', methods=['GET'])
+def _holding_to_dict(h):
+    """Convert holding to frontend-compatible dict"""
+    shares = float(h.shares or 0)
+    avg_cost = float(h.avg_buy_price or 0)
+    current_price = float(h.current_price or 0)
+    total_value = shares * current_price
+    total_cost = shares * avg_cost
+    gain = total_value - total_cost
+    gain_percent = (gain / total_cost * 100) if total_cost > 0 else 0
+    
+    return {
+        'id': h.id,
+        'symbol': h.symbol,
+        'name': h.symbol,  # Will be enriched from MarketData if needed
+        'shares': shares,
+        'avgCost': avg_cost,
+        'currentPrice': current_price,
+        'totalValue': round(total_value, 2),
+        'gain': round(gain, 2),
+        'gainPercent': round(gain_percent, 2)
+    }
+
+
+@portfolio_bp.route('/<portfolio_id>', methods=['GET'])
 @auth_required
 def get_portfolio(portfolio_id):
-    """Get portfolio by ID"""
-    portfolio = UserPortfolio.query.get_or_404(portfolio_id)
+    """Get portfolio by ID with holdings"""
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    # Get holdings
+    holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id).all()
+    
+    # Calculate totals
+    total_value = sum(float(h.current_value or 0) for h in holdings)
+    total_gain = sum(float(h.gain_loss or 0) for h in holdings)
+    total_cost = sum(float(h.shares or 0) * float(h.avg_buy_price or 0) for h in holdings)
+    total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
     
     return jsonify({
         'id': portfolio.id,
         'name': portfolio.name,
-        'totalValue': float(portfolio.total_value) if portfolio.total_value else 0,
-        'holdings': []
+        'totalValue': total_value,
+        'totalGain': total_gain,
+        'totalGainPercent': round(total_gain_percent, 2),
+        'holdings': [_holding_to_dict(h) for h in holdings]
     })
 
 
@@ -175,7 +239,6 @@ def create_portfolio():
     """Create new portfolio"""
     data = request.get_json()
     name = data.get('name', 'My Portfolio')
-    # persist portfolio to DB
     new_id = str(uuid.uuid4())
     portfolio = UserPortfolio(id=new_id, user_id=request.user.id, name=name)
     db.session.add(portfolio)
@@ -184,6 +247,88 @@ def create_portfolio():
     return jsonify({
         'id': portfolio.id,
         'name': portfolio.name,
-        'totalValue': float(portfolio.total_value) if portfolio.total_value else 0,
+        'totalValue': 0,
+        'totalGain': 0,
+        'totalGainPercent': 0,
         'holdings': []
     }), 201
+
+
+@portfolio_bp.route('/<portfolio_id>/holdings', methods=['POST'])
+@auth_required
+def add_holding(portfolio_id):
+    """Add holding to portfolio"""
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    data = request.get_json()
+    symbol = data.get('symbol', '').upper()
+    shares = float(data.get('shares', 0))
+    avg_buy_price = float(data.get('avgBuyPrice', 0))
+    
+    if not symbol or shares <= 0:
+        return jsonify({'error': 'Symbol and shares required'}), 400
+    
+    # Get current market price
+    market = MarketData.query.filter_by(symbol=symbol).first()
+    current_price = float(market.price) if market and market.price else avg_buy_price
+    
+    # Calculate values
+    current_value = shares * current_price
+    gain_loss = current_value - (shares * avg_buy_price)
+    gain_percent = (gain_loss / (shares * avg_buy_price) * 100) if avg_buy_price > 0 else 0
+    
+    holding = PortfolioHolding(
+        id=str(uuid.uuid4()),
+        portfolio_id=portfolio_id,
+        symbol=symbol,
+        shares=shares,
+        avg_buy_price=avg_buy_price,
+        current_price=current_price,
+        current_value=current_value,
+        gain_loss=gain_loss,
+        gain_loss_percent=gain_percent
+    )
+    
+    db.session.add(holding)
+    db.session.commit()
+    
+    # Track activity
+    try:
+        from handlers import track_activity
+        track_activity(request.user.id, 'holding_added', 'portfolio', entity_id=holding.id, extra_data={'symbol': symbol, 'shares': shares})
+    except Exception as e:
+        print(f'[Portfolio] Activity tracking failed: {e}')
+    
+    return jsonify({
+        'id': holding.id,
+        'message': f'{symbol} added to portfolio',
+        'holding': _holding_to_dict(holding)
+    }), 201
+
+
+@portfolio_bp.route('/<portfolio_id>/holdings/<holding_id>', methods=['DELETE'])
+@auth_required
+def delete_holding(portfolio_id, holding_id):
+    """Delete holding from portfolio"""
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    holding = PortfolioHolding.query.filter_by(id=holding_id, portfolio_id=portfolio_id).first()
+    if not holding:
+        return jsonify({'error': 'Holding not found'}), 404
+    
+    symbol = holding.symbol
+    db.session.delete(holding)
+    db.session.commit()
+    
+    # Track activity
+    try:
+        from handlers import track_activity
+        track_activity(request.user.id, 'holding_removed', 'portfolio', entity_id=holding_id, extra_data={'symbol': symbol})
+    except Exception as e:
+        print(f'[Portfolio] Activity tracking failed: {e}')
+    
+    return jsonify({'message': f'{symbol} removed from portfolio'})

@@ -335,12 +335,29 @@ class EmailService:
 
     
     def send_email(self, to: str, template_type: str, data: Dict[str, Any]) -> bool:
-        """Send email using template"""
+        """Send email using template from database (with fallback to hardcoded)"""
         try:
-            template = TEMPLATES.get(template_type)
+            # Try to load template from database first
+            template = None
+            try:
+                from models import EmailTemplate
+                db_template = EmailTemplate.query.filter_by(id=template_type, is_active=True).first()
+                if db_template:
+                    template = {
+                        'subject': db_template.subject,
+                        'html': db_template.body_html,
+                        'text': db_template.body_text
+                    }
+                    print(f'[EmailService] 📧 Using DB template: {template_type}')
+            except Exception as e:
+                print(f'[EmailService] ⚠️ DB template load failed, using fallback: {e}')
+            
+            # Fallback to hardcoded templates
             if not template:
-                print(f'[EmailService] ❌ Unknown template type: {template_type}')
-                return False
+                template = TEMPLATES.get(template_type)
+                if not template:
+                    print(f'[EmailService] ❌ Unknown template type: {template_type}')
+                    return False
             
             # Render template
             subject = self._render_template(template['subject'], data.copy())
