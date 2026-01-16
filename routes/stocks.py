@@ -154,3 +154,89 @@ def get_most_active():
         'price': float(s.price) if s.price else None,
         'volume': s.volume
     } for s in stocks])
+
+
+@stocks_bp.route('/etfs', methods=['GET'])
+def get_etfs():
+    """List all ETFs with optional search and pagination"""
+    query = request.args.get('q', '').strip()
+    limit = min(int(request.args.get('limit', 20)), 100)
+    page = max(int(request.args.get('page', 1)), 1)
+    offset = (page - 1) * limit
+
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
+    base_query = MarketData.query.filter(
+        MarketData.asset_type == 'etf',
+        filter_condition
+    )
+
+    if query:
+        base_query = base_query.filter(
+            db.or_(
+                MarketData.symbol.ilike(f'%{query}%'),
+                MarketData.name.ilike(f'%{query}%')
+            )
+        )
+
+    etfs = base_query.order_by(desc(MarketData.market_cap)).offset(offset).limit(limit).all()
+    
+    return jsonify([e.to_dict() for e in etfs])
+
+
+@stocks_bp.route('/etfs/movers', methods=['GET'])
+def get_etf_movers():
+    """Get top ETF gainers and losers"""
+    limit = min(int(request.args.get('limit', 10)), 50)
+    
+    header_country = request.headers.get('X-User-Country')
+    if header_country is None:
+        filter_condition = (MarketData.country_code == 'US')
+    else:
+        country = header_country.strip().upper()
+        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+
+    gainers = MarketData.query.filter(
+        MarketData.asset_type == 'etf',
+        MarketData.change_percent > 0,
+        filter_condition
+    ).order_by(desc(MarketData.change_percent)).limit(limit).all()
+
+    losers = MarketData.query.filter(
+        MarketData.asset_type == 'etf',
+        MarketData.change_percent < 0,
+        filter_condition
+    ).order_by(asc(MarketData.change_percent)).limit(limit).all()
+    
+    return jsonify({
+        'gainers': [g.to_dict() for g in gainers],
+        'losers': [l.to_dict() for l in losers]
+    })
+
+@stocks_bp.route('/history/<symbol>', methods=['GET'])
+def get_history(symbol):
+    """Get price history for a symbol (Stock, ETF, or Crypto)"""
+    try:
+        from handlers.market_data.stock_handler import get_stock_history
+        
+        period = request.args.get('period', '1mo')
+        interval = request.args.get('interval', '1d')
+        
+        history = get_stock_history(symbol.upper(), period=period, interval=interval)
+        
+        if not history:
+            return jsonify({'error': 'No history found for this symbol'}), 404
+            
+        return jsonify({
+            'symbol': symbol.upper(),
+            'period': period,
+            'interval': interval,
+            'data': history
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
