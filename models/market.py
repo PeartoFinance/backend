@@ -25,9 +25,9 @@ class MarketData(db.Model):
     _52_week_low = db.Column('52_week_low', db.Numeric(18, 6))
     currency = db.Column(db.String(3), default='USD')
     exchange = db.Column(db.String(50))
-    asset_type = db.Column(db.Enum('stock', 'crypto', 'forex', 'commodity', 'index'), default='stock')
+    asset_type = db.Column(db.Enum('stock', 'crypto', 'forex', 'commodity', 'index', 'etf'), default='stock')
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
-    country_code = db.Column(db.String(2), default='US')
+    country_code = db.Column(db.String(10), default='US')
     
     # Additional fields for yfinance data
     sector = db.Column(db.String(100))
@@ -112,7 +112,7 @@ class MarketIndices(db.Model):
     year_high = db.Column(db.Numeric(15, 4))
     year_low = db.Column(db.Numeric(15, 4))
     market_status = db.Column(db.Enum('pre-market', 'open', 'after-hours', 'closed'), default='closed')
-    country_code = db.Column(db.String(5), default='US')
+    country_code = db.Column(db.String(10), default='US')
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -205,6 +205,7 @@ class CommodityData(db.Model):
     year_low = db.Column(db.Numeric(18, 6))
     unit = db.Column(db.String(20))
     currency = db.Column(db.String(10), default='USD')
+    country_code = db.Column(db.String(10), default='GLOBAL')
     last_updated = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -218,7 +219,8 @@ class CommodityData(db.Model):
             'dayHigh': float(self.day_high) if self.day_high else None,
             'dayLow': float(self.day_low) if self.day_low else None,
             'unit': self.unit,
-            'currency': self.currency
+            'currency': self.currency,
+            'countryCode': self.country_code
         }
 
 
@@ -452,7 +454,7 @@ class Dividend(db.Model):
     book_closure_date = db.Column(db.Date)
     fiscal_year = db.Column(db.String(20))
     status = db.Column(db.Enum('proposed', 'approved', 'paid'), default='proposed')
-    country_code = db.Column(db.String(5), default='US')
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -490,7 +492,7 @@ class BulkTransaction(db.Model):
     change_percent = db.Column(db.Numeric(10, 4))
     transaction_type = db.Column(db.Enum('bulk', 'block', 'cross'), default='bulk')
     exchange = db.Column(db.String(50))
-    country_code = db.Column(db.String(5), default='US')
+    country_code = db.Column(db.String(10), default='US')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
