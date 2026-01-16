@@ -134,7 +134,7 @@ def send_daily_digest() -> Dict[str, Any]:
             users = db.session.query(User).join(
                 UserNotificationPref, User.id == UserNotificationPref.user_id
             ).filter(
-                UserNotificationPref.email_enabled == True
+                UserNotificationPref.email_alerts == True
             ).all()
             
             for user in users:

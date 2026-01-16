@@ -53,17 +53,18 @@ def get_courses():
         is_free = request.args.get("free")
         search = request.args.get("search")
 
-        # Determine country filter: header-driven. If no header -> US; if header GLOBAL -> GLOBAL; else only header country
+        # Determine country filter: GLOBAL courses visible to all, plus country-specific
         header_country = request.headers.get("X-User-Country")
         if header_country is None:
-            country_filter = Course.country_code == "US"
+            # No header -> show US + GLOBAL
+            country_filter = Course.country_code.in_(["US", "GLOBAL"])
         else:
             hc = header_country.strip().upper()
-            country_filter = (
-                (Course.country_code == "GLOBAL")
-                if hc == "GLOBAL"
-                else (Course.country_code == hc)
-            )
+            if hc == "GLOBAL":
+                country_filter = (Course.country_code == "GLOBAL")
+            else:
+                # Show country-specific + GLOBAL courses
+                country_filter = Course.country_code.in_([hc, "GLOBAL"])
 
         query = Course.query.filter(Course.is_published == True, country_filter)
 
@@ -117,14 +118,13 @@ def get_course(slug):
     try:
         header_country = request.headers.get("X-User-Country")
         if header_country is None:
-            country_filter = Course.country_code == "US"
+            country_filter = Course.country_code.in_(["US", "GLOBAL"])
         else:
             hc = header_country.strip().upper()
-            country_filter = (
-                (Course.country_code == "GLOBAL")
-                if hc == "GLOBAL"
-                else (Course.country_code == hc)
-            )
+            if hc == "GLOBAL":
+                country_filter = (Course.country_code == "GLOBAL")
+            else:
+                country_filter = Course.country_code.in_([hc, "GLOBAL"])
 
         course = Course.query.filter(
             Course.slug == slug, Course.is_published == True, country_filter
@@ -198,17 +198,16 @@ def get_course(slug):
 def get_instructors():
     """Get all active instructors"""
     try:
-        # Apply same header-based country scoping for instructors
+        # Apply country scoping for instructors (include GLOBAL)
         header_country = request.headers.get("X-User-Country")
         if header_country is None:
-            instructor_filter = Instructor.country_code == "US"
+            instructor_filter = Instructor.country_code.in_(["US", "GLOBAL"])
         else:
             hc = header_country.strip().upper()
-            instructor_filter = (
-                (Instructor.country_code == "GLOBAL")
-                if hc == "GLOBAL"
-                else (Instructor.country_code == hc)
-            )
+            if hc == "GLOBAL":
+                instructor_filter = (Instructor.country_code == "GLOBAL")
+            else:
+                instructor_filter = Instructor.country_code.in_([hc, "GLOBAL"])
 
         instructors = (
             Instructor.query.filter(Instructor.is_active == True, instructor_filter)
@@ -244,14 +243,13 @@ def get_categories():
     try:
         header_country = request.headers.get("X-User-Country")
         if header_country is None:
-            cat_filter = Course.country_code == "US"
+            cat_filter = Course.country_code.in_(["US", "GLOBAL"])
         else:
             hc = header_country.strip().upper()
-            cat_filter = (
-                (Course.country_code == "GLOBAL")
-                if hc == "GLOBAL"
-                else (Course.country_code == hc)
-            )
+            if hc == "GLOBAL":
+                cat_filter = (Course.country_code == "GLOBAL")
+            else:
+                cat_filter = Course.country_code.in_([hc, "GLOBAL"])
 
         categories = (
             db.session.query(Course.category)
@@ -392,6 +390,13 @@ def enroll_in_course(course_id):
         db.session.add(enrollment)
         db.session.commit()
 
+        # Track course enrollment activity
+        try:
+            from handlers import track_course_enroll
+            track_course_enroll(user_id, course_id, course.title or f'Course {course_id}')
+        except Exception as e:
+            print(f'[Education] Activity tracking failed: {e}')
+
         return (
             jsonify(
                 {
@@ -447,6 +452,13 @@ def unenroll_course(course_id):
         enrollment.last_activity_at = db.func.now()
 
         db.session.commit()
+
+        # Track course unenroll activity
+        try:
+            from handlers import track_course_unenroll
+            track_course_unenroll(user_id, course_id)
+        except Exception as e:
+            print(f'[Education] Activity tracking failed: {e}')
 
         return (
             jsonify(

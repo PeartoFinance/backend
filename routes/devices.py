@@ -136,6 +136,13 @@ def track_device():
     db.session.add(session)
     db.session.commit()
     
+    # Track device tracking activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'device_tracked', 'device', entity_id=session_id, extra_data={'device_name': device_name}, ip_address=ip_address)
+    except Exception as e:
+        print(f'[Devices] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'sessionToken': session_token,
@@ -161,6 +168,13 @@ def revoke_session(session_id):
     
     db.session.commit()
     
+    # Track session revoke activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'session_revoke', 'device', entity_id=session_id)
+    except Exception as e:
+        print(f'[Devices] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'message': 'Session revoked successfully'
@@ -183,6 +197,13 @@ def revoke_all_except_current():
     ).delete()
     
     db.session.commit()
+    
+    # Track revoke all sessions activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'sessions_revoke_all', 'device', extra_data={'revoked_count': result})
+    except Exception as e:
+        print(f'[Devices] Activity tracking failed: {e}')
     
     return jsonify({
         'success': True,

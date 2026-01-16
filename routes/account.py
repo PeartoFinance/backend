@@ -55,6 +55,13 @@ def deactivate_account():
     
     db.session.commit()
     
+    # Track account deactivation activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'account_deactivate', 'account', details=reason)
+    except Exception as e:
+        print(f'[Account] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'message': 'Account deactivated successfully. You will be logged out shortly.'
@@ -91,6 +98,13 @@ def reactivate_account():
     
     db.session.commit()
     
+    # Track account reactivation activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'account_reactivate', 'account')
+    except Exception as e:
+        print(f'[Account] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'message': 'Account reactivated successfully. You can now log in.'
@@ -122,6 +136,13 @@ def delete_account_permanently():
     UserSession.query.filter_by(user_id=user.id).delete()
     
     db.session.commit()
+    
+    # Track account deletion activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'account_delete', 'account')
+    except Exception as e:
+        print(f'[Account] Activity tracking failed: {e}')
     
     return jsonify({
         'success': True,

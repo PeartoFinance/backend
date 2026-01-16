@@ -39,11 +39,11 @@ def send_notification(
         prefs = UserNotificationPref.query.filter_by(user_id=user_id).first()
         if prefs:
             channels = []
-            if prefs.email_enabled:
+            if prefs.email_alerts:
                 channels.append('email')
-            if prefs.push_enabled:
+            if prefs.push_alerts:
                 channels.append('push')
-            if prefs.sms_enabled:
+            if prefs.sms_alerts:
                 channels.append('sms')
         else:
             channels = ['email', 'push']  # Default
@@ -53,20 +53,46 @@ def send_notification(
         try:
             from .email_service import EmailService
             from models import User
+            import os
             
             email_service = EmailService()
             user = User.query.get(user_id)
             if user and user.email:
-                # Use generic template or custom one based on notification_type
+                # Build template data based on notification type
+                app_url = os.getenv('APP_URL', 'http://localhost:3000')
+                template_data = {
+                    'user_name': user.name or 'User',
+                    'app_name': 'Pearto Finance',
+                    'dashboard_url': f'{app_url}/dashboard',
+                    'security_url': f'{app_url}/profile?tab=devices',
+                }
+                
+                # Merge with provided data
+                if data:
+                    template_data.update(data)
+                
+                # Map notification_type to template
+                template_map = {
+                    'price_alert': 'price_alert',
+                    'welcome': 'signup',
+                    'security': 'login',
+                    'earnings_reminder': 'earnings_reminder',
+                    'daily_digest': 'daily_digest',
+                }
+                
+                template_type = template_map.get(notification_type, 'login')
+                
+                # Add specific fields for price_alert
+                if notification_type == 'price_alert' and data:
+                    template_data['symbol'] = data.get('symbol', '')
+                    template_data['current_price'] = f"{data.get('current_price', 0):.2f}"
+                    template_data['target_price'] = f"{data.get('target_price', 0):.2f}"
+                    template_data['direction'] = data.get('direction', 'reached')
+                
                 email_service.send_email(
                     to=user.email,
-                    template_type='login',  # Default template, ideally create specific ones
-                    data={
-                        'user_name': user.name or 'User',
-                        'login_time': title,
-                        'device_info': message,
-                        'ip_address': '-'
-                    }
+                    template_type=template_type,
+                    data=template_data
                 )
                 results['email'] = 'sent'
         except Exception as e:

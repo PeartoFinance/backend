@@ -107,6 +107,13 @@ def confirm_email_verification():
     # Clean up code
     del verification_codes[f'email:{user.email}']
     
+    # Track email verification activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'email_verified', 'verification')
+    except Exception as e:
+        print(f'[Verification] Activity tracking failed: {e}')
+    
     return jsonify({
         'success': True,
         'message': 'Email verified successfully'
@@ -184,6 +191,13 @@ def confirm_phone_verification():
     
     # Clean up code
     del verification_codes[f'phone:{user.email}']
+    
+    # Track phone verification activity
+    try:
+        from handlers import track_activity
+        track_activity(user.id, 'phone_verified', 'verification')
+    except Exception as e:
+        print(f'[Verification] Activity tracking failed: {e}')
     
     return jsonify({
         'success': True,

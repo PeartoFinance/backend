@@ -61,6 +61,13 @@ def create_alert():
     db.session.add(alert)
     db.session.commit()
     
+    # Track alert creation activity
+    try:
+        from handlers import track_alert_created
+        track_alert_created(request.user.id, alert.id, symbol, condition, float(target_value))
+    except Exception as e:
+        print(f'[Alerts] Activity tracking failed: {e}')
+    
     return jsonify({
         'id': alert.id,
         'message': f'Alert created for {symbol}'
