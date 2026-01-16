@@ -22,15 +22,12 @@ def get_quotes():
 
     
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        # no header -> default to US only
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        if country == 'GLOBAL':
-            filter_condition = (MarketData.country_code == 'GLOBAL')
-        else:
-            filter_condition = (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        # no header -> default to GLOBAL only
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     prices = MarketData.query.filter(
         MarketData.symbol.in_(symbols),
@@ -78,11 +75,11 @@ def search_stocks():
 def get_profile(symbol):
     """Get basic stock profile from market data"""
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     stock = MarketData.query.filter(
         MarketData.symbol == symbol.upper(),
@@ -105,11 +102,11 @@ def get_movers():
     result = {}
     
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     if mover_type in ('gainers', 'both'):
         gainers = MarketData.query.filter(
@@ -136,11 +133,11 @@ def get_most_active():
     limit = min(int(request.args.get('limit', 10)), 50)
     
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     stocks = MarketData.query.filter(
         MarketData.asset_type == 'stock',
@@ -165,11 +162,11 @@ def get_etfs():
     offset = (page - 1) * limit
 
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     base_query = MarketData.query.filter(
         MarketData.asset_type == 'etf',
@@ -195,11 +192,11 @@ def get_etf_movers():
     limit = min(int(request.args.get('limit', 10)), 50)
     
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     gainers = MarketData.query.filter(
         MarketData.asset_type == 'etf',

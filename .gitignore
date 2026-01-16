@@ -5,17 +5,15 @@ __pycache__/
 .env
 .venv
 
-
-
-
 # Temporary/Utility Scripts
 update_db_schema.py
 fix_team_data.py
 TA_GUIDE.md
-=======
-/uploads
-<<<<<<< HEAD
-*.zip
-=======
 
->>>>>>> 29b5ba3530f243ac309a40449af6b5ff053f4105
+/uploads
+MARKET_DATA_GUIDE.md
+/docs
+/docs/BUSINESS_PROFILE_PLAN.md
+
+*.zip
+

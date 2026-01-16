@@ -55,16 +55,11 @@ def get_courses():
 
         # Determine country filter: GLOBAL courses visible to all, plus country-specific
         header_country = request.headers.get("X-User-Country")
-        if header_country is None:
-            # No header -> show US + GLOBAL
-            country_filter = Course.country_code.in_(["US", "GLOBAL"])
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            if hc == "GLOBAL":
-                country_filter = (Course.country_code == "GLOBAL")
-            else:
-                # Show country-specific + GLOBAL courses
-                country_filter = Course.country_code.in_([hc, "GLOBAL"])
+            country_filter = Course.country_code.in_([hc, "GLOBAL"])
+        else:
+            country_filter = (Course.country_code == "GLOBAL")
 
         query = Course.query.filter(Course.is_published == True, country_filter)
 
@@ -117,14 +112,11 @@ def get_course(slug):
     """Get single course by slug with modules"""
     try:
         header_country = request.headers.get("X-User-Country")
-        if header_country is None:
-            country_filter = Course.country_code.in_(["US", "GLOBAL"])
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            if hc == "GLOBAL":
-                country_filter = (Course.country_code == "GLOBAL")
-            else:
-                country_filter = Course.country_code.in_([hc, "GLOBAL"])
+            country_filter = Course.country_code.in_([hc, "GLOBAL"])
+        else:
+            country_filter = (Course.country_code == "GLOBAL")
 
         course = Course.query.filter(
             Course.slug == slug, Course.is_published == True, country_filter
@@ -200,14 +192,11 @@ def get_instructors():
     try:
         # Apply country scoping for instructors (include GLOBAL)
         header_country = request.headers.get("X-User-Country")
-        if header_country is None:
-            instructor_filter = Instructor.country_code.in_(["US", "GLOBAL"])
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            if hc == "GLOBAL":
-                instructor_filter = (Instructor.country_code == "GLOBAL")
-            else:
-                instructor_filter = Instructor.country_code.in_([hc, "GLOBAL"])
+            instructor_filter = Instructor.country_code.in_([hc, "GLOBAL"])
+        else:
+            instructor_filter = (Instructor.country_code == "GLOBAL")
 
         instructors = (
             Instructor.query.filter(Instructor.is_active == True, instructor_filter)
@@ -242,14 +231,11 @@ def get_categories():
     """Get unique course categories"""
     try:
         header_country = request.headers.get("X-User-Country")
-        if header_country is None:
-            cat_filter = Course.country_code.in_(["US", "GLOBAL"])
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            if hc == "GLOBAL":
-                cat_filter = (Course.country_code == "GLOBAL")
-            else:
-                cat_filter = Course.country_code.in_([hc, "GLOBAL"])
+            cat_filter = Course.country_code.in_([hc, "GLOBAL"])
+        else:
+            cat_filter = (Course.country_code == "GLOBAL")
 
         categories = (
             db.session.query(Course.category)

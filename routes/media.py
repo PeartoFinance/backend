@@ -18,19 +18,24 @@ def get_user_country():
 
 def apply_country_filter(query, model, country_code_field='country_code'):
     """Apply country filter if header is present"""
-    # Determine filter country: header overrides; if no header, default to 'US'
     header_country = get_user_country()
-    if header_country is None:
-        filter_country = 'US'
-    else:
-        filter_country = 'GLOBAL' if header_country == 'GLOBAL' else header_country
-
+    
     # support models that use either 'country_code' or 'country'
     column = getattr(model, country_code_field, None) or getattr(model, 'country', None)
-    if column is not None:
-        return query.filter(column == filter_country)
+    if column is None:
+        return query
 
-    return query
+    if header_country:
+        # If header present, return [country, 'GLOBAL']
+        # Note: 'country' field might use full names like 'United States'
+        if country_code_field == 'country_code':
+            return query.filter(column.in_([header_country, 'GLOBAL']))
+        else:
+            # for 'country' field, we might need mapping, but for now just use header
+            return query.filter(column == header_country)
+    else:
+        # If no header, return ONLY 'GLOBAL'
+        return query.filter(column == 'GLOBAL')
 
 
 # ============================================================================
@@ -73,14 +78,14 @@ def get_tv_channel(id):
 
         # enforce country scoping for single item
         header_country = request.headers.get('X-User-Country')
-        if header_country is None:
-            filter_country = 'US'
-        else:
+        channel_country = (channel.country_code or '').upper()
+        if header_country:
             hc = header_country.strip().upper()
-            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
-
-        if getattr(channel, 'country_code', None) and channel.country_code != filter_country:
-            return jsonify({'error': 'Channel not found'}), 404
+            if channel_country not in [hc, 'GLOBAL']:
+                channel = None
+        else:
+            if channel_country != 'GLOBAL':
+                channel = None
         
         return jsonify({
             'id': channel.id,
@@ -137,15 +142,18 @@ def get_radio_station(id):
 
         # enforce country scoping for single item
         header_country = request.headers.get('X-User-Country')
-        if header_country is None:
-            filter_country = 'US'
-        else:
+        station_country = (getattr(station, 'country', None) or getattr(station, 'country_code', None) or '').upper()
+        if header_country:
             hc = header_country.strip().upper()
-            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
-
-        station_country = getattr(station, 'country', None) or getattr(station, 'country_code', None)
-        if station_country and station_country != filter_country:
-            return jsonify({'error': 'Station not found'}), 404
+            # Note: station_country might be 'UNITED STATES' while hc is 'US'
+            # For now, we assume codes are used or names match
+            if station_country not in [hc, 'GLOBAL']:
+                # Simple check for US/United States
+                if not (hc == 'US' and station_country == 'UNITED STATES'):
+                    station = None
+        else:
+            if station_country != 'GLOBAL':
+                station = None
         
         return jsonify({
             'id': station.id,
@@ -215,15 +223,14 @@ def get_sports_event(id):
 
         # enforce country scoping for single item
         header_country = request.headers.get('X-User-Country')
-        if header_country is None:
-            filter_country = 'US'
-        else:
+        event_country = (getattr(event, 'country_code', None) or getattr(event, 'country', None) or '').upper()
+        if header_country:
             hc = header_country.strip().upper()
-            filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
-
-        event_country = getattr(event, 'country_code', None) or getattr(event, 'country', None)
-        if event_country and event_country != filter_country:
-            return jsonify({'error': 'Event not found'}), 404
+            if event_country not in [hc, 'GLOBAL']:
+                event = None
+        else:
+            if event_country != 'GLOBAL':
+                event = None
 
         return jsonify({
             'id': str(event.id),

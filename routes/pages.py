@@ -23,21 +23,20 @@ def get_pages():
 
     # header-driven country scoping: header overrides query param
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        # no header -> if explicit query param provided use it, otherwise default to US
-        if country:
-            filter_country = country.strip().upper()
-        else:
-            filter_country = 'US'
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        filter_country = 'GLOBAL' if hc == 'GLOBAL' else hc
+        country_filter = Page.country_code.in_([hc, 'GLOBAL'])
+    elif country:
+        # if explicit query param provided use it
+        country_filter = Page.country_code.in_([country.strip().upper(), 'GLOBAL'])
+    else:
+        # no header or query param -> default to GLOBAL only
+        country_filter = (Page.country_code == 'GLOBAL')
 
     query = Page.query
     if status:
         query = query.filter(Page.status == status)
-    if filter_country:
-        query = query.filter(Page.country_code == filter_country)
+    query = query.filter(country_filter)
 
     pages = query.order_by(Page.created_at.desc()).all()
 

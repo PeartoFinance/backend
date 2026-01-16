@@ -17,11 +17,11 @@ def get_news():
     limit = min(int(request.args.get('limit', 10)), 50)
     category = request.args.get('category')
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        news_filter = (NewsItem.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        news_filter = (NewsItem.country_code == 'GLOBAL') if hc == 'GLOBAL' else (NewsItem.country_code == hc)
+        news_filter = NewsItem.country_code.in_([hc, 'GLOBAL'])
+    else:
+        news_filter = (NewsItem.country_code == 'GLOBAL')
 
     query = NewsItem.query.filter(news_filter)
     if category:
@@ -55,14 +55,11 @@ def get_tv_channels():
     category = request.args.get('category')
     header_country = request.headers.get('X-User-Country')
     query = TVChannel.query.filter(TVChannel.is_active == True)
-    if header_country is None:
-        query = query.filter(TVChannel.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        if hc == 'GLOBAL':
-            query = query.filter(TVChannel.country_code == 'GLOBAL')
-        else:
-            query = query.filter(TVChannel.country_code == hc)
+        query = query.filter(TVChannel.country_code.in_([hc, 'GLOBAL']))
+    else:
+        query = query.filter(TVChannel.country_code == 'GLOBAL')
 
     if category:
         query = query.filter(TVChannel.category == category)
@@ -79,25 +76,16 @@ def get_radio_stations():
     genre = request.args.get('genre')
     header_country = request.headers.get('X-User-Country')
     query = RadioStation.query.filter(RadioStation.is_active == True)
-    if header_country is None:
-        # prefer country_code field when present, fall back to 'country'
-        if hasattr(RadioStation, 'country_code'):
-            query = query.filter(RadioStation.country_code == 'US')
-        else:
-            # if model uses 'country' field
-            query = query.filter(RadioStation.country == 'United States')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
         if hasattr(RadioStation, 'country_code'):
-            if hc == 'GLOBAL':
-                query = query.filter(RadioStation.country_code == 'GLOBAL')
-            else:
-                query = query.filter(RadioStation.country_code == hc)
+            query = query.filter(RadioStation.country_code.in_([hc, 'GLOBAL']))
         else:
-            # try to match by country name for older models
-            # Map common codes to names if necessary; default to leaving unfiltered
             if hc == 'US':
                 query = query.filter(RadioStation.country == 'United States')
+    else:
+        if hasattr(RadioStation, 'country_code'):
+            query = query.filter(RadioStation.country_code == 'GLOBAL')
 
     if genre:
         query = query.filter(RadioStation.genre.ilike(f'%{genre}%'))
@@ -113,13 +101,13 @@ def get_trending_topics():
     limit = min(int(request.args.get('limit', 10)), 20)
     header_country = request.headers.get('X-User-Country')
     query = TrendingTopic.query
-    if header_country is None:
-        if hasattr(TrendingTopic, 'country_code'):
-            query = query.filter(TrendingTopic.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
         if hasattr(TrendingTopic, 'country_code'):
-            query = query.filter(TrendingTopic.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+            query = query.filter(TrendingTopic.country_code.in_([hc, 'GLOBAL']))
+    else:
+        if hasattr(TrendingTopic, 'country_code'):
+            query = query.filter(TrendingTopic.country_code == 'GLOBAL')
 
     try:
         topics = query.order_by(TrendingTopic.rank).limit(limit).all()

@@ -17,7 +17,7 @@ def get_country_context():
     # Admin header takes precedence
     if admin_header:
         if admin_header.upper() == 'GLOBAL':
-            return {'is_global': True, 'country_code': 'US'}
+            return {'is_global': True, 'country_code': 'GLOBAL'}
         return {'is_global': False, 'country_code': admin_header.upper()}
     
     # User header from frontend
@@ -25,7 +25,7 @@ def get_country_context():
         return {'is_global': False, 'country_code': user_header.upper()}
     
     # Default fallback
-    return {'is_global': True, 'country_code': 'US'}
+    return {'is_global': True, 'country_code': 'GLOBAL'}
 
 
 def deduplicate_tools(tools, user_country):
@@ -73,11 +73,9 @@ def get_tools_settings():
     query = ToolSettings.query
 
     if country:
-        query = query.filter(ToolSettings.country_code == country.upper())
+        query = query.filter(ToolSettings.country_code.in_([country.upper(), 'GLOBAL']))
     else:
-        query = query.filter(
-            ToolSettings.country_code == 'US'
-        )
+        query = query.filter(ToolSettings.country_code == 'GLOBAL')
 
     tools = query.all()
     return jsonify([t.to_dict() for t in tools])
@@ -91,11 +89,9 @@ def get_enabled_tools():
     query = ToolSettings.query.filter(ToolSettings.enabled == True)
 
     if country:
-        query = query.filter(ToolSettings.country_code == country)
+        query = query.filter(ToolSettings.country_code.in_([country.upper(), 'GLOBAL']))
     else:
-        query = query.filter(
-            ToolSettings.country_code == 'US'
-        )
+        query = query.filter(ToolSettings.country_code == 'GLOBAL')
 
     tools = query.all()
     return jsonify([t.to_dict() for t in tools])

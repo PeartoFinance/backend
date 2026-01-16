@@ -27,8 +27,16 @@ def get_markets():
     }
     sort_column = sort_map.get(sort_by, MarketPrice.market_cap)
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        country_filter = MarketPrice.country_code.in_([hc, 'GLOBAL'])
+    else:
+        country_filter = (MarketPrice.country_code == 'GLOBAL')
+
     cryptos = MarketPrice.query.filter(
-        MarketPrice.asset_type == 'crypto'
+        MarketPrice.asset_type == 'crypto',
+        country_filter
     ).order_by(desc(sort_column)).offset(offset).limit(limit).all()
     
     return jsonify([c.to_dict() for c in cryptos])
@@ -57,9 +65,17 @@ def get_global():
 @crypto_bp.route('/coin/<symbol>', methods=['GET'])
 def get_coin(symbol):
     """Get single cryptocurrency details"""
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        country_filter = MarketPrice.country_code.in_([hc, 'GLOBAL'])
+    else:
+        country_filter = (MarketPrice.country_code == 'GLOBAL')
+
     crypto = MarketPrice.query.filter(
         MarketPrice.symbol == symbol.upper(),
-        MarketPrice.asset_type == 'crypto'
+        MarketPrice.asset_type == 'crypto',
+        country_filter
     ).first()
     
     if not crypto:
@@ -78,9 +94,17 @@ def get_coins():
     
     symbols = [s.strip().upper() for s in symbols_param.split(',')]
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        country_filter = MarketPrice.country_code.in_([hc, 'GLOBAL'])
+    else:
+        country_filter = (MarketPrice.country_code == 'GLOBAL')
+
     cryptos = MarketPrice.query.filter(
         MarketPrice.symbol.in_(symbols),
-        MarketPrice.asset_type == 'crypto'
+        MarketPrice.asset_type == 'crypto',
+        country_filter
     ).all()
     
     return jsonify([c.to_dict() for c in cryptos])
@@ -91,9 +115,17 @@ def get_gainers():
     """Get top gaining cryptocurrencies"""
     limit = min(int(request.args.get('limit', 10)), 50)
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        country_filter = MarketPrice.country_code.in_([hc, 'GLOBAL'])
+    else:
+        country_filter = (MarketPrice.country_code == 'GLOBAL')
+
     gainers = MarketPrice.query.filter(
         MarketPrice.asset_type == 'crypto',
-        MarketPrice.change_percent > 0
+        MarketPrice.change_percent > 0,
+        country_filter
     ).order_by(desc(MarketPrice.change_percent)).limit(limit).all()
     
     return jsonify([g.to_dict() for g in gainers])
@@ -104,9 +136,17 @@ def get_losers():
     """Get top losing cryptocurrencies"""
     limit = min(int(request.args.get('limit', 10)), 50)
     
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        country_filter = MarketPrice.country_code.in_([hc, 'GLOBAL'])
+    else:
+        country_filter = (MarketPrice.country_code == 'GLOBAL')
+
     losers = MarketPrice.query.filter(
         MarketPrice.asset_type == 'crypto',
-        MarketPrice.change_percent < 0
+        MarketPrice.change_percent < 0,
+        country_filter
     ).order_by(MarketPrice.change_percent).limit(limit).all()
     
     return jsonify([l.to_dict() for l in losers])
