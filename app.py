@@ -2,6 +2,13 @@
 Flask Backend - Main Application
 PeartoFinance API Server with SQLAlchemy
 """
+import os
+# Limit OpenBLAS/NumPy threads to prevent resource exhaustion on shared hosting
+# MUST be set before importing numpy or any library that uses it (yfinance, pandas, etc.)
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import config
@@ -23,9 +30,16 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 
-# Configure CORS - allow all origins with explicit headers
+# Configure CORS - explicitly list all allowed origins (cannot use * with credentials)
 CORS(app, 
-     origins="*",
+     origins=[
+         "http://localhost:3000",
+         "http://127.0.0.1:3000",
+         "https://pearto.com",
+         "https://www.pearto.com",
+         "https://test.pearto.com",
+         "https://api.pearto.com"
+     ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
      methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
