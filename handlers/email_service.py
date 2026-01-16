@@ -321,7 +321,7 @@ class EmailService:
         try:
             return Template(template).render(**data)
         except Exception as e:
-            print(f'[EmailService] ❌ Template rendering failed: {e}')
+            print(f'[EmailService] Template rendering failed: {e}')
             # Fallback to simple replacement
             rendered = template
             for key, value in data.items():
@@ -339,7 +339,7 @@ class EmailService:
         try:
             template = TEMPLATES.get(template_type)
             if not template:
-                print(f'[EmailService] ❌ Unknown template type: {template_type}')
+                print(f'[EmailService] Unknown template type: {template_type}')
                 return False
             
             # Render template
@@ -349,7 +349,7 @@ class EmailService:
             
             if not self.is_configured:
                 # Log email when SMTP not configured (development mode)
-                print(f'[EmailService] 📧 Email would be sent (SMTP not configured):')
+                print(f'[EmailService] Email would be sent (SMTP not configured):')
                 print(f'  To: {to}')
                 print(f'  Subject: {subject}')
                 print(f'  Type: {template_type}')
@@ -369,11 +369,11 @@ class EmailService:
             with self._get_smtp_connection() as server:
                 server.sendmail(self.config['from_address'], to, msg.as_string())
             
-            print(f'[EmailService] ✅ Email sent: {template_type} to {to}')
+            print(f'[EmailService] Email sent: {template_type} to {to}')
             return True
             
         except Exception as e:
-            print(f'[EmailService] ❌ Failed to send {template_type} email: {str(e)}')
+            print(f'[EmailService] Failed to send {template_type} email: {str(e)}')
             return False
     
     def verify_connection(self) -> Dict[str, Any]:

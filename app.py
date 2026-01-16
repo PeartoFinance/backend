@@ -2,6 +2,13 @@
 Flask Backend - Main Application
 PeartoFinance API Server with SQLAlchemy
 """
+import os
+# Limit OpenBLAS/NumPy threads to prevent resource exhaustion on shared hosting
+# MUST be set before importing numpy or any library that uses it (yfinance, pandas, etc.)
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import config

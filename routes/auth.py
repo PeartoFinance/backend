@@ -32,9 +32,17 @@ def login():
     if not user:
         return jsonify({'error': 'Invalid credentials'}), 401
     
+    # Check if user has a password (Google OAuth users have empty password)
+    if not user.password:
+        return jsonify({'error': 'Please sign in with Google'}), 400
+    
     # Verify password
-    if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-        return jsonify({'error': 'Invalid credentials'}), 401
+    try:
+        if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+            return jsonify({'error': 'Invalid credentials'}), 401
+    except ValueError:
+        # Invalid bcrypt hash (e.g., empty or malformed password)
+        return jsonify({'error': 'Please sign in with Google'}), 400
     
     # Generate JWT token
     payload = {
@@ -209,7 +217,7 @@ def google_signin():
         user.last_login_at = datetime.now(timezone.utc)
         db.session.commit()
         
-        print(f'[Auth] ✅ Google login: {email}')
+        print(f'[Auth] Google login: {email}')
     else:
         # New user - create account
         user = User(
@@ -226,13 +234,13 @@ def google_signin():
         db.session.add(user)
         db.session.commit()
         
-        print(f'[Auth] ✅ New Google signup: {email}')
+        print(f'[Auth] New Google signup: {email}')
         
         # Send welcome email for new users
         try:
             send_welcome_email(user.email, user.name)
         except Exception as e:
-            print(f'[Auth] ❌ Welcome email failed: {e}')
+            print(f'[Auth] Welcome email failed: {e}')
     
     # Generate JWT token
     payload = {
@@ -249,7 +257,7 @@ def google_signin():
         user_agent = request.headers.get('User-Agent', 'Unknown device')
         send_google_login_email(user.email, user.name, ip_address, user_agent)
     except Exception as e:
-        print(f'[Auth] ❌ Google login email failed: {e}')
+        print(f'[Auth] Google login email failed: {e}')
     
     return jsonify({
         'user': user.to_dict(),
