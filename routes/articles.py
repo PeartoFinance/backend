@@ -17,11 +17,11 @@ def get_featured_articles():
     
     # Apply header-driven country scoping: no header -> US; header GLOBAL -> GLOBAL; else only header country
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        news_filter = (NewsItem.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        news_filter = (NewsItem.country_code == 'GLOBAL') if hc == 'GLOBAL' else (NewsItem.country_code == hc)
+        news_filter = NewsItem.country_code.in_([hc, 'GLOBAL'])
+    else:
+        news_filter = (NewsItem.country_code == 'GLOBAL')
 
     # Try to get from news_items first (has summary, image_url)
     news = NewsItem.query.filter(news_filter).order_by(desc(NewsItem.published_at)).limit(limit).all()
@@ -44,11 +44,11 @@ def get_featured_articles():
     )
     # if Post has country_code attribute, scope it; otherwise leave global
     if hasattr(Post, 'country_code'):
-        if header_country is None:
-            posts_query = posts_query.filter(Post.country_code == 'US')
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            posts_query = posts_query.filter(Post.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+            posts_query = posts_query.filter(Post.country_code.in_([hc, 'GLOBAL']))
+        else:
+            posts_query = posts_query.filter(Post.country_code == 'GLOBAL')
 
     posts = posts_query.order_by(desc(Post.published_at)).limit(limit).all()
     
@@ -66,11 +66,11 @@ def get_featured_articles():
     # Fallback to articles
     articles_query = Article.query
     if hasattr(Article, 'country_code'):
-        if header_country is None:
-            articles_query = articles_query.filter(Article.country_code == 'US')
-        else:
+        if header_country:
             hc = header_country.strip().upper()
-            articles_query = articles_query.filter(Article.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+            articles_query = articles_query.filter(Article.country_code.in_([hc, 'GLOBAL']))
+        else:
+            articles_query = articles_query.filter(Article.country_code == 'GLOBAL')
 
     articles = articles_query.order_by(desc(Article.createdAt)).limit(limit).all()
     
@@ -124,17 +124,13 @@ def get_article(article_id):
     news = NewsItem.query.get(article_id)
     if news:
         header_country = request.headers.get('X-User-Country')
-        if header_country is None:
-            if (news.country_code or 'US') != 'US':
+        if header_country:
+            hc = header_country.strip().upper()
+            if (news.country_code or '').upper() not in [hc, 'GLOBAL']:
                 news = None
         else:
-            hc = header_country.strip().upper()
-            if hc == 'GLOBAL':
-                if (news.country_code or '').upper() != 'GLOBAL':
-                    news = None
-            else:
-                if (news.country_code or '').upper() != hc:
-                    news = None
+            if (news.country_code or '').upper() != 'GLOBAL':
+                news = None
 
     if news:
         return jsonify({

@@ -16,18 +16,14 @@ market_bp = Blueprint('market', __name__)
 def get_market_overview():
     """Get comprehensive market overview data"""
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        # default to US-only
-        md_filter = (MarketData.country_code == 'US')
-        idx_filter = (MarketIndices.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        if hc == 'GLOBAL':
-            md_filter = (MarketData.country_code == 'GLOBAL')
-            idx_filter = (MarketIndices.country_code == 'GLOBAL')
-        else:
-            md_filter = (MarketData.country_code == hc)
-            idx_filter = (MarketIndices.country_code == hc)
+        md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
+        idx_filter = MarketIndices.country_code.in_([hc, 'GLOBAL'])
+    else:
+        # default to GLOBAL-only
+        md_filter = (MarketData.country_code == 'GLOBAL')
+        idx_filter = (MarketIndices.country_code == 'GLOBAL')
 
     # Get indices (scoped)
     indices = MarketIndices.query.filter(idx_filter).limit(6).all()
@@ -85,11 +81,11 @@ def get_indices():
     region = request.args.get('region')
 
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        idx_filter = (MarketIndices.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        idx_filter = (MarketIndices.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketIndices.country_code == hc)
+        idx_filter = MarketIndices.country_code.in_([hc, 'GLOBAL'])
+    else:
+        idx_filter = (MarketIndices.country_code == 'GLOBAL')
 
     query = MarketIndices.query.filter(idx_filter)
     if region:
@@ -105,16 +101,13 @@ def get_commodities():
     # Commodities are global by default; keep as-is but allow header to filter if model had country_code
     header_country = request.headers.get('X-User-Country')
     query = CommodityData.query
-    if header_country is None:
-        # no header -> return all (or could restrict to US if desired)
-        pass
-    else:
+    if header_country:
         hc = header_country.strip().upper()
         if hasattr(CommodityData, 'country_code'):
-            if hc == 'GLOBAL':
-                query = query.filter(CommodityData.country_code == 'GLOBAL')
-            else:
-                query = query.filter(CommodityData.country_code == hc)
+            query = query.filter(CommodityData.country_code.in_([hc, 'GLOBAL']))
+    else:
+        if hasattr(CommodityData, 'country_code'):
+            query = query.filter(CommodityData.country_code == 'GLOBAL')
 
     commodities = query.all()
     return jsonify([c.to_dict() for c in commodities])
@@ -126,11 +119,11 @@ def get_stock_offers():
     status = request.args.get('status')
     offer_type = request.args.get('type')
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        offer_filter = None
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        offer_filter = (StockOffer.country_code == 'GLOBAL') if hc == 'GLOBAL' else (StockOffer.country_code == hc)
+        offer_filter = StockOffer.country_code.in_([hc, 'GLOBAL'])
+    else:
+        offer_filter = (StockOffer.country_code == 'GLOBAL')
 
     query = StockOffer.query
     if status:
@@ -193,11 +186,11 @@ def get_crypto_markets():
     sort_column = sort_map.get(sort_by, MarketData.market_cap)
 
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        md_filter = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        md_filter = (MarketData.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketData.country_code == hc)
+        md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
+    else:
+        md_filter = (MarketData.country_code == 'GLOBAL')
 
     cryptos = MarketData.query.filter(
         MarketData.asset_type == 'crypto',
@@ -211,11 +204,11 @@ def get_crypto_markets():
 def get_market_stats():
     """High-level market breadth stats for /api/market/stats."""
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        md_filter = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         hc = header_country.strip().upper()
-        md_filter = (MarketData.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketData.country_code == hc)
+        md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
+    else:
+        md_filter = (MarketData.country_code == 'GLOBAL')
 
     all_stocks = MarketData.query.filter(MarketData.asset_type == 'stock', md_filter).all()
 
@@ -242,9 +235,11 @@ def get_dividends():
     query = Dividend.query
     if status:
         query = query.filter(Dividend.status == status)
-    if header_country is not None and hasattr(Dividend, 'country_code'):
+    if header_country and hasattr(Dividend, 'country_code'):
         hc = header_country.strip().upper()
-        query = query.filter(Dividend.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+        query = query.filter(Dividend.country_code.in_([hc, 'GLOBAL']))
+    elif hasattr(Dividend, 'country_code'):
+        query = query.filter(Dividend.country_code == 'GLOBAL')
 
     dividends = query.order_by(desc(Dividend.created_at)).limit(limit).all()
     return jsonify([d.to_dict() for d in dividends])
@@ -259,9 +254,11 @@ def get_bulk_transactions():
     query = BulkTransaction.query
     if symbol:
         query = query.filter(BulkTransaction.symbol == symbol.upper())
-    if header_country is not None and hasattr(BulkTransaction, 'country_code'):
+    if header_country and hasattr(BulkTransaction, 'country_code'):
         hc = header_country.strip().upper()
-        query = query.filter(BulkTransaction.country_code == ('GLOBAL' if hc == 'GLOBAL' else hc))
+        query = query.filter(BulkTransaction.country_code.in_([hc, 'GLOBAL']))
+    elif hasattr(BulkTransaction, 'country_code'):
+        query = query.filter(BulkTransaction.country_code == 'GLOBAL')
 
     transactions = query.order_by(desc(BulkTransaction.transaction_date)).limit(limit).all()
     return jsonify([t.to_dict() for t in transactions])

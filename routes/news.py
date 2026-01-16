@@ -18,7 +18,7 @@ def get_published_news():
     limit = min(int(request.args.get('limit', 50)), 200)
     offset = int(request.args.get('offset', 0))
     category = request.args.get('category')
-    country = getattr(request, 'user_country', 'US')
+    country = getattr(request, 'user_country', None)
     
     query = NewsItem.query.filter(
         NewsItem.curated_status == 'published',
@@ -61,7 +61,7 @@ def get_headlines():
     if queries_param:
         categories = [q.strip() for q in queries_param.split(',') if q.strip()]
         limit_each = min(int(request.args.get('limitEach', 6)), 50)
-        country = getattr(request, 'user_country', 'US')
+        country = getattr(request, 'user_country', None)
 
         sections = {}
         for category in categories:
@@ -89,7 +89,7 @@ def get_headlines():
     limit = min(int(request.args.get('limit', 20)), 100)
     page = max(int(request.args.get('page', 1)), 1)
     category = request.args.get('category')
-    country = getattr(request, 'user_country', 'US')
+    country = getattr(request, 'user_country', None)
 
     offset = (page - 1) * limit
 
@@ -122,7 +122,7 @@ def search_news():
     """Search news articles"""
     query_str = request.args.get('q', '').strip()
     limit = min(int(request.args.get('limit', 20)), 100)
-    country = getattr(request, 'user_country', 'US')
+    country = getattr(request, 'user_country', None)
     
     if not query_str or len(query_str) < 2:
         return jsonify({'error': 'q parameter required (min 2 chars)'}), 400
@@ -151,7 +151,7 @@ def search_news():
 def get_featured():
     """Get featured news articles"""
     limit = min(int(request.args.get('limit', 5)), 20)
-    country = getattr(request, 'user_country', 'US')
+    country = getattr(request, 'user_country', None)
     
     articles = NewsItem.query.filter(
         NewsItem.curated_status == 'published',
@@ -247,7 +247,7 @@ def get_sections():
     categories = [q.strip() for q in queries_param.split(',') if q.strip()]
     limit_per_section = min(int(request.args.get('limit', 12)), 50)
     random_count = int(request.args.get('random', 0))
-    country = getattr(request, 'user_country', 'US')
+    country = getattr(request, 'user_country', None)
 
     sections = {}
     pool = []

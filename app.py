@@ -39,8 +39,7 @@ def extract_country():
     # Admin routes use X-Admin-Country, user routes use X-User-Country
     request.user_country = (
         request.headers.get('X-Admin-Country') or
-        request.headers.get('X-User-Country') or
-        'US'
+        request.headers.get('X-User-Country')
     )
 
 

@@ -23,15 +23,11 @@ def get_watchlist():
         symbols = [i.symbol for i in items]
 
     header_country = request.headers.get('X-User-Country')
-    if header_country is None:
-        # no header -> default to US only
-        filter_condition = (MarketData.country_code == 'US')
-    else:
+    if header_country:
         country = header_country.strip().upper()
-        if country == 'GLOBAL':
-            filter_condition = (MarketData.country_code == 'GLOBAL')
-        else:
-            filter_condition = (MarketData.country_code == country)
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
+    else:
+        filter_condition = (MarketData.country_code == 'GLOBAL')
 
     if not symbols:
         return jsonify([])
