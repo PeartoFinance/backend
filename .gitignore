@@ -11,3 +11,6 @@ __pycache__/
 # Temporary/Utility Scripts
 update_db_schema.py
 fix_team_data.py
+
+# readme file
+MARKET_DATA_GUIDE.md

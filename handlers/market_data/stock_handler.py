@@ -23,6 +23,8 @@ def get_stock_quote(symbol: str) -> Optional[Dict[str, Any]]:
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
+        quote_type = info.get('quoteType') # Returns 'ETF' or 'EQUITY'
+        asset_type = 'etf' if quote_type == 'ETF' else 'stock'
         
         if not info or 'symbol' not in info:
             return None
@@ -61,6 +63,7 @@ def get_stock_quote(symbol: str) -> Optional[Dict[str, Any]]:
             'website': info.get('website'),
             'logoUrl': info.get('logo_url'),
             'description': info.get('longBusinessSummary'),
+            'quoteType': info.get('quoteType'),
         }
     except Exception as e:
         logger.error(f"Error fetching quote for {symbol}: {e}")
@@ -101,6 +104,7 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                             'industry': info.get('industry'),
                             'exchange': info.get('exchange'),
                             'currency': info.get('currency', 'USD'),
+                            'quoteType': info.get('quoteType'),
                         })
             except Exception as e:
                 logger.warning(f"Error fetching {symbol}: {e}")
@@ -263,10 +267,14 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                 errors += 1
                 continue
             
-            # Check if exists
-            existing = MarketData.query.filter_by(
-                symbol=symbol.upper(),
-                asset_type='stock'
+            # Determine asset type (ETF vs Stock)
+            quote_type = quote.get('quoteType')
+            asset_type = 'etf' if quote_type == 'ETF' else 'stock'
+            
+            # Check if exists (check both stock and etf types)
+            existing = MarketData.query.filter(
+                MarketData.symbol == symbol.upper(),
+                MarketData.asset_type.in_(['stock', 'etf'])
             ).first()
             
             if existing:
@@ -303,6 +311,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                 existing.website = quote.get('website')
                 existing.logo_url = quote.get('logoUrl')
                 existing.description = quote.get('description')
+                existing.asset_type = asset_type  # Update type if it changed
                 existing.last_updated = datetime.utcnow()
                 updated += 1
             else:
@@ -338,7 +347,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     industry=quote.get('industry'),
                     exchange=quote.get('exchange'),
                     currency=quote.get('currency', 'USD'),
-                    asset_type='stock',
+                    asset_type=asset_type,
                     country_code=country_code,
                     website=quote.get('website'),
                     logo_url=quote.get('logoUrl'),
