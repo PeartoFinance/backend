@@ -12,3 +12,4 @@ __pycache__/
 update_db_schema.py
 fix_team_data.py
 /uploads
+*.zip
