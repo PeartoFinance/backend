@@ -253,7 +253,10 @@ def create_portfolio():
 @portfolio_bp.route('/<portfolio_id>/holdings', methods=['POST'])
 @auth_required
 def add_holding(portfolio_id):
-    """Add holding to portfolio"""
+    """Add holding to portfolio - creates both holding and transaction record"""
+    from models import PortfolioTransaction
+    from datetime import date
+    
     portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
     if not portfolio:
         return jsonify({'error': 'Portfolio not found'}), 404
@@ -270,24 +273,54 @@ def add_holding(portfolio_id):
     market = MarketData.query.filter_by(symbol=symbol).first()
     current_price = float(market.price) if market and market.price else avg_buy_price
     
-    # Calculate values
-    current_value = shares * current_price
-    gain_loss = current_value - (shares * avg_buy_price)
-    gain_percent = (gain_loss / (shares * avg_buy_price) * 100) if avg_buy_price > 0 else 0
+    # Check if holding already exists
+    existing_holding = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id, symbol=symbol).first()
     
-    holding = PortfolioHolding(
+    if existing_holding:
+        # Update existing holding (add to position)
+        old_total = float(existing_holding.shares) * float(existing_holding.avg_buy_price or 0)
+        new_total = shares * avg_buy_price
+        new_shares = float(existing_holding.shares) + shares
+        existing_holding.avg_buy_price = (old_total + new_total) / new_shares if new_shares > 0 else 0
+        existing_holding.shares = new_shares
+        existing_holding.current_price = current_price
+        existing_holding.current_value = new_shares * current_price
+        existing_holding.gain_loss = existing_holding.current_value - (new_shares * float(existing_holding.avg_buy_price))
+        holding = existing_holding
+    else:
+        # Create new holding
+        current_value = shares * current_price
+        gain_loss = current_value - (shares * avg_buy_price)
+        gain_percent = (gain_loss / (shares * avg_buy_price) * 100) if avg_buy_price > 0 else 0
+        
+        holding = PortfolioHolding(
+            id=str(uuid.uuid4()),
+            portfolio_id=portfolio_id,
+            symbol=symbol,
+            shares=shares,
+            avg_buy_price=avg_buy_price,
+            current_price=current_price,
+            current_value=current_value,
+            gain_loss=gain_loss,
+            gain_loss_percent=gain_percent,
+            first_buy_date=date.today()
+        )
+        db.session.add(holding)
+    
+    # Always create a transaction record for audit trail
+    transaction = PortfolioTransaction(
         id=str(uuid.uuid4()),
         portfolio_id=portfolio_id,
         symbol=symbol,
+        transaction_type='buy',
         shares=shares,
-        avg_buy_price=avg_buy_price,
-        current_price=current_price,
-        current_value=current_value,
-        gain_loss=gain_loss,
-        gain_loss_percent=gain_percent
+        price_per_share=avg_buy_price,
+        total_amount=shares * avg_buy_price,
+        fees=0,
+        notes='Initial buy via Add Holding',
+        transaction_date=date.today()
     )
-    
-    db.session.add(holding)
+    db.session.add(transaction)
     db.session.commit()
     
     # Track activity
@@ -300,7 +333,8 @@ def add_holding(portfolio_id):
     return jsonify({
         'id': holding.id,
         'message': f'{symbol} added to portfolio',
-        'holding': _holding_to_dict(holding)
+        'holding': _holding_to_dict(holding),
+        'transaction_id': transaction.id
     }), 201
 
 
@@ -328,3 +362,302 @@ def delete_holding(portfolio_id, holding_id):
         print(f'[Portfolio] Activity tracking failed: {e}')
     
     return jsonify({'message': f'{symbol} removed from portfolio'})
+
+
+@portfolio_bp.route('/<portfolio_id>/transactions', methods=['GET'])
+@auth_required
+def get_transactions(portfolio_id):
+    """Get transaction history for a portfolio"""
+    from models import PortfolioTransaction
+    
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    # Get filters
+    symbol = request.args.get('symbol')
+    tx_type = request.args.get('type')
+    limit = min(int(request.args.get('limit', 50)), 100)
+    
+    query = PortfolioTransaction.query.filter_by(portfolio_id=portfolio_id)
+    
+    if symbol:
+        query = query.filter(PortfolioTransaction.symbol == symbol.upper())
+    if tx_type:
+        query = query.filter(PortfolioTransaction.transaction_type == tx_type)
+    
+    transactions = query.order_by(desc(PortfolioTransaction.transaction_date)).limit(limit).all()
+    
+    return jsonify([{
+        'id': t.id,
+        'symbol': t.symbol,
+        'type': t.transaction_type,
+        'shares': float(t.shares) if t.shares else 0,
+        'pricePerShare': float(t.price_per_share) if t.price_per_share else 0,
+        'totalAmount': float(t.total_amount) if t.total_amount else 0,
+        'fees': float(t.fees) if t.fees else 0,
+        'notes': t.notes,
+        'date': t.transaction_date.isoformat() if t.transaction_date else None,
+        'createdAt': t.created_at.isoformat() if t.created_at else None
+    } for t in transactions])
+
+
+@portfolio_bp.route('/<portfolio_id>/transactions', methods=['POST'])
+@auth_required
+def add_transaction(portfolio_id):
+    """Add a transaction and update holdings"""
+    from models import PortfolioTransaction
+    from datetime import date
+    
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    data = request.get_json()
+    symbol = data.get('symbol', '').upper()
+    tx_type = data.get('type', 'buy')  # buy, sell, dividend, split
+    shares = float(data.get('shares', 0))
+    price = float(data.get('price', 0))
+    fees = float(data.get('fees', 0))
+    notes = data.get('notes', '')
+    tx_date = data.get('date', date.today().isoformat())
+    
+    if not symbol or shares <= 0:
+        return jsonify({'error': 'Symbol and shares required'}), 400
+    
+    # Create transaction
+    transaction = PortfolioTransaction(
+        id=str(uuid.uuid4()),
+        portfolio_id=portfolio_id,
+        symbol=symbol,
+        transaction_type=tx_type,
+        shares=shares,
+        price_per_share=price,
+        total_amount=shares * price,
+        fees=fees,
+        notes=notes,
+        transaction_date=tx_date
+    )
+    db.session.add(transaction)
+    
+    # Update holding based on transaction type
+    holding = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id, symbol=symbol).first()
+    
+    if tx_type == 'buy':
+        if holding:
+            # Update average price
+            old_total = float(holding.shares) * float(holding.avg_buy_price or 0)
+            new_total = shares * price
+            new_shares = float(holding.shares) + shares
+            holding.avg_buy_price = (old_total + new_total) / new_shares if new_shares > 0 else 0
+            holding.shares = new_shares
+        else:
+            # Create new holding
+            holding = PortfolioHolding(
+                id=str(uuid.uuid4()),
+                portfolio_id=portfolio_id,
+                symbol=symbol,
+                shares=shares,
+                avg_buy_price=price
+            )
+            db.session.add(holding)
+    
+    elif tx_type == 'sell':
+        if holding and float(holding.shares) >= shares:
+            holding.shares = float(holding.shares) - shares
+            if float(holding.shares) <= 0:
+                db.session.delete(holding)
+        else:
+            return jsonify({'error': 'Insufficient shares'}), 400
+    
+    # Update current price from market data
+    market = MarketData.query.filter_by(symbol=symbol).first()
+    if market and holding and tx_type != 'sell':
+        holding.current_price = market.price
+        holding.current_value = float(holding.shares) * float(market.price or 0)
+        holding.gain_loss = holding.current_value - (float(holding.shares) * float(holding.avg_buy_price or 0))
+    
+    db.session.commit()
+    
+    return jsonify({
+        'id': transaction.id,
+        'message': f'{tx_type.capitalize()} transaction recorded',
+        'transaction': {
+            'id': transaction.id,
+            'symbol': symbol,
+            'type': tx_type,
+            'shares': shares,
+            'price': price
+        }
+    }), 201
+
+
+@portfolio_bp.route('/<portfolio_id>/holdings/<holding_id>', methods=['GET'])
+@auth_required
+def get_holding_detail(portfolio_id, holding_id):
+    """Get detailed holding info with transactions"""
+    from models import PortfolioTransaction
+    
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    holding = PortfolioHolding.query.filter_by(id=holding_id, portfolio_id=portfolio_id).first()
+    if not holding:
+        return jsonify({'error': 'Holding not found'}), 404
+    
+    # Get transactions for this symbol
+    transactions = PortfolioTransaction.query.filter_by(
+        portfolio_id=portfolio_id, 
+        symbol=holding.symbol
+    ).order_by(desc(PortfolioTransaction.transaction_date)).limit(20).all()
+    
+    # Get market data for additional info
+    market = MarketData.query.filter_by(symbol=holding.symbol).first()
+    
+    # Calculate metrics
+    shares = float(holding.shares or 0)
+    avg_cost = float(holding.avg_buy_price or 0)
+    current_price = float(market.price if market else holding.current_price or 0)
+    total_value = shares * current_price
+    total_cost = shares * avg_cost
+    total_gain = total_value - total_cost
+    gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
+    
+    # Portfolio weight
+    all_holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id).all()
+    portfolio_value = sum(float(h.shares or 0) * float(h.current_price or 0) for h in all_holdings)
+    weight = (total_value / portfolio_value * 100) if portfolio_value > 0 else 0
+    
+    return jsonify({
+        'holding': {
+            'id': holding.id,
+            'symbol': holding.symbol,
+            'shares': shares,
+            'avgCost': avg_cost,
+            'currentPrice': current_price,
+            'totalValue': round(total_value, 2),
+            'totalCost': round(total_cost, 2),
+            'totalGain': round(total_gain, 2),
+            'gainPercent': round(gain_percent, 2),
+            'portfolioWeight': round(weight, 2),
+            'firstBuyDate': holding.first_buy_date.isoformat() if holding.first_buy_date else None
+        },
+        'market': {
+            'name': market.name if market else holding.symbol,
+            'sector': market.sector if market else None,
+            'industry': market.industry if market else None,
+            'dayChange': float(market.change) if market and market.change else 0,
+            'dayChangePercent': float(market.change_percent) if market and market.change_percent else 0,
+            'high52w': float(market._52_week_high) if market and market._52_week_high else None,
+            'low52w': float(market._52_week_low) if market and market._52_week_low else None,
+            'peRatio': float(market.pe_ratio) if market and market.pe_ratio else None,
+            'marketCap': int(market.market_cap) if market and market.market_cap else None
+        } if market else None,
+        'transactions': [{
+            'id': t.id,
+            'type': t.transaction_type,
+            'shares': float(t.shares),
+            'price': float(t.price_per_share) if t.price_per_share else 0,
+            'total': float(t.total_amount) if t.total_amount else 0,
+            'date': t.transaction_date.isoformat() if t.transaction_date else None
+        } for t in transactions]
+    })
+
+
+@portfolio_bp.route('/wealth-history', methods=['GET'])
+@auth_required
+def get_wealth_history():
+    """Get user's wealth history for net worth chart"""
+    from models import WealthState
+    
+    days = min(int(request.args.get('days', 30)), 365)
+    
+    history = WealthState.query.filter_by(user_id=request.user.id)\
+        .order_by(desc(WealthState.date))\
+        .limit(days).all()
+    
+    return jsonify([{
+        'date': h.date.isoformat() if h.date else None,
+        'totalValue': float(h.total_portfolio_value) if h.total_portfolio_value else 0,
+        'totalCash': float(h.total_cash) if h.total_cash else 0,
+        'totalInvestments': float(h.total_investments) if h.total_investments else 0,
+        'dailyChange': float(h.daily_change) if h.daily_change else 0
+    } for h in reversed(history)])
+
+
+@portfolio_bp.route('/<portfolio_id>/analytics', methods=['GET'])
+@auth_required
+def get_portfolio_analytics(portfolio_id):
+    """Get portfolio analytics: allocation, performance, risk"""
+    portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+    
+    holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id).all()
+    
+    if not holdings:
+        return jsonify({
+            'totalValue': 0,
+            'totalGain': 0,
+            'allocation': [],
+            'sectorBreakdown': [],
+            'topPerformers': [],
+            'worstPerformers': []
+        })
+    
+    # Calculate allocations
+    allocation = []
+    sector_map = {}
+    total_value = 0
+    total_gain = 0
+    
+    for h in holdings:
+        market = MarketData.query.filter_by(symbol=h.symbol).first()
+        shares = float(h.shares or 0)
+        current_price = float(market.price if market else h.current_price or 0)
+        avg_cost = float(h.avg_buy_price or 0)
+        value = shares * current_price
+        cost = shares * avg_cost
+        gain = value - cost
+        gain_percent = (gain / cost * 100) if cost > 0 else 0
+        
+        total_value += value
+        total_gain += gain
+        
+        allocation.append({
+            'symbol': h.symbol,
+            'name': market.name if market else h.symbol,
+            'value': round(value, 2),
+            'gain': round(gain, 2),
+            'gainPercent': round(gain_percent, 2),
+            'shares': shares,
+            'sector': market.sector if market else 'Unknown'
+        })
+        
+        # Sector aggregation
+        sector = market.sector if market else 'Unknown'
+        if sector not in sector_map:
+            sector_map[sector] = 0
+        sector_map[sector] += value
+    
+    # Calculate percentages
+    for item in allocation:
+        item['weight'] = round((item['value'] / total_value * 100) if total_value > 0 else 0, 2)
+    
+    # Sort for top/worst performers
+    sorted_by_gain = sorted(allocation, key=lambda x: x['gainPercent'], reverse=True)
+    
+    return jsonify({
+        'totalValue': round(total_value, 2),
+        'totalGain': round(total_gain, 2),
+        'totalGainPercent': round((total_gain / (total_value - total_gain) * 100) if (total_value - total_gain) > 0 else 0, 2),
+        'holdingsCount': len(holdings),
+        'allocation': sorted(allocation, key=lambda x: x['value'], reverse=True),
+        'sectorBreakdown': [
+            {'sector': k, 'value': round(v, 2), 'weight': round((v / total_value * 100) if total_value > 0 else 0, 2)}
+            for k, v in sorted(sector_map.items(), key=lambda x: x[1], reverse=True)
+        ],
+        'topPerformers': sorted_by_gain[:5],
+        'worstPerformers': sorted_by_gain[-5:][::-1] if len(sorted_by_gain) >= 5 else sorted_by_gain[::-1]
+    })

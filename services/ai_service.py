@@ -18,11 +18,34 @@ class AIService:
         self.timeout = 60.0
         
     def build_system_prompt(self, page_type: str = 'general', page_data: Dict = None) -> str:
-        """Build context-aware system prompt"""
-        base_prompt = """You are Pearto AI, the intelligent assistant for Pearto Finance - a comprehensive financial platform. 
-Your name is Pearto. Provide helpful, accurate, and professional financial guidance. Be concise and actionable."""
+        """Build context-aware system prompt with actual data"""
+        import json
         
-        if page_type == 'stock' and page_data:
+        base_prompt = """You are Pearto AI, the intelligent assistant for Pearto Finance - a comprehensive financial platform. 
+Your name is Pearto. Provide helpful, accurate, and professional financial guidance. Be concise and actionable.
+
+Format your response with clean, readable markdown:
+- Use ## for section headers (2-3 sections max)
+- Use **bold** for key numbers and important terms
+- Use bullet points (•) for lists
+- Keep paragraphs short (2-3 sentences)
+- Be concise but insightful (150-250 words max)
+- Focus on actionable insights, not just listing data back"""
+        
+        # Add data context based on page type
+        if page_data and isinstance(page_data, dict) and len(page_data) > 0:
+            try:
+                # Truncate large data to avoid token limits
+                data_str = json.dumps(page_data, default=str)
+                if len(data_str) > 3000:
+                    data_str = data_str[:3000] + "... (truncated)"
+                
+                base_prompt += f"\n\n=== PAGE CONTEXT: {page_type.upper()} ===\n"
+                base_prompt += f"Analyze and provide insights on this real-time data:\n{data_str}"
+                
+            except Exception as e:
+                base_prompt += f"\n\nCONTEXT: {page_type} page data available"
+        elif page_type == 'stock' and page_data:
             base_prompt += f"\n\nCONTEXT: Stock {page_data.get('symbol', 'N/A')} - Price: ${page_data.get('price', 'N/A')}"
         elif page_type == 'crypto' and page_data:
             base_prompt += f"\n\nCONTEXT: Cryptocurrency {page_data.get('symbol', 'N/A')}"
@@ -48,8 +71,9 @@ Your name is Pearto. Provide helpful, accurate, and professional financial guida
         context = context or {}
         options = options or {}
         
-        page_type = context.get('page_type', 'general')
-        page_data = context.get('page_data', {})
+        # Handle both camelCase (from frontend) and snake_case
+        page_type = context.get('pageType') or context.get('page_type', 'general')
+        page_data = context.get('pageData') or context.get('page_data', {})
         history = context.get('history', [])
         
         system_prompt = self.build_system_prompt(page_type, page_data)

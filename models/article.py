@@ -115,6 +115,7 @@ class NewsItem(db.Model):
     slug = db.Column(db.String(255))
     meta_description = db.Column(db.String(500))
     country_code = db.Column(db.String(2))
+    related_symbol = db.Column(db.String(20))  # Stock symbol this news relates to
     
     def to_dict(self):
         return {
