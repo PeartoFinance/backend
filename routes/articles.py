@@ -35,6 +35,7 @@ def get_featured_articles():
             'imageUrl': n.image,
             'category': n.category,
             'publishedAt': n.published_at.isoformat() if n.published_at else None,
+            'slug': n.slug,
         } for n in news])
     
     # Fallback to posts if exists

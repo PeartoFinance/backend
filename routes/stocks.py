@@ -63,12 +63,7 @@ def search_stocks():
         filter_condition
     ).limit(limit).all()
     
-    return jsonify([{
-        'symbol': s.symbol,
-        'name': s.name,
-        'exchange': s.exchange,
-        'type': s.asset_type
-    } for s in stocks])
+    return jsonify([s.to_dict() for s in stocks])
 
 
 @stocks_bp.route('/profile/<symbol>', methods=['GET'])
