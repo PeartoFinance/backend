@@ -117,6 +117,33 @@ def get_headlines():
     })
 
 
+@news_bp.route('/stock/<symbol>', methods=['GET'])
+def get_news_by_stock(symbol):
+    """Get news articles related to a specific stock symbol"""
+    limit = min(int(request.args.get('limit', 10)), 50)
+    country = getattr(request, 'user_country', None)
+    
+    # Query by related_symbol column or search in title/summary
+    articles = NewsItem.query.filter(
+        NewsItem.curated_status == 'published',
+        or_(
+            NewsItem.country_code == country,
+            NewsItem.country_code == 'GLOBAL',
+            NewsItem.country_code == None
+        ),
+        or_(
+            NewsItem.related_symbol == symbol.upper(),
+            NewsItem.title.ilike(f'%{symbol}%')
+        )
+    ).order_by(desc(NewsItem.published_at)).limit(limit).all()
+    
+    return jsonify({
+        'symbol': symbol.upper(),
+        'items': [a.to_dict() for a in articles],
+        'total': len(articles)
+    })
+
+
 @news_bp.route('/search', methods=['GET'])
 def search_news():
     """Search news articles"""
