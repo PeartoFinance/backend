@@ -5,7 +5,8 @@ Stocks API Routes with SQLAlchemy
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, asc
 from models.base import db
-from models.market import MarketData
+from models.market import MarketData, CompanyFinancials, MarketIssue
+from models.article import NewsItem
 
 stocks_bp = Blueprint('stocks', __name__)
 
@@ -68,7 +69,7 @@ def search_stocks():
 
 @stocks_bp.route('/profile/<symbol>', methods=['GET'])
 def get_profile(symbol):
-    """Get basic stock profile from market data"""
+    """Get expanded stock profile including financials, news, and issues"""
     header_country = request.headers.get('X-User-Country')
     if header_country:
         country = header_country.strip().upper()
@@ -76,8 +77,9 @@ def get_profile(symbol):
     else:
         filter_condition = (MarketData.country_code == 'GLOBAL')
 
+    symbol = symbol.upper()
     stock = MarketData.query.filter(
-        MarketData.symbol == symbol.upper(),
+        MarketData.symbol == symbol,
         MarketData.asset_type == 'stock',
         filter_condition
     ).first()
@@ -85,7 +87,45 @@ def get_profile(symbol):
     if not stock:
         return jsonify({'error': 'Stock not found'}), 404
     
-    return jsonify(stock.to_dict())
+    # Get basic data
+    data = stock.to_dict()
+    
+    # 1. Get Financials (Latest 4 records)
+    financials = CompanyFinancials.query.filter_by(symbol=symbol).order_by(CompanyFinancials.fiscal_date_ending.desc()).limit(4).all()
+    data['financials'] = [f.to_dict() for f in financials]
+    
+    # 2. Get Market Issues (Active ones)
+    issues = MarketIssue.query.filter_by(symbol=symbol, is_active=True).order_by(MarketIssue.issue_date.desc()).all()
+    data['marketIssues'] = [i.to_dict() for i in issues]
+    
+    # 3. Get Related News
+    news = NewsItem.query.filter_by(related_symbol=symbol).order_by(NewsItem.published_at.desc()).limit(5).all()
+    if not news:
+        # Fallback to general news if no symbol-specific news found
+        news = NewsItem.query.filter(
+            NewsItem.title.ilike(f'%{symbol}%'),
+            NewsItem.curated_status == 'published'
+        ).order_by(NewsItem.published_at.desc()).limit(5).all()
+    
+    data['news'] = [n.to_dict() for n in news]
+    
+    return jsonify(data)
+
+
+@stocks_bp.route('/directory', methods=['GET'])
+def get_business_directory():
+    """List all businesses marked as 'is_listed' for the public directory"""
+    try:
+        from handlers.market_data.business_handler import get_business_directory
+        
+        search = request.args.get('q', '')
+        header_country = request.headers.get('X-User-Country', 'US')
+        limit = min(int(request.args.get('limit', 20)), 100)
+        
+        businesses = get_business_directory(search=search, country=header_country, limit=limit)
+        return jsonify(businesses)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @stocks_bp.route('/movers', methods=['GET'])

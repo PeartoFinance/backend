@@ -3,7 +3,7 @@ Admin Market Routes - Market data management
 """
 from flask import Blueprint, jsonify, request
 from ..decorators import admin_required
-from models import db, MarketData, MarketIndices, MarketSentiment, CryptoMarketData, CommodityData
+from models import db, MarketData, MarketIndices, MarketSentiment, CryptoMarketData, CommodityData, MarketIssue
 from datetime import datetime
 
 market_bp = Blueprint('admin_market', __name__)
@@ -62,6 +62,8 @@ def get_market_data():
                 'website': m.website,
                 'logo_url': m.logo_url,
                 'asset_type': m.asset_type,
+                'is_listed': m.is_listed,
+                'is_featured': m.is_featured,
                 'last_updated': m.last_updated.isoformat() if m.last_updated else None
             } for m in items],
             'total': len(items)
@@ -780,5 +782,109 @@ def get_dividend_stock_list():
     try:
         from handlers.market_data.dividend_handler import DIVIDEND_STOCKS
         return jsonify({'symbols': DIVIDEND_STOCKS})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# BUSINESS PROFILE ROUTES
+# ============================================================================
+
+@market_bp.route('/business/sync-financials', methods=['POST'])
+@admin_required
+def admin_sync_financials():
+    """Sync financial statements for a symbol"""
+    try:
+        from handlers.market_data.financial_handler import sync_financials
+        data = request.get_json()
+        symbol = data.get('symbol')
+        period = data.get('period', 'annual')
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = sync_financials(symbol, period)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/sync-forecast', methods=['POST'])
+@admin_required
+def admin_sync_forecast():
+    """Sync analyst forecast data for a symbol"""
+    try:
+        from handlers.market_data.forecast_handler import sync_forecast_data
+        data = request.get_json()
+        symbol = data.get('symbol')
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = sync_forecast_data(symbol)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/toggle-listing', methods=['POST'])
+@admin_required
+def admin_toggle_listing():
+    """Toggle business listing status"""
+    try:
+        from handlers.market_data.business_handler import toggle_business_listing
+        data = request.get_json()
+        symbol = data.get('symbol')
+        is_listed = data.get('is_listed', False)
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = toggle_business_listing(symbol, is_listed)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/add-issue', methods=['POST'])
+@admin_required
+def admin_add_issue():
+    """Add a market issue/alert for a business"""
+    try:
+        from handlers.market_data.business_handler import add_market_issue
+        data = request.get_json()
+        symbol = data.get('symbol')
+        title = data.get('title')
+        description = data.get('description')
+        severity = data.get('severity', 'info')
+        
+        if not symbol or not title:
+            return jsonify({'error': 'Symbol and title are required'}), 400
+            
+        result = add_market_issue(symbol, title, description, severity)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/issues/<symbol>', methods=['GET'])
+@admin_required
+def admin_get_issues(symbol):
+    """Get all market issues for a business"""
+    try:
+        issues = MarketIssue.query.filter_by(symbol=symbol).order_by(MarketIssue.issue_date.desc()).all()
+        return jsonify([i.to_dict() for i in issues])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/issues/<int:issue_id>', methods=['DELETE'])
+@admin_required
+def admin_delete_issue(issue_id):
+    """Resolve/Delete a market issue"""
+    try:
+        from handlers.market_data.business_handler import resolve_market_issue
+        result = resolve_market_issue(issue_id)
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

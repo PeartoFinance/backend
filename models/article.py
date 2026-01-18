@@ -116,6 +116,9 @@ class NewsItem(db.Model):
     meta_description = db.Column(db.String(500))
     country_code = db.Column(db.String(2))
     
+    # Business Profile Link (Added to filter news by specific company)
+    related_symbol = db.Column(db.String(20), index=True, nullable=True)
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -132,7 +135,8 @@ class NewsItem(db.Model):
             'author': self.author,
             'publishedAt': self.published_at.isoformat() if self.published_at else None,
             'isInternal': bool(not self.canonical_url and self.slug),
-            'country': self.country_code
+            'country': self.country_code,
+            'relatedSymbol': self.related_symbol
         }
 
 

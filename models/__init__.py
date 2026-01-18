@@ -39,6 +39,8 @@ from .market import (
     StockSplit,
     Dividend,
     BulkTransaction,
+    CompanyFinancials,
+    MarketIssue,
 )
 
 # Article/News models
@@ -159,7 +161,7 @@ __all__ = [
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
     'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 'StockSplit',
-    'Dividend', 'BulkTransaction',
+    'Dividend', 'BulkTransaction', 'CompanyFinancials', 'MarketIssue',
     # Article
     'Article', 'Post', 'PostCategory', 'NewsItem', 'RssFeed', 'RssItem', 'ContentProvider',
     # Education
