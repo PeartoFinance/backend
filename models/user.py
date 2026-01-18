@@ -217,12 +217,94 @@ class LoginEvent(db.Model):
 
 
 class Role(db.Model):
-    """User roles"""
+    """Admin roles with granular permissions"""
     __tablename__ = 'roles'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.Text)
-    permissions = db.Column(db.JSON)
-    is_system = db.Column(db.Boolean, default=False)
+    permissions = db.Column(db.JSON)  # {"dashboard": true, "users": true, ...}
+    is_system = db.Column(db.Boolean, default=False)  # System roles can't be deleted
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # All available permission keys (matching sidebar sections)
+    PERMISSION_KEYS = [
+        'dashboard',
+        'content',
+        'educational',
+        'news_media',
+        'events_jobs',
+        'help_center',
+        'users_access',
+        'bookings',
+        'business',
+        'financial',
+        'market_data',
+        'business_profiles',
+        'marketing',
+        'communications',
+        'ai_features',
+        'system',
+        'apis_integration',
+        'configuration',
+        'roles_management',  # Only for superadmin
+    ]
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'permissions': self.permissions or {},
+            'isSystem': self.is_system,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    @staticmethod
+    def get_superadmin_permissions():
+        """Returns all permissions enabled (for superadmin)"""
+        return {key: True for key in Role.PERMISSION_KEYS}
+    
+    @staticmethod
+    def get_default_admin_permissions():
+        """Returns default admin permissions (no roles management)"""
+        perms = {key: True for key in Role.PERMISSION_KEYS}
+        perms['roles_management'] = False
+        return perms
+
+
+class AdminUser(db.Model):
+    """Links users to admin roles (separate from basic user.role field)"""
+    __tablename__ = 'admin_users'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
+    is_superadmin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='admin_profile')
+    role = db.relationship('Role', backref='admin_users')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'userId': self.user_id,
+            'roleId': self.role_id,
+            'isSuperadmin': self.is_superadmin,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'user': self.user.to_dict() if self.user else None,
+            'role': self.role.to_dict() if self.role else None,
+        }
+    
+    def get_permissions(self):
+        """Get effective permissions for this admin"""
+        if self.is_superadmin:
+            return Role.get_superadmin_permissions()
+        return self.role.permissions if self.role else {}
+

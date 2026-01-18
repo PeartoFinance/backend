@@ -21,6 +21,7 @@ from .user import (
     UserEconomicEvent,
     LoginEvent,
     Role,
+    AdminUser,
 )
 
 # Market data models

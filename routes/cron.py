@@ -20,7 +20,7 @@ def verify_cron_token():
 
 @cron_bp.route('/stocks', methods=['GET', 'POST'])
 def cron_update_stocks():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/stocks?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/stocks?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -34,7 +34,7 @@ def cron_update_stocks():
 
 @cron_bp.route('/crypto', methods=['GET', 'POST'])
 def cron_update_crypto():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/crypto?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/crypto?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -48,7 +48,7 @@ def cron_update_crypto():
 
 @cron_bp.route('/indices', methods=['GET', 'POST'])
 def cron_update_indices():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/indices?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/indices?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -62,7 +62,7 @@ def cron_update_indices():
 
 @cron_bp.route('/commodities', methods=['GET', 'POST'])
 def cron_update_commodities():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/commodities?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/commodities?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -76,7 +76,7 @@ def cron_update_commodities():
 
 @cron_bp.route('/earnings', methods=['GET', 'POST'])
 def cron_update_earnings():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/earnings?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/earnings?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -90,7 +90,7 @@ def cron_update_earnings():
 
 @cron_bp.route('/dividends', methods=['GET', 'POST'])
 def cron_update_dividends():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/dividends?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/dividends?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -104,7 +104,7 @@ def cron_update_dividends():
 
 @cron_bp.route('/watchlist-alerts', methods=['GET', 'POST'])
 def cron_check_watchlist():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/watchlist-alerts?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/watchlist-alerts?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -118,7 +118,7 @@ def cron_check_watchlist():
 
 @cron_bp.route('/daily-digest', methods=['GET', 'POST'])
 def cron_daily_digest():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/daily-digest?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://localhost:5000/api/cron/daily-digest?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -134,7 +134,7 @@ def cron_daily_digest():
 def cron_all_market():
     """
     Update all market data at once
-    cURL: curl -X POST https://api.pearto.com/api/cron/all-market?token=YOUR_TOKEN
+    cURL: curl -X POST http://localhost:5000/api/cron/all-market?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
