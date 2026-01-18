@@ -52,6 +52,10 @@ class MarketData(db.Model):
     website = db.Column(db.String(255))
     description = db.Column(db.Text)
     
+    # Business Profile Features (Added for detailed company profiles)
+    is_listed = db.Column(db.Boolean, default=False, index=True) # Controls visibility in public directory
+    is_featured = db.Column(db.Boolean, default=False) # For highlighting on dashboard
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -92,6 +96,8 @@ class MarketData(db.Model):
             'logoUrl': self.logo_url,
             'website': self.website,
             'description': self.description,
+            'isListed': self.is_listed,
+            'isFeatured': self.is_featured,
         }
 
 
@@ -509,4 +515,83 @@ class BulkTransaction(db.Model):
             'changePercent': float(self.change_percent) if self.change_percent else None,
             'transactionType': self.transaction_type,
             'exchange': self.exchange,
+        }
+
+
+class CompanyFinancials(db.Model):
+    """Historical financial statements for Business Profiles"""
+    __tablename__ = 'company_financials'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    period = db.Column(db.Enum('annual', 'quarterly'), default='annual')
+    fiscal_date_ending = db.Column(db.Date, nullable=False)
+    
+    # Income Statement
+    revenue = db.Column(db.BigInteger)
+    net_income = db.Column(db.BigInteger)
+    gross_profit = db.Column(db.BigInteger)
+    ebitda = db.Column(db.BigInteger)
+    operating_income = db.Column(db.BigInteger)
+    
+    # Balance Sheet
+    total_assets = db.Column(db.BigInteger)
+    total_liabilities = db.Column(db.BigInteger)
+    shareholder_equity = db.Column(db.BigInteger)
+    cash_and_equivalents = db.Column(db.BigInteger)
+    total_debt = db.Column(db.BigInteger)
+    
+    # Cash Flow
+    operating_cash_flow = db.Column(db.BigInteger)
+    capital_expenditure = db.Column(db.BigInteger)
+    free_cash_flow = db.Column(db.BigInteger)
+    
+    # Per Share & Ratios
+    eps_actual = db.Column(db.Numeric(18, 6))
+    eps_estimate = db.Column(db.Numeric(18, 6))
+    
+    currency = db.Column(db.String(10), default='USD')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'period': self.period,
+            'fiscalDateEnding': self.fiscal_date_ending.isoformat() if self.fiscal_date_ending else None,
+            'revenue': self.revenue,
+            'netIncome': self.net_income,
+            'grossProfit': self.gross_profit,
+            'ebitda': self.ebitda,
+            'totalAssets': self.total_assets,
+            'totalLiabilities': self.total_liabilities,
+            'epsActual': float(self.eps_actual) if self.eps_actual else None,
+            'currency': self.currency
+        }
+
+
+class MarketIssue(db.Model):
+    """Regulatory alerts, market warnings, or corporate governance notes"""
+    __tablename__ = 'market_issues'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    severity = db.Column(db.Enum('info', 'warning', 'critical'), default='info')
+    issue_date = db.Column(db.Date, default=datetime.utcnow().date)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'title': self.title,
+            'description': self.description,
+            'severity': self.severity,
+            'issueDate': self.issue_date.isoformat() if self.issue_date else None,
+            'isActive': self.is_active
         }
