@@ -183,3 +183,53 @@ def update_dividends() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Dividends update failed: {e}")
         return {'status': 'error', 'error': str(e)}
+
+
+def update_business_profiles() -> Dict[str, Any]:
+    """
+    Update Financials and Forecast data for all 'is_listed' stocks.
+    Runs weekly to keep business profiles fresh.
+    """
+    logger.info("Starting business profile update job")
+    start_time = datetime.utcnow()
+    
+    try:
+        from models import db, MarketData
+        from handlers.market_data.financial_handler import sync_financials
+        from handlers.market_data.forecast_handler import sync_forecast_data
+        
+        app = get_app()
+        with app.app_context():
+            # Only update stocks that are approved for the public directory
+            listed_stocks = MarketData.query.filter_by(is_listed=True, asset_type='stock').all()
+            symbols = [s.symbol for s in listed_stocks]
+            
+            if not symbols:
+                logger.info("No listed stocks to update")
+                return {'status': 'ok', 'updated': 0}
+            
+            success_count = 0
+            error_count = 0
+            
+            for symbol in symbols:
+                try:
+                    # Sync both Financials and Forecasts
+                    sync_financials(symbol)
+                    sync_forecast_data(symbol)
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to sync profile for {symbol}: {e}")
+                    error_count += 1
+            
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"Business profile update complete: {success_count} synced, {error_count} errors in {elapsed:.1f}s")
+            
+            return {
+                'status': 'ok',
+                'synced': success_count,
+                'errors': error_count,
+                'elapsed_seconds': elapsed
+            }
+    except Exception as e:
+        logger.error(f"Business profile update job failed: {e}")
+        return {'status': 'error', 'error': str(e)}

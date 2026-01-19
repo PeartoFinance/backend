@@ -32,6 +32,7 @@ def get_market_overview():
     gainers = MarketData.query.filter(
         MarketData.change_percent > 0,
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         md_filter
     ).order_by(desc(MarketData.change_percent)).limit(5).all()
 
@@ -39,12 +40,14 @@ def get_market_overview():
     losers = MarketData.query.filter(
         MarketData.change_percent < 0,
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         md_filter
     ).order_by(asc(MarketData.change_percent)).limit(5).all()
 
     # Get most active (scoped)
     most_active = MarketData.query.filter(
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         MarketData.volume != None,
         md_filter
     ).order_by(desc(MarketData.volume)).limit(5).all()
@@ -160,7 +163,11 @@ def get_all_stocks():
         hc = header_country.strip().upper()
         md_filter = (MarketData.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketData.country_code == hc)
 
-    query = MarketData.query.filter(MarketData.asset_type == 'stock', md_filter)
+    query = MarketData.query.filter(
+        MarketData.asset_type == 'stock', 
+        MarketData.is_listed == True,
+        md_filter
+    )
     if sector:
         query = query.filter(MarketData.sector == sector)
 

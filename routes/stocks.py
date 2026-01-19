@@ -5,8 +5,9 @@ Stocks API Routes with SQLAlchemy
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, asc
 from models.base import db
-from models.market import MarketData, CompanyFinancials, MarketIssue
+from models.market import MarketData, CompanyFinancials, MarketIssue, Dividend, AnalystRecommendation, StockPriceHistory
 from models.article import NewsItem
+from datetime import datetime, timedelta
 
 stocks_bp = Blueprint('stocks', __name__)
 
@@ -21,13 +22,11 @@ def get_quotes():
     
     symbols = [s.strip().upper() for s in symbols_param.split(',')]
 
-    
     header_country = request.headers.get('X-User-Country')
     if header_country:
         country = header_country.strip().upper()
         filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
     else:
-        # no header -> default to GLOBAL only
         filter_condition = (MarketData.country_code == 'GLOBAL')
 
     prices = MarketData.query.filter(
@@ -61,6 +60,7 @@ def search_stocks():
             MarketData.name.ilike(f'%{query}%')
         ),
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         filter_condition
     ).limit(limit).all()
     
@@ -81,27 +81,22 @@ def get_profile(symbol):
     stock = MarketData.query.filter(
         MarketData.symbol == symbol,
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         filter_condition
     ).first()
     
     if not stock:
         return jsonify({'error': 'Stock not found'}), 404
     
-    # Get basic data
     data = stock.to_dict()
     
-    # 1. Get Financials (Latest 4 records)
-    financials = CompanyFinancials.query.filter_by(symbol=symbol).order_by(CompanyFinancials.fiscal_date_ending.desc()).limit(4).all()
-    data['financials'] = [f.to_dict() for f in financials]
-    
-    # 2. Get Market Issues (Active ones)
+    # 1. Get Market Issues (Active ones)
     issues = MarketIssue.query.filter_by(symbol=symbol, is_active=True).order_by(MarketIssue.issue_date.desc()).all()
     data['marketIssues'] = [i.to_dict() for i in issues]
     
-    # 3. Get Related News
+    # 2. Get Related News
     news = NewsItem.query.filter_by(related_symbol=symbol).order_by(NewsItem.published_at.desc()).limit(5).all()
     if not news:
-        # Fallback to general news if no symbol-specific news found
         news = NewsItem.query.filter(
             NewsItem.title.ilike(f'%{symbol}%'),
             NewsItem.curated_status == 'published'
@@ -110,6 +105,73 @@ def get_profile(symbol):
     data['news'] = [n.to_dict() for n in news]
     
     return jsonify(data)
+
+
+@stocks_bp.route('/financials/<symbol>', methods=['GET'])
+def get_stock_financials(symbol):
+    """Get full financial statements for a symbol"""
+    symbol = symbol.upper()
+    period = request.args.get('period', 'annual')
+    
+    financials = CompanyFinancials.query.filter_by(
+        symbol=symbol, 
+        period=period
+    ).order_by(CompanyFinancials.fiscal_date_ending.desc()).all()
+    
+    return jsonify([f.to_dict() for f in financials])
+
+
+@stocks_bp.route('/forecast/<symbol>', methods=['GET'])
+def get_stock_forecast(symbol):
+    """Get analyst forecast and price targets for a symbol"""
+    symbol = symbol.upper()
+    from handlers.market_data.forecast_handler import get_forecast_data
+    
+    forecast = get_forecast_data(symbol)
+    if not forecast:
+        return jsonify({'error': 'Forecast data not found'}), 404
+        
+    return jsonify(forecast)
+
+
+@stocks_bp.route('/statistics/<symbol>', methods=['GET'])
+def get_stock_statistics(symbol):
+    """Get detailed technical and fundamental statistics for a symbol"""
+    symbol = symbol.upper()
+    stock = MarketData.query.filter_by(symbol=symbol, asset_type='stock').first()
+    
+    if not stock:
+        return jsonify({'error': 'Stock not found'}), 404
+        
+    stats = {
+        'symbol': stock.symbol,
+        'marketCap': float(stock.market_cap) if stock.market_cap else None,
+        'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
+        'forwardPe': float(stock.forward_pe) if stock.forward_pe else None,
+        'eps': float(stock.eps) if stock.eps else None,
+        'beta': float(stock.beta) if stock.beta else None,
+        'dividendYield': float(stock.dividend_yield) if stock.dividend_yield else None,
+        'dividendRate': float(stock.dividend_rate) if stock.dividend_rate else None,
+        'sharesOutstanding': stock.shares_outstanding,
+        'floatShares': stock.float_shares,
+        'bookValue': float(stock.book_value) if stock.book_value else None,
+        'priceToBook': float(stock.price_to_book) if stock.price_to_book else None,
+        'shortRatio': float(stock.short_ratio) if stock.short_ratio else None,
+        'high52w': float(stock._52_week_high) if stock._52_week_high else None,
+        'low52w': float(stock._52_week_low) if stock._52_week_low else None,
+        'avgVolume': stock.avg_volume
+    }
+    
+    return jsonify(stats)
+
+
+@stocks_bp.route('/dividends/<symbol>', methods=['GET'])
+def get_stock_dividends(symbol):
+    """Get dividend history for a specific symbol"""
+    symbol = symbol.upper()
+    dividends = Dividend.query.filter_by(symbol=symbol).order_by(Dividend.created_at.desc()).all()
+    
+    return jsonify([d.to_dict() for d in dividends])
 
 
 @stocks_bp.route('/directory', methods=['GET'])
@@ -146,6 +208,7 @@ def get_movers():
     if mover_type in ('gainers', 'both'):
         gainers = MarketData.query.filter(
             MarketData.asset_type == 'stock',
+            MarketData.is_listed == True,
             MarketData.change_percent > 0,
             filter_condition
         ).order_by(desc(MarketData.change_percent)).limit(limit).all()
@@ -154,6 +217,7 @@ def get_movers():
     if mover_type in ('losers', 'both'):
         losers = MarketData.query.filter(
             MarketData.asset_type == 'stock',
+            MarketData.is_listed == True,
             MarketData.change_percent < 0,
             filter_condition
         ).order_by(asc(MarketData.change_percent)).limit(limit).all()
@@ -176,6 +240,7 @@ def get_most_active():
 
     stocks = MarketData.query.filter(
         MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
         MarketData.volume != None,
         filter_condition
     ).order_by(desc(MarketData.volume)).limit(limit).all()
@@ -250,25 +315,78 @@ def get_etf_movers():
         'losers': [l.to_dict() for l in losers]
     })
 
+
+# Simple in-memory cache for history to prevent Yahoo rate limits
+# Format: { 'SYMBOL_PERIOD_INTERVAL': (timestamp, data) }
+history_cache = {}
+
 @stocks_bp.route('/history/<symbol>', methods=['GET'])
 def get_history(symbol):
     """Get price history for a symbol (Stock, ETF, or Crypto)"""
     try:
-        from handlers.market_data.stock_handler import get_stock_history
+        from handlers.market_data.stock_handler import get_stock_history, save_stock_history_to_db
+        import time
         
+        symbol = symbol.upper()
         period = request.args.get('period', '1mo')
         interval = request.args.get('interval', '1d')
         
-        history = get_stock_history(symbol.upper(), period=period, interval=interval)
+        # 1. Check In-Memory Cache first (Fastest, handles 1000s of users)
+        cache_key = f"{symbol}_{period}_{interval}"
+        now = time.time()
+        if cache_key in history_cache:
+            cache_time, cached_data = history_cache[cache_key]
+            if now - cache_time < 300:  # 5 minute cache
+                return jsonify({
+                    'symbol': symbol,
+                    'period': period,
+                    'interval': interval,
+                    'data': cached_data,
+                    'source': 'memory_cache'
+                })
+        
+        # 2. Try to get from Database (Only for daily data)
+        if interval == '1d':
+            days_map = {'1mo': 30, '3mo': 90, '6mo': 180, '1y': 365, '2y': 730, '5y': 1825}
+            days_back = days_map.get(period, 30)
+            start_date = datetime.utcnow() - timedelta(days=days_back)
+            
+            db_history = StockPriceHistory.query.filter(
+                StockPriceHistory.symbol == symbol,
+                StockPriceHistory.interval == interval,
+                StockPriceHistory.date >= start_date.date()
+            ).order_by(StockPriceHistory.date.asc()).all()
+            
+            if len(db_history) >= (days_back * 0.5):
+                data = [h.to_dict() for h in db_history]
+                # Also save to memory cache for the next user
+                history_cache[cache_key] = (now, data)
+                return jsonify({
+                    'symbol': symbol,
+                    'period': period,
+                    'interval': interval,
+                    'data': data,
+                    'source': 'database'
+                })
+
+        # 3. Fallback to Yahoo Finance
+        history = get_stock_history(symbol, period=period, interval=interval)
         
         if not history:
             return jsonify({'error': 'No history found for this symbol'}), 404
             
+        # 4. Save to DB (if daily) and Memory Cache (always)
+        if interval == '1d':
+            save_stock_history_to_db(symbol, history, interval=interval)
+        
+        history_cache[cache_key] = (now, history)
+            
         return jsonify({
-            'symbol': symbol.upper(),
+            'symbol': symbol,
             'period': period,
             'interval': interval,
-            'data': history
+            'data': history,
+            'source': 'yahoo'
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
