@@ -147,8 +147,10 @@ def get_stock_history(
         
         results = []
         for date, row in hist.iterrows():
+            # Use isoformat to include time for intraday data (1m, 5m, 1h, etc.)
+            formatted_date = date.isoformat() if hasattr(date, 'isoformat') else str(date)
             results.append({
-                'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
+                'date': formatted_date,
                 'open': float(row['Open']) if row['Open'] else None,
                 'high': float(row['High']) if row['High'] else None,
                 'low': float(row['Low']) if row['Low'] else None,
@@ -159,6 +161,58 @@ def get_stock_history(
     except Exception as e:
         logger.error(f"Error fetching history for {symbol}: {e}")
         return []
+
+
+def save_stock_history_to_db(symbol: str, history_data: List[Dict[str, Any]], interval: str = '1d'):
+    """
+    Save historical OHLCV data to the database.
+    """
+    from models import db, StockPriceHistory
+    from datetime import datetime
+    
+    symbol = symbol.upper()
+    count = 0
+    
+    for entry in history_data:
+        try:
+            # Parse date - handle both date strings and ISO timestamps
+            date_str = entry['date']
+            if 'T' in date_str:
+                dt = datetime.fromisoformat(date_str)
+            else:
+                dt = datetime.strptime(date_str, '%Y-%m-%d')
+            
+            # Check if record already exists
+            existing = StockPriceHistory.query.filter_by(
+                symbol=symbol,
+                date=dt.date(),
+                interval=interval
+            ).first()
+            
+            if not existing:
+                new_history = StockPriceHistory(
+                    symbol=symbol,
+                    date=dt.date(),
+                    open_price=entry.get('open'),
+                    high=entry.get('high'),
+                    low=entry.get('low'),
+                    close=entry.get('close'),
+                    volume=entry.get('volume'),
+                    interval=interval
+                )
+                db.session.add(new_history)
+                count += 1
+        except Exception as e:
+            logger.error(f"Error saving history record for {symbol} on {entry.get('date')}: {e}")
+            continue
+            
+    try:
+        db.session.commit()
+        return count
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error committing history to DB for {symbol}: {e}")
+        return 0
 
 
 def get_recommendations(symbol: str) -> Optional[Dict[str, Any]]:

@@ -553,17 +553,24 @@ def refresh_symbol(symbol):
 def get_symbol_history(symbol):
     """Get price history for a symbol from yfinance"""
     try:
-        from handlers.market_data.stock_handler import get_stock_history
+        from handlers.market_data.stock_handler import get_stock_history, save_stock_history_to_db
         
         period = request.args.get('period', '1mo')
         interval = request.args.get('interval', '1d')
         
+        # 1. Fetch live data
         history = get_stock_history(symbol, period=period, interval=interval)
+        
+        # 2. Save to DB for future analysis
+        if history:
+            save_stock_history_to_db(symbol, history, interval=interval)
+            
         return jsonify({
             'symbol': symbol,
             'period': period,
             'interval': interval,
             'data': history,
+            'stored': True
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

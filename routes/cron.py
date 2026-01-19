@@ -156,3 +156,17 @@ def cron_all_market():
         return jsonify({'ok': True, 'results': results})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/business-profiles', methods=['GET', 'POST'])
+def cron_update_business_profiles():
+    """cURL: curl -X POST http://localhost:5000/api/cron/business-profiles?token=YOUR_TOKEN"""
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.market_jobs import update_business_profiles
+        result = update_business_profiles()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
