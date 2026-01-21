@@ -121,15 +121,46 @@ def get_stock_financials(symbol):
     return jsonify([f.to_dict() for f in financials])
 
 
+@stocks_bp.route('/financials/<symbol>/statements', methods=['GET'])
+def get_stock_financial_statements(symbol):
+    """
+    Get comprehensive financial statements from database.
+    Falls back to yfinance sync if no data exists.
+    
+    Query params:
+        statement_type: 'income', 'balance', 'cash_flow', 'ratios' (default: 'income')
+        period: 'annual', 'quarterly' (default: 'annual')
+    """
+    from handlers.market_data.financial_handler import get_financial_statements
+    
+    symbol = symbol.upper()
+    statement_type = request.args.get('statement_type', 'income')
+    period = request.args.get('period', 'annual')
+    
+    data = get_financial_statements(symbol, statement_type, period)
+    
+    if 'error' in data:
+        return jsonify(data), 400
+    
+    data['symbol'] = symbol
+    return jsonify(data)
+
+
 @stocks_bp.route('/forecast/<symbol>', methods=['GET'])
 def get_stock_forecast(symbol):
-    """Get analyst forecast and price targets for a symbol"""
+    """
+    Get comprehensive analyst forecast data including:
+    - Price targets (low, mean, high, upside)
+    - Analyst consensus (Strong Buy/Buy/Hold/Sell counts)
+    - Earnings estimates (Revenue & EPS projections)
+    - Recommendation trends (historical ratings by month)
+    """
     symbol = symbol.upper()
-    from handlers.market_data.forecast_handler import get_forecast_data
+    from handlers.market_data.forecast_handler import get_detailed_forecast
     
-    forecast = get_forecast_data(symbol)
-    if not forecast:
-        return jsonify({'error': 'Forecast data not found'}), 404
+    forecast = get_detailed_forecast(symbol)
+    if not forecast or (not forecast.get('priceTarget', {}).get('mean') and not forecast.get('earningsEstimates', {}).get('annual')):
+        return jsonify({'error': 'Forecast data not found. Try syncing from admin panel.'}), 404
         
     return jsonify(forecast)
 

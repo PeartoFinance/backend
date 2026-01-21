@@ -24,7 +24,6 @@ from .user import (
     AdminUser,
 )
 
-# Market data models
 from .market import (
     MarketData,
     MarketIndices,
@@ -37,6 +36,8 @@ from .market import (
     StockPriceHistory,
     EarningsCalendar,
     AnalystRecommendation,
+    EarningsEstimate,
+    RecommendationHistory,
     StockSplit,
     Dividend,
     BulkTransaction,
@@ -104,6 +105,7 @@ from .settings import (
     Service,
     ServiceFeature,
     Product,
+    MarketHours,
 )
 
 # Media models
@@ -180,7 +182,8 @@ __all__ = [
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
-    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 'StockSplit',
+    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 
+    'EarningsEstimate', 'RecommendationHistory', 'StockSplit',
     'Dividend', 'BulkTransaction', 'CompanyFinancials', 'MarketIssue',
     # Article
     'Article', 'Post', 'PostCategory', 'NewsItem', 'RssFeed', 'RssItem', 'ContentProvider',
@@ -194,7 +197,7 @@ __all__ = [
     'PaperTransaction', 'WealthState', 'Transaction', 'Deposit', 'Withdrawal', 'Order', 'OrderItem',
     # Settings
     'Settings', 'Appearance', 'Country', 'APIRegistry', 'ToolSettings',
-    'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product',
+    'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product', 'MarketHours',
     # Media
     'TVChannel', 'RadioStation', 'ForexRate', 'TrendingTopic', 'SportsEvent',
     # Admin

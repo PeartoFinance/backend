@@ -43,7 +43,7 @@ CORS(app,
          "https://stocks-nine-blush.vercel.app",
          "https://www.pearto.com",
          "https://test.pearto.com",
-         "http://192.168.1.71:5000"
+         "https://api.pearto.com"
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
@@ -130,6 +130,10 @@ app.register_blueprint(documents_bp, url_prefix='/api/user/documents')
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
 app.register_blueprint(cron_bp, url_prefix='/api/cron')
+
+# Market status routes (market hours, open/close status)
+from routes.market_status import market_status_bp
+app.register_blueprint(market_status_bp, url_prefix='/api/market')
 
 
 # Error handlers

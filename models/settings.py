@@ -253,3 +253,44 @@ class Product(db.Model):
     stock_quantity = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class MarketHours(db.Model):
+    """Exchange trading hours by country"""
+    __tablename__ = 'market_hours'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exchange_code = db.Column(db.String(20), nullable=False, index=True)  # NYSE, NASDAQ, LSE, etc.
+    exchange_name = db.Column(db.String(100), nullable=False)  # New York Stock Exchange
+    country_code = db.Column(db.String(10), nullable=False, index=True)  # US, UK, JP, IN, etc.
+    
+    # Trading hours in local exchange timezone (24h format: "09:30", "16:00")
+    open_time = db.Column(db.String(10), nullable=False)  # "09:30"
+    close_time = db.Column(db.String(10), nullable=False)  # "16:00"
+    
+    # IANA timezone name (e.g., "America/New_York")
+    timezone = db.Column(db.String(50), nullable=False)
+    
+    # Trading days (comma-separated: "MON,TUE,WED,THU,FRI")
+    trading_days = db.Column(db.String(30), default='MON,TUE,WED,THU,FRI')
+    
+    # Is this the primary exchange for this country
+    is_primary = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'exchangeCode': self.exchange_code,
+            'exchangeName': self.exchange_name,
+            'countryCode': self.country_code,
+            'openTime': self.open_time,
+            'closeTime': self.close_time,
+            'timezone': self.timezone,
+            'tradingDays': self.trading_days.split(',') if self.trading_days else [],
+            'isPrimary': self.is_primary,
+        }
+

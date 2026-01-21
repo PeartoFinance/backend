@@ -417,6 +417,95 @@ class AnalystRecommendation(db.Model):
         }
 
 
+class EarningsEstimate(db.Model):
+    """Analyst earnings and revenue estimates for future fiscal periods"""
+    __tablename__ = 'earnings_estimates'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    period_type = db.Column(db.String(20), default='annual')  # 'annual' or 'quarterly'
+    fiscal_year = db.Column(db.String(10))  # e.g., 'FY2024', 'Q1 2025'
+    fiscal_end_date = db.Column(db.Date)
+    
+    # Revenue Estimates
+    revenue_estimate = db.Column(db.BigInteger)  # Mean estimate
+    revenue_low = db.Column(db.BigInteger)
+    revenue_high = db.Column(db.BigInteger)
+    revenue_avg = db.Column(db.BigInteger)
+    revenue_growth = db.Column(db.Numeric(10, 4))  # as decimal, e.g., 0.1234 = 12.34%
+    num_revenue_analysts = db.Column(db.Integer)
+    
+    # EPS Estimates
+    eps_estimate = db.Column(db.Numeric(18, 6))  # Mean estimate
+    eps_low = db.Column(db.Numeric(18, 6))
+    eps_high = db.Column(db.Numeric(18, 6))
+    eps_avg = db.Column(db.Numeric(18, 6))
+    eps_growth = db.Column(db.Numeric(10, 4))  # as decimal
+    num_eps_analysts = db.Column(db.Integer)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('symbol', 'period_type', 'fiscal_year', name='uq_earnings_estimate'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'periodType': self.period_type,
+            'fiscalYear': self.fiscal_year,
+            'fiscalEndDate': self.fiscal_end_date.isoformat() if self.fiscal_end_date else None,
+            'revenueEstimate': self.revenue_estimate,
+            'revenueLow': self.revenue_low,
+            'revenueHigh': self.revenue_high,
+            'revenueAvg': self.revenue_avg,
+            'revenueGrowth': float(self.revenue_growth) if self.revenue_growth else None,
+            'numRevenueAnalysts': self.num_revenue_analysts,
+            'epsEstimate': float(self.eps_estimate) if self.eps_estimate else None,
+            'epsLow': float(self.eps_low) if self.eps_low else None,
+            'epsHigh': float(self.eps_high) if self.eps_high else None,
+            'epsAvg': float(self.eps_avg) if self.eps_avg else None,
+            'epsGrowth': float(self.eps_growth) if self.eps_growth else None,
+            'numEpsAnalysts': self.num_eps_analysts,
+        }
+
+
+class RecommendationHistory(db.Model):
+    """Historical analyst recommendation counts for trends chart"""
+    __tablename__ = 'recommendation_history'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    period_date = db.Column(db.Date, nullable=False)  # Month start date
+    period_label = db.Column(db.String(20))  # e.g., 'Jan 2025', 'Feb 2025'
+    
+    strong_buy = db.Column(db.Integer, default=0)
+    buy = db.Column(db.Integer, default=0)
+    hold = db.Column(db.Integer, default=0)
+    sell = db.Column(db.Integer, default=0)
+    strong_sell = db.Column(db.Integer, default=0)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('symbol', 'period_date', name='uq_rec_history'),
+    )
+
+    def to_dict(self):
+        return {
+            'symbol': self.symbol,
+            'periodDate': self.period_date.isoformat() if self.period_date else None,
+            'periodLabel': self.period_label,
+            'strongBuy': self.strong_buy,
+            'buy': self.buy,
+            'hold': self.hold,
+            'sell': self.sell,
+            'strongSell': self.strong_sell,
+        }
+
+
 class StockSplit(db.Model):
     """Stock split events from yfinance calendar"""
     __tablename__ = 'stock_splits'
@@ -519,55 +608,187 @@ class BulkTransaction(db.Model):
 
 
 class CompanyFinancials(db.Model):
-    """Historical financial statements for Business Profiles"""
+    """Historical financial statements for Business Profiles - Enhanced for StockAnalysis-style display"""
     __tablename__ = 'company_financials'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     symbol = db.Column(db.String(20), nullable=False, index=True)
-    period = db.Column(db.Enum('annual', 'quarterly'), default='annual')
+    period = db.Column(db.Enum('annual', 'quarterly', 'ttm'), default='annual')
     fiscal_date_ending = db.Column(db.Date, nullable=False)
     
-    # Income Statement
+    # =========================================================================
+    # INCOME STATEMENT
+    # =========================================================================
     revenue = db.Column(db.BigInteger)
-    net_income = db.Column(db.BigInteger)
+    cost_of_revenue = db.Column(db.BigInteger)
     gross_profit = db.Column(db.BigInteger)
-    ebitda = db.Column(db.BigInteger)
+    selling_general_admin = db.Column(db.BigInteger)
+    research_development = db.Column(db.BigInteger)
+    operating_expenses = db.Column(db.BigInteger)
     operating_income = db.Column(db.BigInteger)
+    interest_expense = db.Column(db.BigInteger)
+    interest_income = db.Column(db.BigInteger)
+    pretax_income = db.Column(db.BigInteger)
+    income_tax = db.Column(db.BigInteger)
+    net_income = db.Column(db.BigInteger)
+    net_income_common = db.Column(db.BigInteger)
+    ebitda = db.Column(db.BigInteger)
+    ebit = db.Column(db.BigInteger)
     
-    # Balance Sheet
-    total_assets = db.Column(db.BigInteger)
-    total_liabilities = db.Column(db.BigInteger)
-    shareholder_equity = db.Column(db.BigInteger)
+    # Per Share
+    eps_basic = db.Column(db.Numeric(18, 6))
+    eps_diluted = db.Column(db.Numeric(18, 6))
+    shares_basic = db.Column(db.BigInteger)
+    shares_diluted = db.Column(db.BigInteger)
+    
+    # Margins (stored as percentages, e.g., 45.5 for 45.5%)
+    gross_margin = db.Column(db.Numeric(10, 4))
+    operating_margin = db.Column(db.Numeric(10, 4))
+    profit_margin = db.Column(db.Numeric(10, 4))
+    
+    # =========================================================================
+    # BALANCE SHEET
+    # =========================================================================
+    # Assets
     cash_and_equivalents = db.Column(db.BigInteger)
+    short_term_investments = db.Column(db.BigInteger)
+    accounts_receivable = db.Column(db.BigInteger)
+    inventory = db.Column(db.BigInteger)
+    current_assets = db.Column(db.BigInteger)
+    property_plant_equipment = db.Column(db.BigInteger)
+    long_term_investments = db.Column(db.BigInteger)
+    goodwill = db.Column(db.BigInteger)
+    intangible_assets = db.Column(db.BigInteger)
+    total_assets = db.Column(db.BigInteger)
+    
+    # Liabilities
+    accounts_payable = db.Column(db.BigInteger)
+    short_term_debt = db.Column(db.BigInteger)
+    current_liabilities = db.Column(db.BigInteger)
+    long_term_debt = db.Column(db.BigInteger)
+    total_liabilities = db.Column(db.BigInteger)
     total_debt = db.Column(db.BigInteger)
     
-    # Cash Flow
+    # Equity
+    common_stock = db.Column(db.BigInteger)
+    retained_earnings = db.Column(db.BigInteger)
+    shareholder_equity = db.Column(db.BigInteger)
+    
+    # Computed Balance Sheet Metrics
+    working_capital = db.Column(db.BigInteger)
+    net_cash = db.Column(db.BigInteger)  # Cash - Debt
+    
+    # =========================================================================
+    # CASH FLOW
+    # =========================================================================
+    depreciation_amortization = db.Column(db.BigInteger)
+    stock_based_compensation = db.Column(db.BigInteger)
+    change_in_working_capital = db.Column(db.BigInteger)
     operating_cash_flow = db.Column(db.BigInteger)
     capital_expenditure = db.Column(db.BigInteger)
+    investing_cash_flow = db.Column(db.BigInteger)
+    debt_issued = db.Column(db.BigInteger)
+    debt_repaid = db.Column(db.BigInteger)
+    dividends_paid = db.Column(db.BigInteger)
+    stock_repurchased = db.Column(db.BigInteger)
+    financing_cash_flow = db.Column(db.BigInteger)
     free_cash_flow = db.Column(db.BigInteger)
+    net_cash_flow = db.Column(db.BigInteger)
     
-    # Per Share & Ratios
-    eps_actual = db.Column(db.Numeric(18, 6))
-    eps_estimate = db.Column(db.Numeric(18, 6))
-    
+    # =========================================================================
+    # META
+    # =========================================================================
     currency = db.Column(db.String(10), default='USD')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    __table_args__ = (
+        db.UniqueConstraint('symbol', 'period', 'fiscal_date_ending', name='uq_financials_symbol_period_date'),
+    )
+
     def to_dict(self):
+        """Full dict for API response"""
         return {
             'id': self.id,
             'symbol': self.symbol,
             'period': self.period,
             'fiscalDateEnding': self.fiscal_date_ending.isoformat() if self.fiscal_date_ending else None,
+            # Income Statement
+            'revenue': self.revenue,
+            'costOfRevenue': self.cost_of_revenue,
+            'grossProfit': self.gross_profit,
+            'sellingGeneralAdmin': self.selling_general_admin,
+            'researchDevelopment': self.research_development,
+            'operatingExpenses': self.operating_expenses,
+            'operatingIncome': self.operating_income,
+            'interestExpense': self.interest_expense,
+            'interestIncome': self.interest_income,
+            'pretaxIncome': self.pretax_income,
+            'incomeTax': self.income_tax,
+            'netIncome': self.net_income,
+            'netIncomeCommon': self.net_income_common,
+            'ebitda': self.ebitda,
+            'ebit': self.ebit,
+            'epsBasic': float(self.eps_basic) if self.eps_basic else None,
+            'epsDiluted': float(self.eps_diluted) if self.eps_diluted else None,
+            'sharesBasic': self.shares_basic,
+            'sharesDiluted': self.shares_diluted,
+            'grossMargin': float(self.gross_margin) if self.gross_margin else None,
+            'operatingMargin': float(self.operating_margin) if self.operating_margin else None,
+            'profitMargin': float(self.profit_margin) if self.profit_margin else None,
+            # Balance Sheet
+            'cashAndEquivalents': self.cash_and_equivalents,
+            'shortTermInvestments': self.short_term_investments,
+            'accountsReceivable': self.accounts_receivable,
+            'inventory': self.inventory,
+            'currentAssets': self.current_assets,
+            'propertyPlantEquipment': self.property_plant_equipment,
+            'longTermInvestments': self.long_term_investments,
+            'goodwill': self.goodwill,
+            'intangibleAssets': self.intangible_assets,
+            'totalAssets': self.total_assets,
+            'accountsPayable': self.accounts_payable,
+            'shortTermDebt': self.short_term_debt,
+            'currentLiabilities': self.current_liabilities,
+            'longTermDebt': self.long_term_debt,
+            'totalLiabilities': self.total_liabilities,
+            'totalDebt': self.total_debt,
+            'commonStock': self.common_stock,
+            'retainedEarnings': self.retained_earnings,
+            'shareholderEquity': self.shareholder_equity,
+            'workingCapital': self.working_capital,
+            'netCash': self.net_cash,
+            # Cash Flow
+            'depreciationAmortization': self.depreciation_amortization,
+            'stockBasedCompensation': self.stock_based_compensation,
+            'changeInWorkingCapital': self.change_in_working_capital,
+            'operatingCashFlow': self.operating_cash_flow,
+            'capitalExpenditure': self.capital_expenditure,
+            'investingCashFlow': self.investing_cash_flow,
+            'debtIssued': self.debt_issued,
+            'debtRepaid': self.debt_repaid,
+            'dividendsPaid': self.dividends_paid,
+            'stockRepurchased': self.stock_repurchased,
+            'financingCashFlow': self.financing_cash_flow,
+            'freeCashFlow': self.free_cash_flow,
+            'netCashFlow': self.net_cash_flow,
+            # Meta
+            'currency': self.currency,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def to_summary_dict(self):
+        """Compact dict for summary cards"""
+        return {
+            'fiscalDateEnding': self.fiscal_date_ending.isoformat() if self.fiscal_date_ending else None,
+            'period': self.period,
             'revenue': self.revenue,
             'netIncome': self.net_income,
             'grossProfit': self.gross_profit,
             'ebitda': self.ebitda,
+            'epsBasic': float(self.eps_basic) if self.eps_basic else None,
             'totalAssets': self.total_assets,
-            'totalLiabilities': self.total_liabilities,
-            'epsActual': float(self.eps_actual) if self.eps_actual else None,
-            'currency': self.currency
+            'freeCashFlow': self.free_cash_flow,
         }
 
 
