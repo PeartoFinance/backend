@@ -422,3 +422,89 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
         return {'imported': 0, 'updated': 0, 'errors': len(symbols)}
     
     return {'imported': imported, 'updated': updated, 'errors': errors}
+
+
+def sync_stock_news(symbol: str) -> Dict[str, Any]:
+    """
+    Fetch news for a specific stock from yfinance and save to database.
+    """
+    from models import db, NewsItem
+    import hashlib
+    import re
+    
+    symbol = symbol.upper()
+    try:
+        ticker = yf.Ticker(symbol)
+        news = ticker.news
+        
+        if not news:
+            return {'status': 'ok', 'added': 0, 'message': f'No news found for {symbol}'}
+            
+        added_count = 0
+        for item in news:
+            # Extract content (yfinance news structure can vary slightly)
+            content = item.get('content', item)
+            title = content.get('title')
+            link = content.get('canonicalUrl', {}).get('url') or content.get('link')
+            
+            if not title or not link:
+                continue
+                
+            # Generate a unique hash for deduplication
+            item_hash = hashlib.sha256(f"{link}|{title}".encode('utf-8')).hexdigest()
+            
+            # Check if already exists
+            existing = NewsItem.query.filter_by(hash=item_hash).first()
+            if existing:
+                continue
+                
+            # Generate slug
+            slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:100]
+            # Ensure slug uniqueness (simplified)
+            if NewsItem.query.filter_by(slug=slug).first():
+                slug = f"{slug}-{int(datetime.utcnow().timestamp())}"
+
+            # Parse date
+            pub_date = None
+            pub_date_str = content.get('pubDate') or content.get('pubtime')
+            if pub_date_str:
+                try:
+                    pub_date = datetime.fromisoformat(pub_date_str.replace('Z', '+00:00'))
+                except:
+                    pub_date = datetime.utcnow()
+            else:
+                pub_date = datetime.utcnow()
+
+            # Get image
+            image_url = None
+            thumbnail = content.get('thumbnail', {})
+            if thumbnail:
+                resolutions = thumbnail.get('resolutions', [])
+                if resolutions:
+                    # Pick the highest resolution
+                    image_url = resolutions[-1].get('url')
+
+            new_news = NewsItem(
+                title=title,
+                summary=content.get('summary') or title,
+                canonical_url=link,
+                source=content.get('provider', {}).get('displayName') or 'Yahoo Finance',
+                published_at=pub_date,
+                hash=item_hash,
+                slug=slug,
+                related_symbol=symbol,
+                curated_status='published', # Auto-publish stock-specific news
+                source_type='yfinance',
+                image=image_url,
+                created_at=datetime.utcnow()
+            )
+            db.session.add(new_news)
+            added_count += 1
+            
+        db.session.commit()
+        return {'status': 'success', 'added': added_count, 'message': f'Added {added_count} news items for {symbol}'}
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error syncing news for {symbol}: {e}")
+        return {'status': 'error', 'message': str(e)}

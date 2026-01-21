@@ -16,6 +16,7 @@ from .notification_jobs import (
     check_watchlist_alerts,
     send_daily_digest,
 )
+from .system_jobs import cleanup_deleted_accounts
 
 __all__ = [
     'init_scheduler',
@@ -29,4 +30,5 @@ __all__ = [
     'update_dividends',
     'check_watchlist_alerts',
     'send_daily_digest',
+    'cleanup_deleted_accounts',
 ]

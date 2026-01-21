@@ -44,8 +44,15 @@ def get_current_user():
     # Compatibility fallback: X-User-Email
     user_email = request.headers.get('X-User-Email')
     if not user_email:
-        return None
-    return User.query.filter_by(email=user_email).first()
+        user = None
+    else:
+        user = User.query.filter_by(email=user_email).first()
+
+    # Final Security Check: If user was found by any method, check their status
+    if user and user.account_status != 'active':
+        return None  # Treat as unauthenticated if account is not active
+        
+    return user
 
 
 @user_bp.route('/profile', methods=['GET'])

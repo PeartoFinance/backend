@@ -145,6 +145,7 @@ def cron_all_market():
             update_all_crypto,
             update_all_indices,
             update_all_commodities,
+            update_business_profiles,
         )
         
         results = {
@@ -152,6 +153,7 @@ def cron_all_market():
             'crypto': update_all_crypto(),
             'indices': update_all_indices(),
             'commodities': update_all_commodities(),
+            'business_profiles': update_business_profiles(),
         }
         return jsonify({'ok': True, 'results': results})
     except Exception as e:
@@ -168,5 +170,22 @@ def cron_update_business_profiles():
         from jobs.market_jobs import update_business_profiles
         result = update_business_profiles()
         return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/cleanup-accounts', methods=['GET', 'POST'])
+def cron_cleanup_accounts():
+    """
+    Permanently delete accounts marked for deletion > 30 days ago.
+    cURL: curl -X POST http://localhost:5000/api/cron/cleanup-accounts?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.system_jobs import cleanup_deleted_accounts
+        cleanup_deleted_accounts()
+        return jsonify({'ok': True, 'message': 'Cleanup completed successfully'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

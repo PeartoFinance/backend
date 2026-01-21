@@ -173,6 +173,7 @@ def _register_notification_jobs():
     logger.info("Notification jobs registered")
 
 
+
 def get_job_status():
     """Get status of all scheduled jobs"""
     if scheduler is None:

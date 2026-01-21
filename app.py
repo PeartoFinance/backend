@@ -90,6 +90,8 @@ from routes.media import media_bp
 from routes.education import education_bp
 from routes.ai import ai_bp
 from routes.jobs import jobs_bp
+from routes.backup import backup_bp
+
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -112,6 +114,8 @@ app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
+app.register_blueprint(backup_bp, url_prefix='/api/backup')
+
 
 # User feature routes
 from routes.alerts import alerts_bp

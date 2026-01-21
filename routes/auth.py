@@ -23,6 +23,8 @@ def login():
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
     
+    # check account status
+    
     if not email or not password:
         return jsonify({'error': 'Email and password required'}), 400
     
@@ -31,6 +33,16 @@ def login():
     
     if not user:
         return jsonify({'error': 'Invalid credentials'}), 401
+    
+    # Check account status
+    if user.account_status == 'deleted':
+        return jsonify({'error': 'This account has been permanently deleted.'}), 403
+    
+    if user.account_status == 'deactivated':
+        return jsonify({'error': 'Account is deactivated. Please reactivate to login.'}), 403
+    
+    if user.account_status == 'suspended':
+        return jsonify({'error': 'Account is suspended. Please contact support.'}), 403
     
     # Check if user has a password (Google OAuth users have empty password)
     if not user.password:

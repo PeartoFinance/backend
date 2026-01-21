@@ -25,6 +25,16 @@ def auth_required(f):
             if not user:
                 return jsonify({'error': 'User not found'}), 404
             
+            # Check account status
+            if user.account_status != 'active':
+                status_messages = {
+                    'deleted': 'This account has been permanently deleted.',
+                    'deactivated': 'Account is deactivated.',
+                    'suspended': 'Account is suspended. Please contact support.'
+                }
+                msg = status_messages.get(user.account_status, 'Account is not active.')
+                return jsonify({'error': msg}), 403
+            
             # ✅ NEW (correct)
             g.user = user
             g.user_id = user.id

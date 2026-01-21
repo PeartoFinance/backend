@@ -88,8 +88,14 @@ def reactivate_account():
         return jsonify({'error': 'Invalid password'}), 401
     
     # Check current status
-    if user.account_status != 'deactivated':
-        return jsonify({'error': 'Account is not deactivated'}), 400
+    if user.account_status not in ['deactivated', 'deleted']:
+        return jsonify({'error': 'Account is already active or cannot be reactivated'}), 400
+    
+    # Optional: Check if the 30-day window has passed for 'deleted' accounts
+    if user.account_status == 'deleted' and user.deactivated_at:
+        from datetime import timedelta
+        if datetime.utcnow() > user.deactivated_at + timedelta(days=30):
+            return jsonify({'error': 'The 30-day reactivation window has expired. Please create a new account.'}), 403
     
     # Reactivate account
     user.account_status = 'active'
