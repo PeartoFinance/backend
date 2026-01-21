@@ -34,8 +34,12 @@ migrate = Migrate(app, db)
 CORS(app, 
      origins=[
          "http://localhost:3000",
+         "http://localhost:3001",
          "http://127.0.0.1:3000",
+         "http://192.168.1.71:3000",
+         "http://192.168.1.71:3001",
          "https://pearto.com",
+         "https://frontend-admin-pearto.vercel.app",
          "https://stocks-nine-blush.vercel.app",
          "https://www.pearto.com",
          "https://test.pearto.com",
@@ -90,6 +94,8 @@ from routes.media import media_bp
 from routes.education import education_bp
 from routes.ai import ai_bp
 from routes.jobs import jobs_bp
+from routes.navigation import navigation_bp
+from routes.social import social_bp
 from routes.backup import backup_bp
 
 
@@ -114,8 +120,6 @@ app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
-app.register_blueprint(backup_bp, url_prefix='/api/backup')
-
 
 # User feature routes
 from routes.alerts import alerts_bp
@@ -126,6 +130,10 @@ app.register_blueprint(documents_bp, url_prefix='/api/user/documents')
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
 app.register_blueprint(cron_bp, url_prefix='/api/cron')
+
+# Market status routes (market hours, open/close status)
+from routes.market_status import market_status_bp
+app.register_blueprint(market_status_bp, url_prefix='/api/market')
 
 
 # Error handlers

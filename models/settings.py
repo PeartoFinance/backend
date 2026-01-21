@@ -107,7 +107,7 @@ class ToolSettings(db.Model):
 
 
 class NavigationItem(db.Model):
-    """Navigation menu items"""
+    """Navigation menu items for header, sidebar, footer sections"""
     __tablename__ = 'navigation_items'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -115,12 +115,53 @@ class NavigationItem(db.Model):
     url = db.Column(db.String(255))
     icon = db.Column(db.String(50))
     parent_id = db.Column(db.Integer, db.ForeignKey('navigation_items.id'))
-    position = db.Column(db.String(50))
+    
+    # Section: sidebar_main, sidebar_media, sidebar_tools, header_pillars, 
+    # header_tools, header_resources, header_featured, footer
+    section = db.Column(db.String(50), default='sidebar_main')
+    
+    # Link type: internal, external, dropdown
+    link_type = db.Column(db.String(20), default='internal')
+    
+    # For special styling (e.g., "NEW", "20+", "Beta")
+    badge_text = db.Column(db.String(20))
+    
+    # Custom CSS class for special buttons (gradient, etc.)
+    css_class = db.Column(db.String(100))
+    
+    position = db.Column(db.String(50))  # Legacy, kept for compatibility
     order_index = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     requires_auth = db.Column(db.Boolean, default=False)
     roles_allowed = db.Column(db.JSON)
     country_code = db.Column(db.String(10))
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Self-referential relationship for children
+    children = db.relationship('NavigationItem', backref=db.backref('parent', remote_side=[id]), lazy='dynamic')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'label': self.label,
+            'url': self.url,
+            'icon': self.icon,
+            'parent_id': self.parent_id,
+            'section': self.section,
+            'link_type': self.link_type,
+            'badge_text': self.badge_text,
+            'css_class': self.css_class,
+            'order_index': self.order_index,
+            'is_active': self.is_active,
+            'requires_auth': self.requires_auth,
+            'roles_allowed': self.roles_allowed,
+            'country_code': self.country_code,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 
 class Page(db.Model):
@@ -212,3 +253,44 @@ class Product(db.Model):
     stock_quantity = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class MarketHours(db.Model):
+    """Exchange trading hours by country"""
+    __tablename__ = 'market_hours'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    exchange_code = db.Column(db.String(20), nullable=False, index=True)  # NYSE, NASDAQ, LSE, etc.
+    exchange_name = db.Column(db.String(100), nullable=False)  # New York Stock Exchange
+    country_code = db.Column(db.String(10), nullable=False, index=True)  # US, UK, JP, IN, etc.
+    
+    # Trading hours in local exchange timezone (24h format: "09:30", "16:00")
+    open_time = db.Column(db.String(10), nullable=False)  # "09:30"
+    close_time = db.Column(db.String(10), nullable=False)  # "16:00"
+    
+    # IANA timezone name (e.g., "America/New_York")
+    timezone = db.Column(db.String(50), nullable=False)
+    
+    # Trading days (comma-separated: "MON,TUE,WED,THU,FRI")
+    trading_days = db.Column(db.String(30), default='MON,TUE,WED,THU,FRI')
+    
+    # Is this the primary exchange for this country
+    is_primary = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'exchangeCode': self.exchange_code,
+            'exchangeName': self.exchange_name,
+            'countryCode': self.country_code,
+            'openTime': self.open_time,
+            'closeTime': self.close_time,
+            'timezone': self.timezone,
+            'tradingDays': self.trading_days.split(',') if self.trading_days else [],
+            'isPrimary': self.is_primary,
+        }
+

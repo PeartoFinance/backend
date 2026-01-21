@@ -24,7 +24,6 @@ from .user import (
     AdminUser,
 )
 
-# Market data models
 from .market import (
     MarketData,
     MarketIndices,
@@ -37,6 +36,8 @@ from .market import (
     StockPriceHistory,
     EarningsCalendar,
     AnalystRecommendation,
+    EarningsEstimate,
+    RecommendationHistory,
     StockSplit,
     Dividend,
     BulkTransaction,
@@ -104,6 +105,7 @@ from .settings import (
     Service,
     ServiceFeature,
     Product,
+    MarketHours,
 )
 
 # Media models
@@ -150,6 +152,25 @@ from .misc import (
     Booking,
 )
 
+# Social/Community models
+from .social import (
+    UserProfile,
+    UserFollow,
+    Conversation,
+    ConversationParticipant,
+    Message,
+    TradingIdea,
+    IdeaLike,
+    IdeaComment,
+    DiscussionGroup,
+    GroupMember,
+    GroupPost,
+    Badge,
+    UserBadge,
+    CopyTradingLink,
+    CopyTradeExecution,
+)
+
 # All models list for migrations
 __all__ = [
     'db',
@@ -157,11 +178,12 @@ __all__ = [
     # User
     'User', 'PasswordResetToken', 'UserSession', 'UserDevice', 'UserActivity',
     'UserAlert', 'UserNotificationPref', 'UserDashboardConfig', 'UserDocument',
-    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role',
+    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role', 'AdminUser',
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
-    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 'StockSplit',
+    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 
+    'EarningsEstimate', 'RecommendationHistory', 'StockSplit',
     'Dividend', 'BulkTransaction', 'CompanyFinancials', 'MarketIssue',
     # Article
     'Article', 'Post', 'PostCategory', 'NewsItem', 'RssFeed', 'RssItem', 'ContentProvider',
@@ -175,9 +197,9 @@ __all__ = [
     'PaperTransaction', 'WealthState', 'Transaction', 'Deposit', 'Withdrawal', 'Order', 'OrderItem',
     # Settings
     'Settings', 'Appearance', 'Country', 'APIRegistry', 'ToolSettings',
-    'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product',
+    'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product', 'MarketHours',
     # Media
-    'TVChannel', 'RadioStation', 'ForexRate', 'TrendingTopic',
+    'TVChannel', 'RadioStation', 'ForexRate', 'TrendingTopic', 'SportsEvent',
     # Admin
     'Vendor', 'VendorAPIKey', 'VendorCustomAPI', 'Seller', 'SellerApplication',
     'SellerCategory', 'Provider', 'AuditEvent', 'AnalyticsEvent', 'NavMetrics',
@@ -186,4 +208,9 @@ __all__ = [
     'FAQ', 'FAQItem', 'GlossaryTerm', 'ContactMessage', 'Subscriber',
     'Testimonial', 'TeamMember', 'Job', 'JobListing', 'Affiliate',
     'MarketingCampaign', 'ChatMessage', 'Booking',
+    # Social
+    'UserProfile', 'UserFollow', 'Conversation', 'ConversationParticipant', 'Message',
+    'TradingIdea', 'IdeaLike', 'IdeaComment', 'DiscussionGroup', 'GroupMember', 'GroupPost',
+    'Badge', 'UserBadge', 'CopyTradingLink', 'CopyTradeExecution',
 ]
+

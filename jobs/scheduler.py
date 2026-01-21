@@ -77,6 +77,7 @@ def _register_market_jobs():
         update_all_commodities,
         update_earnings_calendar,
         update_dividends,
+        update_business_profiles,
     )
     
     # Stock updates - every 15 min (configurable)
@@ -137,6 +138,17 @@ def _register_market_jobs():
         minute=30,
         id='update_dividends',
         name='Update Dividends',
+        replace_existing=True
+    )
+    
+    # Business Profiles (Financials + Forecasts) - weekly on Sunday at 2 AM UTC
+    scheduler.add_job(
+        update_business_profiles,
+        'cron',
+        day_of_week='sun',
+        hour=2,
+        id='update_business_profiles',
+        name='Sync Business Profiles (Financials/Forecasts)',
         replace_existing=True
     )
     

@@ -800,18 +800,66 @@ def get_dividend_stock_list():
 @market_bp.route('/business/sync-financials', methods=['POST'])
 @admin_required
 def admin_sync_financials():
-    """Sync financial statements for a symbol"""
+    """
+    Sync financial statements for a symbol.
+    Syncs both annual and quarterly data by default.
+    """
     try:
-        from handlers.market_data.financial_handler import sync_financials
+        from handlers.market_data.financial_handler import sync_financials, sync_all_financials
         data = request.get_json()
         symbol = data.get('symbol')
-        period = data.get('period', 'annual')
+        period = data.get('period')  # 'annual', 'quarterly', or None for both
         
         if not symbol:
             return jsonify({'error': 'Symbol is required'}), 400
+        
+        if period:
+            result = sync_financials(symbol, period)
+        else:
+            result = sync_all_financials(symbol)
             
-        result = sync_financials(symbol, period)
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@market_bp.route('/business/bulk-sync-financials', methods=['POST'])
+@admin_required
+def admin_bulk_sync_financials():
+    """
+    Sync financials for multiple symbols.
+    POST body: { "symbols": ["AAPL", "MSFT", "GOOGL"] }
+    """
+    try:
+        from handlers.market_data.financial_handler import sync_all_financials
+        data = request.get_json()
+        symbols = data.get('symbols', [])
+        
+        if not symbols:
+            return jsonify({'error': 'Symbols array is required'}), 400
+        
+        results = {}
+        success_count = 0
+        error_count = 0
+        
+        for symbol in symbols:
+            try:
+                result = sync_all_financials(symbol)
+                results[symbol] = result
+                if result.get('status') in ['success', 'partial']:
+                    success_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
+                results[symbol] = {'status': 'error', 'message': str(e)}
+                error_count += 1
+        
+        return jsonify({
+            'ok': True,
+            'synced': success_count,
+            'errors': error_count,
+            'results': results
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

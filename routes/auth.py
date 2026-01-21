@@ -9,7 +9,7 @@ import jwt
 import uuid
 from datetime import datetime, timedelta, timezone
 from config import config
-from models import db, User, PasswordResetToken
+from models import db, User, PasswordResetToken, UserProfile
 from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email, track_login, track_signup
 from .decorators import auth_required
 
@@ -117,6 +117,15 @@ def signup():
     )
     
     db.session.add(user)
+    db.session.commit()
+    
+    # Create user profile automatically
+    profile = UserProfile(
+        user_id=user.id,
+        profile_visibility='public',
+        trading_style='mixed'
+    )
+    db.session.add(profile)
     db.session.commit()
     
     # Track signup activity and send welcome email
@@ -244,6 +253,15 @@ def google_signin():
             country_code=request.user_country
         )
         db.session.add(user)
+        db.session.commit()
+        
+        # Create user profile automatically
+        profile = UserProfile(
+            user_id=user.id,
+            profile_visibility='public',
+            trading_style='mixed'
+        )
+        db.session.add(profile)
         db.session.commit()
         
         print(f'[Auth] New Google signup: {email}')
