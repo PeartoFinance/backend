@@ -19,6 +19,7 @@ from .activity import activity_bp
 from .pages import pages_bp
 from .media import media_bp
 from .education import education_bp
+from .navigation import navigation_bp
 
 __all__ = [
     'auth_bp',
@@ -39,4 +40,5 @@ __all__ = [
     'pages_bp',
     'media_bp',
     'education_bp',
+    'navigation_bp',
 ]

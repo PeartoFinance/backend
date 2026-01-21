@@ -21,6 +21,7 @@ from .education import education_admin_bp
 from .roles import roles_bp
 from .uploads import uploads_bp
 from .email_templates import email_templates_bp
+from .navigation import navigation_bp
 
 # Main admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -44,5 +45,6 @@ admin_bp.register_blueprint(education_admin_bp)
 admin_bp.register_blueprint(roles_bp)
 admin_bp.register_blueprint(uploads_bp)
 admin_bp.register_blueprint(email_templates_bp)
+admin_bp.register_blueprint(navigation_bp)
 
 __all__ = ['admin_bp']

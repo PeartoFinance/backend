@@ -150,6 +150,25 @@ from .misc import (
     Booking,
 )
 
+# Social/Community models
+from .social import (
+    UserProfile,
+    UserFollow,
+    Conversation,
+    ConversationParticipant,
+    Message,
+    TradingIdea,
+    IdeaLike,
+    IdeaComment,
+    DiscussionGroup,
+    GroupMember,
+    GroupPost,
+    Badge,
+    UserBadge,
+    CopyTradingLink,
+    CopyTradeExecution,
+)
+
 # All models list for migrations
 __all__ = [
     'db',
@@ -157,7 +176,7 @@ __all__ = [
     # User
     'User', 'PasswordResetToken', 'UserSession', 'UserDevice', 'UserActivity',
     'UserAlert', 'UserNotificationPref', 'UserDashboardConfig', 'UserDocument',
-    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role',
+    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role', 'AdminUser',
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
@@ -177,7 +196,7 @@ __all__ = [
     'Settings', 'Appearance', 'Country', 'APIRegistry', 'ToolSettings',
     'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product',
     # Media
-    'TVChannel', 'RadioStation', 'ForexRate', 'TrendingTopic',
+    'TVChannel', 'RadioStation', 'ForexRate', 'TrendingTopic', 'SportsEvent',
     # Admin
     'Vendor', 'VendorAPIKey', 'VendorCustomAPI', 'Seller', 'SellerApplication',
     'SellerCategory', 'Provider', 'AuditEvent', 'AnalyticsEvent', 'NavMetrics',
@@ -186,4 +205,9 @@ __all__ = [
     'FAQ', 'FAQItem', 'GlossaryTerm', 'ContactMessage', 'Subscriber',
     'Testimonial', 'TeamMember', 'Job', 'JobListing', 'Affiliate',
     'MarketingCampaign', 'ChatMessage', 'Booking',
+    # Social
+    'UserProfile', 'UserFollow', 'Conversation', 'ConversationParticipant', 'Message',
+    'TradingIdea', 'IdeaLike', 'IdeaComment', 'DiscussionGroup', 'GroupMember', 'GroupPost',
+    'Badge', 'UserBadge', 'CopyTradingLink', 'CopyTradeExecution',
 ]
+

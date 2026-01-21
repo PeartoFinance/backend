@@ -34,13 +34,16 @@ migrate = Migrate(app, db)
 CORS(app, 
      origins=[
          "http://localhost:3000",
+         "http://localhost:3001",
          "http://127.0.0.1:3000",
+         "http://192.168.1.71:3000",
+         "http://192.168.1.71:3001",
          "https://pearto.com",
          "https://frontend-admin-pearto.vercel.app",
          "https://stocks-nine-blush.vercel.app",
          "https://www.pearto.com",
          "https://test.pearto.com",
-         "https://api.pearto.com"
+         "http://192.168.1.71:5000"
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
@@ -91,6 +94,8 @@ from routes.media import media_bp
 from routes.education import education_bp
 from routes.ai import ai_bp
 from routes.jobs import jobs_bp
+from routes.navigation import navigation_bp
+from routes.social import social_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(stocks_bp, url_prefix='/api/stocks')
@@ -113,6 +118,8 @@ app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
+app.register_blueprint(navigation_bp)
+app.register_blueprint(social_bp, url_prefix='/api')
 
 # User feature routes
 from routes.alerts import alerts_bp
