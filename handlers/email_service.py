@@ -28,7 +28,7 @@ EMAIL_CONFIG = {
     'from_address': os.getenv('EMAIL_FROM_ADDRESS', 'noreply@pearto.com'),
 }
 
-APP_URL = os.getenv('APP_URL', 'http://localhost:3000')
+APP_URL = os.getenv('APP_URL', 'https://test.pearto.com')
 APP_NAME = 'Pearto Finance'
 
 
@@ -417,7 +417,7 @@ def send_login_notification_email(user_email: str, user_name: str,
 
 def send_password_reset_email(user_email: str, user_name: str, reset_token: str) -> bool:
     """Send password reset email"""
-    reset_url = f"{APP_URL}/reset-password?token={reset_token}"
+    reset_url = f"{APP_URL}/auth/reset-password?token={reset_token}"
     return _email_service.send_email_async(user_email, 'forgot_password', {
         'user_name': user_name,
         'reset_url': reset_url,

@@ -14,15 +14,21 @@ def auth_required(f):
         auth_header = request.headers.get('Authorization', '')
         
         if not auth_header.startswith('Bearer '):
+            print(f'[AUTH DEBUG] No Bearer token. Header: {auth_header[:50]}...' if auth_header else '[AUTH DEBUG] No Authorization header')
             return jsonify({'error': 'No token provided'}), 401
         
         token = auth_header.split(' ')[1]
         
+        # Debug: Show token info
+        print(f'[AUTH DEBUG] Token received: {token[:20]}...{token[-20:] if len(token) > 40 else ""}')
+        
         try:
             payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
+            print(f'[AUTH DEBUG] Token decoded successfully. User ID: {payload.get("user_id")}')
             user = User.query.get(payload['user_id'])
             
             if not user:
+                print(f'[AUTH DEBUG] User not found for ID: {payload.get("user_id")}')
                 return jsonify({'error': 'User not found'}), 404
             
             # Check account status
@@ -45,8 +51,10 @@ def auth_required(f):
             
             return f(*args, **kwargs)
         except jwt.ExpiredSignatureError:
+            print(f'[AUTH DEBUG] Token expired')
             return jsonify({'error': 'Token expired'}), 401
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            print(f'[AUTH DEBUG] Invalid token error: {str(e)}')
             return jsonify({'error': 'Invalid token'}), 401
             
     return decorated

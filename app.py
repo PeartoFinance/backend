@@ -33,10 +33,10 @@ migrate = Migrate(app, db)
 # Configure CORS - explicitly list all allowed origins (cannot use * with credentials)
 CORS(app, 
      origins=[
-         "http://localhost:3000",
+         "https://test.pearto.com",
          "http://localhost:3001",
          "http://127.0.0.1:3000",
-         "http://192.168.1.71:3000",
+         "https://api.pearto.com",
          "http://192.168.1.71:3001",
          "https://pearto.com",
          "https://frontend-admin-pearto.vercel.app",
@@ -48,7 +48,7 @@ CORS(app,
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
      methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-     expose_headers=["Content-Type", "Authorization"])
+     expose_headers=["Content-Type", "Authorization", "Content-Disposition"])
 
 
 # Middleware to extract country from headers
@@ -120,7 +120,7 @@ app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
-app.register_blueprint(navigation_bp, url_prefix='/api/navigation')
+app.register_blueprint(navigation_bp, url_prefix='/api')
 app.register_blueprint(social_bp, url_prefix='/api/social')
 app.register_blueprint(backup_bp, url_prefix='/api/backup')
 
@@ -170,16 +170,31 @@ with app.app_context():
 
 
 if __name__ == '__main__':
-    # Initialize background job scheduler
     import os
-    if os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true':
-        from jobs.scheduler import init_scheduler
-        init_scheduler(app)
-        print("[OK] Background scheduler started")
+    
+    # Initialize background job scheduler
+    # Only run scheduler in the main process, not in the reloader child process
+    # When Flask debug mode is on, WERKZEUG_RUN_MAIN is set to 'true' in the child process
+    is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
+    
+    # In debug mode, only start scheduler in the reloader child process (after restart)
+    # In production (non-debug), start scheduler immediately
+    if enable_scheduler:
+        if config.DEBUG:
+            if is_reloader_process:
+                from jobs.scheduler import init_scheduler
+                init_scheduler(app)
+                print("[OK] Background scheduler started (debug mode)")
+        else:
+            from jobs.scheduler import init_scheduler
+            init_scheduler(app)
+            print("[OK] Background scheduler started")
     
     print(f"[INFO] Starting PeartoFinance API on port {config.PORT}")
     app.run(
         host='0.0.0.0',
         port=config.PORT,
-        debug=config.DEBUG
+        debug=config.DEBUG,
+        use_reloader=config.DEBUG  # Only use reloader in debug mode
     )

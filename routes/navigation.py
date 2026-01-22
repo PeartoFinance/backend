@@ -5,7 +5,7 @@ Serves navigation menu items to frontend
 from flask import Blueprint, jsonify, request
 from models import NavigationItem
 
-navigation_bp = Blueprint('navigation', __name__, url_prefix='/api')
+navigation_bp = Blueprint('navigation', __name__)
 
 
 @navigation_bp.route('/navigation', methods=['GET'])

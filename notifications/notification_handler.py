@@ -59,7 +59,7 @@ def send_notification(
             user = User.query.get(user_id)
             if user and user.email:
                 # Build template data based on notification type
-                app_url = os.getenv('APP_URL', 'http://localhost:3000')
+                app_url = os.getenv('APP_URL', 'https://test.pearto.com')
                 template_data = {
                     'user_name': user.name or 'User',
                     'app_name': 'Pearto Finance',
