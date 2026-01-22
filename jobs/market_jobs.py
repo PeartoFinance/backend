@@ -197,6 +197,7 @@ def update_business_profiles() -> Dict[str, Any]:
         from models import db, MarketData
         from handlers.market_data.financial_handler import sync_financials
         from handlers.market_data.forecast_handler import sync_forecast_data
+        from handlers.market_data.stock_handler import sync_stock_news
         
         app = get_app()
         with app.app_context():
@@ -213,9 +214,10 @@ def update_business_profiles() -> Dict[str, Any]:
             
             for symbol in symbols:
                 try:
-                    # Sync both Financials and Forecasts
+                    # Sync Financials, Forecasts, and News
                     sync_financials(symbol)
                     sync_forecast_data(symbol)
+                    sync_stock_news(symbol)
                     success_count += 1
                 except Exception as e:
                     logger.error(f"Failed to sync profile for {symbol}: {e}")

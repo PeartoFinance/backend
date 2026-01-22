@@ -145,6 +145,7 @@ def cron_all_market():
             update_all_crypto,
             update_all_indices,
             update_all_commodities,
+            update_business_profiles,
         )
         
         results = {
@@ -152,6 +153,7 @@ def cron_all_market():
             'crypto': update_all_crypto(),
             'indices': update_all_indices(),
             'commodities': update_all_commodities(),
+            'business_profiles': update_business_profiles(),
         }
         return jsonify({'ok': True, 'results': results})
     except Exception as e:
@@ -172,6 +174,23 @@ def cron_update_business_profiles():
         return jsonify({'error': str(e)}), 500
 
 
+@cron_bp.route('/cleanup-accounts', methods=['GET', 'POST'])
+def cron_cleanup_accounts():
+    """
+    Permanently delete accounts marked for deletion > 30 days ago.
+    cURL: curl -X POST http://localhost:5000/api/cron/cleanup-accounts?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+
+    try:
+        from jobs.system_jobs import cleanup_deleted_accounts
+        cleanup_deleted_accounts()
+        return jsonify({'ok': True, 'message': 'Cleanup completed successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @cron_bp.route('/financials', methods=['GET', 'POST'])
 def cron_update_financials():
     """
@@ -180,7 +199,7 @@ def cron_update_financials():
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
-    
+
     try:
         from jobs.market_jobs import update_financials
         result = update_financials()
@@ -193,32 +212,25 @@ def cron_update_financials():
 def cron_update_forecast():
     """
     Sync analyst forecast data (price targets, earnings estimates, recommendation trends).
-    cURL: curl -X POST http://localhost:5000/api/cron/forecast?token=YOUR_TOKEN
-    Optional: Pass ?symbol=AMD to sync just one symbol
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
-    
+
     try:
         from handlers.market_data.forecast_handler import sync_forecast_data
         from models.market import MarketData
-        
-        # Check if specific symbol requested
+
         symbol = request.args.get('symbol')
-        
         if symbol:
             result = sync_forecast_data(symbol.upper())
             return jsonify({'ok': True, 'symbol': symbol, 'result': result})
-        
-        # Otherwise sync all listed stocks
+
         stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all()
         results = []
         for stock in stocks:
             result = sync_forecast_data(stock.symbol)
             results.append({'symbol': stock.symbol, 'status': result.get('status')})
-        
+
         return jsonify({'ok': True, 'synced': len(results), 'results': results})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-

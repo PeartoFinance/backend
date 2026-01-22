@@ -132,6 +132,8 @@ def update_news(news_id):
                 article.published_at = datetime.utcnow()
         if 'featured' in data:
             article.featured = data['featured']
+        if 'related_symbol' in data:
+            article.related_symbol = data['related_symbol'].upper() if data['related_symbol'] else None
         
         article.updated_at = datetime.utcnow()
         db.session.commit()
@@ -209,6 +211,7 @@ def create_admin_article():
             slug=slug,
             country_code=country,
             published_at=now if data.get('published') else None,
+            related_symbol=data.get('related_symbol').upper() if data.get('related_symbol') else None,
             created_at=now,
             updated_at=now
         )

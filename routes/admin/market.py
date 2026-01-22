@@ -882,6 +882,24 @@ def admin_sync_forecast():
         return jsonify({'error': str(e)}), 500
 
 
+@market_bp.route('/business/sync-news', methods=['POST'])
+@admin_required
+def admin_sync_news():
+    """Sync latest news for a symbol from yfinance"""
+    try:
+        from handlers.market_data.stock_handler import sync_stock_news
+        data = request.get_json()
+        symbol = data.get('symbol')
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = sync_stock_news(symbol)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @market_bp.route('/business/toggle-listing', methods=['POST'])
 @admin_required
 def admin_toggle_listing():
