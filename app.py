@@ -120,6 +120,9 @@ app.register_blueprint(media_bp)
 app.register_blueprint(education_bp, url_prefix='/api/education')
 app.register_blueprint(ai_bp, url_prefix='/api/ai')
 app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
+app.register_blueprint(navigation_bp, url_prefix='/api/navigation')
+app.register_blueprint(social_bp, url_prefix='/api/social')
+app.register_blueprint(backup_bp, url_prefix='/api/backup')
 
 # User feature routes
 from routes.alerts import alerts_bp
