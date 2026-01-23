@@ -24,11 +24,12 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,           # Reduced for shared hosting
-        'max_overflow': 3,        # Allow a few extra connections
-        'pool_recycle': 300,      # Recycle connections every 5 minutes (cPanel MySQL often has short timeouts)
-        'pool_pre_ping': True,    # Verify connection before using
-        'pool_timeout': 20,       # Connection timeout
+        'pool_size': 3,            # Reduced for shared hosting
+        'max_overflow': 2,         # Allow a few extra connections
+        'pool_recycle': 60,        # Recycle connections every 60 seconds (cPanel MySQL often has short timeouts)
+        'pool_pre_ping': True,     # Verify connection before using - prevents "MySQL gone away"
+        'pool_timeout': 20,        # Connection timeout
+        'pool_reset_on_return': 'rollback',  # Reset connection state on return
         'connect_args': {
             'connect_timeout': 10  # MySQL connect timeout
         }
