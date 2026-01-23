@@ -33,17 +33,18 @@ migrate = Migrate(app, db)
 # Configure CORS - explicitly list all allowed origins (cannot use * with credentials)
 CORS(app, 
      origins=[
-         "https://test.pearto.com",
+         "http://localhost:3000",
          "http://localhost:3001",
          "http://127.0.0.1:3000",
-         "https://api.pearto.com",
+         "http://192.168.1.71:3000",
          "http://192.168.1.71:3001",
+         "http://192.168.1.71:5000",
          "https://pearto.com",
-         "https://frontend-admin-pearto.vercel.app",
-         "https://stocks-nine-blush.vercel.app",
          "https://www.pearto.com",
          "https://test.pearto.com",
-         "https://api.pearto.com"
+         "https://api.pearto.com",
+         "https://frontend-admin-pearto.vercel.app",
+         "https://stocks-nine-blush.vercel.app",
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
