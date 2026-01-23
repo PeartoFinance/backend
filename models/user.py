@@ -28,6 +28,7 @@ class User(db.Model):
     deactivated_at = db.Column(db.DateTime)
     deactivation_reason = db.Column(db.Text)
     referred_by = db.Column(db.Integer)
+    referral_code = db.Column(db.String(50), unique=True)
     total_reward_points = db.Column(db.Integer, default=0)
     email_verified = db.Column(db.Boolean, default=False)
     email_verified_at = db.Column(db.DateTime)
@@ -58,6 +59,8 @@ class User(db.Model):
             'verifiedBadge': self.verified_badge,
             'accountStatus': self.account_status,
             'totalRewardPoints': self.total_reward_points,
+            'referralCode': self.referral_code,
+            'referredBy': self.referred_by,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'lastLoginAt': self.last_login_at.isoformat() if self.last_login_at else None
         }

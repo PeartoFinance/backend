@@ -101,6 +101,34 @@ def update_profile():
     })
 
 
+@user_bp.route('/referrals', methods=['GET'])
+def get_referrals():
+    """Get list of users referred by the current user"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    # Find all users where referred_by matches current user's ID
+    referred_users = User.query.filter_by(referred_by=user.id).all()
+    
+    referrals_list = []
+    for ru in referred_users:
+        referrals_list.append({
+            'id': ru.id,
+            'name': ru.name,
+            'email': f"{ru.email[:3]}***@{ru.email.split('@')[1]}", # Mask email for privacy
+            'createdAt': ru.created_at.isoformat() if ru.created_at else None,
+            'status': ru.account_status
+        })
+    
+    return jsonify({
+        'referralCode': user.referral_code,
+        'totalReferrals': len(referred_users),
+        'totalRewardPoints': user.total_reward_points,
+        'referrals': referrals_list
+    })
+
+
 @user_bp.route('/preferences', methods=['GET'])
 def get_preferences():
     """Get user preferences"""
