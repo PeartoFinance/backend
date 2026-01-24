@@ -120,7 +120,12 @@ def import_market_data():
             if not symbol:
                 continue
                 
-            existing = MarketData.query.filter_by(symbol=symbol, asset_type=asset_type).first()
+            country_code = item.get('country_code') or getattr(request, 'user_country', None) or 'GLOBAL'
+            existing = MarketData.query.filter_by(
+                symbol=symbol, 
+                asset_type=asset_type,
+                country_code=country_code
+            ).first()
             
             if existing:
                 existing.name = item.get('name', existing.name)
@@ -141,7 +146,7 @@ def import_market_data():
                     volume=item.get('volume'),
                     market_cap=item.get('market_cap'),
                     asset_type=asset_type,
-                    country_code=item.get('country_code', getattr(request, 'user_country', 'US')),
+                    country_code=country_code,
                     last_updated=datetime.utcnow()
                 )
                 db.session.add(new_item)
@@ -356,7 +361,7 @@ def import_stocks_yfinance():
         if not symbols:
             return jsonify({'error': 'symbols array required'}), 400
         
-        country = getattr(request, 'user_country', 'US')
+        country = data.get('country_code') or getattr(request, 'user_country', None) or 'GLOBAL'
         result = import_stocks_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
@@ -379,7 +384,7 @@ def import_crypto_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', TOP_CRYPTOS)
         
-        country = getattr(request, 'user_country', 'GLOBAL')
+        country = data.get('country_code') or getattr(request, 'user_country', None) or 'GLOBAL'
         result = import_cryptos_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
@@ -402,7 +407,7 @@ def import_indices_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', list(MAJOR_INDICES.keys()))
         
-        country = getattr(request, 'user_country', None)
+        country = data.get('country_code') or getattr(request, 'user_country', None) or 'GLOBAL'
         result = import_indices_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,
@@ -425,7 +430,7 @@ def import_commodities_yfinance():
         data = request.get_json() or {}
         symbols = data.get('symbols', list(COMMODITIES.keys()))
         
-        country = getattr(request, 'user_country', 'GLOBAL')
+        country = data.get('country_code') or getattr(request, 'user_country', None) or 'GLOBAL'
         result = import_commodities_to_db(symbols, country_code=country)
         return jsonify({
             'ok': True,

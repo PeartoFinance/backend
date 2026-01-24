@@ -221,7 +221,8 @@ def import_cryptos_to_db(symbols: List[str] = None, db_session=None, country_cod
             # Check if exists
             existing = MarketData.query.filter_by(
                 symbol=store_symbol,
-                asset_type='crypto'
+                asset_type='crypto',
+                country_code=country_code
             ).first()
             
             if existing:
