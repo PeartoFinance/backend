@@ -31,22 +31,28 @@ def update_all_stocks() -> Dict[str, Any]:
         with app.app_context():
             # Get all stock symbols currently in database
             stocks = MarketData.query.filter_by(asset_type='stock').all()
-            symbols = [s.symbol for s in stocks]
             
-            if not symbols:
+            if not stocks:
                 logger.info("No stocks to update")
                 return {'status': 'ok', 'updated': 0}
+
+            # Group stocks by country code to update them independently
+            from collections import defaultdict
+            stocks_by_country = defaultdict(list)
+            for s in stocks:
+                stocks_by_country[s.country_code].append(s.symbol)
             
-            # Update in batches of 50 to avoid rate limits
-            batch_size = 50
             total_updated = 0
             total_errors = 0
             
-            for i in range(0, len(symbols), batch_size):
-                batch = symbols[i:i + batch_size]
-                result = import_stocks_to_db(batch)
-                total_updated += result.get('updated', 0)
-                total_errors += result.get('errors', 0)
+            for country, symbols in stocks_by_country.items():
+                # Update in batches of 50
+                batch_size = 50
+                for i in range(0, len(symbols), batch_size):
+                    batch = symbols[i:i + batch_size]
+                    result = import_stocks_to_db(batch, country_code=country)
+                    total_updated += result.get('updated', 0)
+                    total_errors += result.get('errors', 0)
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Stock update complete: {total_updated} updated, {total_errors} errors in {elapsed:.1f}s")
@@ -74,7 +80,8 @@ def update_all_crypto() -> Dict[str, Any]:
         
         app = get_app()
         with app.app_context():
-            result = import_cryptos_to_db(TOP_CRYPTOS)
+            # Crypto is always GLOBAL
+            result = import_cryptos_to_db(TOP_CRYPTOS, country_code='GLOBAL')
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Crypto update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")
@@ -102,7 +109,7 @@ def update_all_indices() -> Dict[str, Any]:
         app = get_app()
         with app.app_context():
             symbols = list(MAJOR_INDICES.keys())
-            result = import_indices_to_db(symbols)
+            result = import_indices_to_db(symbols, country_code='GLOBAL')
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Indices update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")
@@ -130,7 +137,7 @@ def update_all_commodities() -> Dict[str, Any]:
         app = get_app()
         with app.app_context():
             symbols = list(COMMODITIES.keys())
-            result = import_commodities_to_db(symbols)
+            result = import_commodities_to_db(symbols, country_code='GLOBAL')
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Commodities update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")

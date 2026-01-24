@@ -49,22 +49,51 @@ def search_stocks():
     
     header_country = request.headers.get('X-User-Country')
     if header_country is None:
-        filter_condition = (MarketData.country_code == 'US')
+        filter_condition = (MarketData.country_code == 'GLOBAL')
     else:
         country = header_country.strip().upper()
-        filter_condition = (MarketData.country_code == 'GLOBAL') if country == 'GLOBAL' else (MarketData.country_code == country)
-
+        filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
     stocks = MarketData.query.filter(
         db.or_(
             MarketData.symbol.ilike(f'%{query}%'),
             MarketData.name.ilike(f'%{query}%')
         ),
         MarketData.asset_type == 'stock',
-        MarketData.is_listed == True,
         filter_condition
     ).limit(limit).all()
     
-    return jsonify([s.to_dict() for s in stocks])
+    results = [s.to_dict() for s in stocks]
+
+    # 2. Safe Discovery: If few local results, search Yahoo for Names/Symbols ONLY.
+    # We do NOT fetch prices here to prevent Yahoo from blocking us (Rate Limiting).
+    if len(results) < 5 and len(query) >= 2:
+        try:
+            from handlers.market_data.search_handler import search_tickers
+            # Fetch basic info only (fast & safe)
+            yahoo_results = search_tickers(query, max_results=5)
+            
+            existing_symbols = {r['symbol'].upper() for r in results}
+            
+            for q in yahoo_results.get('quotes', []):
+                sym = q.get('symbol', '').upper()
+                # Only add if not already in results and looks like a valid stock
+                if sym and sym not in existing_symbols:
+                    results.append({
+                        'symbol': sym,
+                        'name': q.get('name') or q.get('shortname'),
+                        'price': None,     # Price is NULL for safety. Loads on click.
+                        'change': None,
+                        'changePercent': None,
+                        'currency': 'USD',
+                        'exchange': q.get('exchange'),
+                        'asset_type': 'stock',
+                        'is_discovery': True, # Frontend can show "Click to Load" badge
+                        'country_code': 'GLOBAL'
+                    })
+        except Exception as e:
+            print(f"Discovery search error: {e}")
+
+    return jsonify(results)
 
 
 @stocks_bp.route('/profile/<symbol>', methods=['GET'])
@@ -81,9 +110,25 @@ def get_profile(symbol):
     stock = MarketData.query.filter(
         MarketData.symbol == symbol,
         MarketData.asset_type == 'stock',
-        MarketData.is_listed == True,
         filter_condition
     ).first()
+    
+    # 2. If not found, try to auto-import from Yahoo Finance (Live Discovery)
+    if not stock:
+        try:
+            from handlers.market_data.stock_handler import import_stocks_to_db
+            # Import as GLOBAL so everyone can see it
+            import_stocks_to_db([symbol], country_code='GLOBAL')
+        except Exception as e:
+            # If race condition (duplicate entry), just ignore and query again
+            print(f"Auto-import note for {symbol}: {e}")
+            
+        # Query again - whether we added it or someone else did
+        stock = MarketData.query.filter(
+            MarketData.symbol == symbol,
+            MarketData.asset_type == 'stock',
+            filter_condition
+        ).first()
     
     if not stock:
         return jsonify({'error': 'Stock not found'}), 404

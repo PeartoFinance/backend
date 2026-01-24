@@ -295,7 +295,7 @@ def get_analyst_price_targets(symbol: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str = 'US') -> Dict[str, int]:
+def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str = 'GLOBAL') -> Dict[str, int]:
     """
     Import stock data to database.
     
@@ -316,6 +316,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
     
     for symbol in symbols:
         try:
+            symbol = symbol.upper()
             quote = get_stock_quote(symbol)
             if not quote:
                 errors += 1
@@ -325,10 +326,14 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
             quote_type = quote.get('quoteType')
             asset_type = 'etf' if quote_type == 'ETF' else 'stock'
             
-            # Check if exists (check both stock and etf types)
-            existing = MarketData.query.filter(
-                MarketData.symbol == symbol.upper(),
-                MarketData.asset_type.in_(['stock', 'etf'])
+            # Yahoo Finance data is GLOBAL by default unless specified otherwise
+            target_country = country_code
+            
+            # Check if exists (check symbol, asset_type, AND country_code)
+            existing = MarketData.query.filter_by(
+                symbol=symbol,
+                asset_type=asset_type,
+                country_code=target_country
             ).first()
             
             if existing:
@@ -365,17 +370,16 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                 existing.website = quote.get('website')
                 existing.logo_url = quote.get('logoUrl')
                 existing.description = quote.get('description')
-                existing.asset_type = asset_type  # Update type if it changed
                 existing.last_updated = datetime.utcnow()
                 updated += 1
             else:
                 # Create new record
                 new_stock = MarketData(
-                    symbol=symbol.upper(),
-                    name=quote.get('name'),
-                    price=quote.get('price'),
-                    change=quote.get('change'),
-                    change_percent=quote.get('changePercent'),
+                    symbol=symbol,
+                    name=quote.get('name', symbol),
+                    price=quote.get('price', 0),
+                    change=quote.get('change', 0),
+                    change_percent=quote.get('changePercent', 0),
                     volume=quote.get('volume'),
                     market_cap=quote.get('marketCap'),
                     pe_ratio=quote.get('peRatio'),
@@ -402,11 +406,12 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     exchange=quote.get('exchange'),
                     currency=quote.get('currency', 'USD'),
                     asset_type=asset_type,
-                    country_code=country_code,
+                    country_code=target_country,
+                    is_listed=True,
                     website=quote.get('website'),
                     logo_url=quote.get('logoUrl'),
                     description=quote.get('description'),
-                    last_updated=datetime.utcnow(),
+                    last_updated=datetime.utcnow()
                 )
                 session.add(new_stock)
                 imported += 1

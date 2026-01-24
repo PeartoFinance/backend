@@ -56,6 +56,10 @@ class MarketData(db.Model):
     is_listed = db.Column(db.Boolean, default=False, index=True) # Controls visibility in public directory
     is_featured = db.Column(db.Boolean, default=False) # For highlighting on dashboard
     
+    __table_args__ = (
+        db.UniqueConstraint('symbol', 'country_code', 'asset_type', name='uq_market_data_symbol_country_asset'),
+    )
+    
     def to_dict(self):
         return {
             'id': self.id,
