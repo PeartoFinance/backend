@@ -3,6 +3,7 @@ from flask import request, jsonify, g
 import jwt
 from config import config
 from models import User
+from models.user import UserSession
 
 def auth_required(f):
     @wraps(f)
@@ -30,6 +31,16 @@ def auth_required(f):
             if not user:
                 print(f'[AUTH DEBUG] User not found for ID: {payload.get("user_id")}')
                 return jsonify({'error': 'User not found'}), 404
+
+            # validate session 
+            session = UserSession.query.filter_by(
+                user_id=user.id,
+                token=token
+            ).first()
+            
+            if not session:
+                print(f'[AUTH DEBUG] Invalid session for user ID: {user.id}')
+                return jsonify({'error': 'Invalid session or expired'}), 401
             
             # Check account status
             if user.account_status != 'active':
@@ -58,6 +69,7 @@ def auth_required(f):
             return jsonify({'error': 'Invalid token'}), 401
             
     return decorated
+
 
 def admin_required(f):
     @wraps(f)

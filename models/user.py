@@ -82,7 +82,7 @@ class UserSession(db.Model):
     """User login sessions"""
     __tablename__ = 'user_sessions'
     
-    id = db.Column(db.String(255), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     token = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
