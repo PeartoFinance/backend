@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from config import config
 from models import db, User, PasswordResetToken, UserProfile
 from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email, track_login, track_signup
+from models.user import UserSession
 from .decorators import auth_required
 
 auth_bp = Blueprint('auth', __name__)
@@ -322,7 +323,23 @@ def google_signin():
         'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
     token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+
+    # normalize token
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
     
+    UserSession.query.filter_by(user_id=user.id).delete()
+
+    # create session
+    session = UserSession(
+        user_id=user.id,
+        token=token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
+    )
+    db.session.add(session)
+    db.session.commit()
+
+
     # Send Google login notification email
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
@@ -335,3 +352,24 @@ def google_signin():
         'user': user.to_dict(),
         'token': token
     })
+
+
+# set password for google user
+@auth_bp.route('/set-password', methods=['POST'])
+@auth_required
+def set_password():
+    """Set password for Google user"""
+    user = request.user
+    data = request.get_json()
+    password = data.get('password')
+
+    if user.password:
+        return jsonify({'error': 'Password already set'}), 400
+
+    if not password or len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
+    user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    db.session.commit()
+
+    return jsonify({'message': 'Password set successfully'})

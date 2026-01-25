@@ -31,9 +31,18 @@ def deactivate_account():
     """Deactivate user account"""
     user = request.user
     data = request.get_json()
-    password = data.get('password', '')
     reason = data.get('reason', 'User requested')
     
+    # Check current status
+    if user.account_status == 'deactivated':
+        return jsonify({'error': 'Account is already deactivated'}), 400
+
+    # if user has no password then -> force set password
+    if not user.password:
+        return jsonify({'error': 'password not set', "action": "set_password"}), 403
+     
+    #  if user has password
+    password = data.get('password')
     if not password:
         return jsonify({'error': 'Password required for deactivation'}), 400
     
@@ -41,9 +50,6 @@ def deactivate_account():
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({'error': 'Invalid password'}), 401
     
-    # Check current status
-    if user.account_status == 'deactivated':
-        return jsonify({'error': 'Account is already deactivated'}), 400
     
     # Deactivate account
     user.account_status = 'deactivated'
@@ -65,7 +71,7 @@ def deactivate_account():
     return jsonify({
         'success': True,
         'message': 'Account deactivated successfully. You will be logged out shortly.'
-    })
+    }), 200
 
 
 @account_bp.route('/reactivate', methods=['POST'])
@@ -73,9 +79,8 @@ def reactivate_account():
     """Reactivate deactivated account"""
     data = request.get_json()
     email = data.get('email', '').strip().lower()
-    password = data.get('password', '')
     
-    if not email or not password:
+    if not email:
         return jsonify({'error': 'Email and password required'}), 400
     
     # Get user
@@ -83,13 +88,27 @@ def reactivate_account():
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
-    # Verify password
-    if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-        return jsonify({'error': 'Invalid password'}), 401
-    
     # Check current status
     if user.account_status not in ['deactivated', 'deleted']:
         return jsonify({'error': 'Account is already active or cannot be reactivated'}), 400
+    
+    # 🔑 Google user or no password → force set-password
+    if not user.password:
+        return jsonify({
+            'error': 'Password not set',
+            'action': 'set_password'
+        }), 403
+
+    password = data.get('password')
+    if not password:
+        return jsonify({'error': 'Password required'}), 400
+    
+     # Verify password
+    if not bcrypt.checkpw(
+        password.encode('utf-8'),
+        user.password.encode('utf-8')
+    ):
+        return jsonify({'error': 'Invalid password'}), 401
     
     # Optional: Check if the 30-day window has passed for 'deleted' accounts
     if user.account_status == 'deleted' and user.deactivated_at:
@@ -123,11 +142,26 @@ def delete_account_permanently():
     """Permanently delete account (soft delete)"""
     user = request.user
     data = request.get_json()
-    password = data.get('password', '')
     confirmation = data.get('confirmation', '')
-    
-    if not password or confirmation != 'DELETE':
-        return jsonify({'error': 'Password and confirmation "DELETE" required'}), 400
+
+    # check status
+    if user.account_status == 'deleted':
+        return jsonify({'error': 'Account is already deleted'}), 400
+
+    # google user or no password -> force set password
+    if not user.password:
+        return jsonify({
+            'error': 'Password not set',
+            'action': 'set_password'
+        }), 403
+
+    # Require confirmation
+    if confirmation != 'DELETE':
+        return jsonify({'error': 'Confirmation "DELETE" required'}), 400
+
+    password = data.get('password')
+    if not password:
+        return jsonify({'error': 'Password required'}), 400
     
     # Verify password
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
