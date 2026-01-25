@@ -192,6 +192,96 @@ def update_preferences():
     })
 
 
+@user_bp.route('/notification-preferences', methods=['GET'])
+def get_notification_preferences():
+    """Get user notification preferences"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    from models import UserNotificationPref
+    from services.preference_checker import get_default_preferences
+    
+    prefs = UserNotificationPref.query.filter_by(user_id=user.id).first()
+    
+    if not prefs:
+        # Return defaults if no preferences set
+        return jsonify(get_default_preferences())
+    
+    return jsonify(prefs.to_dict())
+
+
+@user_bp.route('/notification-preferences', methods=['PUT'])
+def update_notification_preferences():
+    """Update user notification preferences"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    from models import UserNotificationPref
+    from datetime import time as dt_time
+    
+    data = request.get_json()
+    
+    prefs = UserNotificationPref.query.filter_by(user_id=user.id).first()
+    if not prefs:
+        prefs = UserNotificationPref(user_id=user.id)
+        db.session.add(prefs)
+    
+    # Map frontend field names to database field names
+    field_mapping = {
+        'emailSecurity': 'email_security',
+        'emailAccount': 'email_account',
+        'emailPriceAlerts': 'email_price_alerts',
+        'emailDailyDigest': 'email_daily_digest',
+        'emailEarnings': 'email_earnings',
+        'emailNews': 'email_news',
+        'emailMarketing': 'email_marketing',
+        'emailNewsletter': 'email_newsletter',
+        'pushSecurity': 'push_security',
+        'pushPriceAlerts': 'push_price_alerts',
+        'pushNews': 'push_news',
+        'pushEarnings': 'push_earnings',
+        'smsSecurity': 'sms_security',
+        'smsPriceAlerts': 'sms_price_alerts',
+        'quietHoursEnabled': 'quiet_hours_enabled',
+    }
+    
+    for frontend_key, db_key in field_mapping.items():
+        if frontend_key in data:
+            setattr(prefs, db_key, data[frontend_key])
+    
+    # Handle quiet hours time fields
+    if 'quietHoursStart' in data and data['quietHoursStart']:
+        try:
+            parts = data['quietHoursStart'].split(':')
+            prefs.quiet_hours_start = dt_time(int(parts[0]), int(parts[1]))
+        except (ValueError, IndexError):
+            pass
+    
+    if 'quietHoursEnd' in data and data['quietHoursEnd']:
+        try:
+            parts = data['quietHoursEnd'].split(':')
+            prefs.quiet_hours_end = dt_time(int(parts[0]), int(parts[1]))
+        except (ValueError, IndexError):
+            pass
+    
+    db.session.commit()
+    
+    # Track settings update activity
+    try:
+        from handlers import track_settings_update
+        track_settings_update(user.id, 'notification_preferences')
+    except Exception as e:
+        print(f'[User] Activity tracking failed: {e}')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Notification preferences updated',
+        'preferences': prefs.to_dict()
+    })
+
+
 @user_bp.route('/change-password', methods=['POST'])
 def change_password():
     """Change user password"""
