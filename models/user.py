@@ -140,19 +140,71 @@ class UserAlert(db.Model):
 
 
 class UserNotificationPref(db.Model):
-    """User notification preferences"""
+    """User notification preferences - granular control over all notification types"""
     __tablename__ = 'user_notification_prefs'
     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    email_marketing = db.Column(db.Boolean, default=True)
+    
+    # Legacy fields (kept for backward compatibility)
+    email_marketing = db.Column(db.Boolean, default=False)
     email_alerts = db.Column(db.Boolean, default=True)
     email_news = db.Column(db.Boolean, default=True)
     push_alerts = db.Column(db.Boolean, default=True)
     push_news = db.Column(db.Boolean, default=True)
     sms_alerts = db.Column(db.Boolean, default=False)
+    
+    # Security & Account notifications (always recommended ON)
+    email_security = db.Column(db.Boolean, default=True)  # Login alerts, password changes
+    email_account = db.Column(db.Boolean, default=True)   # Account updates, profile changes
+    
+    # Trading & Market notifications
+    email_price_alerts = db.Column(db.Boolean, default=True)   # Price target hits
+    email_daily_digest = db.Column(db.Boolean, default=True)   # Daily market summary
+    email_earnings = db.Column(db.Boolean, default=True)       # Earnings reminders
+    email_newsletter = db.Column(db.Boolean, default=True)     # Weekly newsletter
+    
+    # Push notifications
+    push_security = db.Column(db.Boolean, default=True)
+    push_price_alerts = db.Column(db.Boolean, default=True)
+    push_earnings = db.Column(db.Boolean, default=True)
+    
+    # SMS (premium)
+    sms_security = db.Column(db.Boolean, default=False)
+    sms_price_alerts = db.Column(db.Boolean, default=False)
+    
+    # Quiet hours (do not disturb)
+    quiet_hours_enabled = db.Column(db.Boolean, default=False)
+    quiet_hours_start = db.Column(db.Time)  # e.g., 22:00
+    quiet_hours_end = db.Column(db.Time)    # e.g., 08:00
+    
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    def to_dict(self):
+        return {
+            # Email preferences
+            'emailSecurity': self.email_security if self.email_security is not None else True,
+            'emailAccount': self.email_account if self.email_account is not None else True,
+            'emailPriceAlerts': self.email_price_alerts if self.email_price_alerts is not None else self.email_alerts,
+            'emailDailyDigest': self.email_daily_digest if self.email_daily_digest is not None else True,
+            'emailEarnings': self.email_earnings if self.email_earnings is not None else True,
+            'emailNews': self.email_news if self.email_news is not None else True,
+            'emailMarketing': self.email_marketing if self.email_marketing is not None else False,
+            'emailNewsletter': self.email_newsletter if self.email_newsletter is not None else True,
+            # Push preferences
+            'pushSecurity': self.push_security if self.push_security is not None else True,
+            'pushPriceAlerts': self.push_price_alerts if self.push_price_alerts is not None else self.push_alerts,
+            'pushNews': self.push_news if self.push_news is not None else True,
+            'pushEarnings': self.push_earnings if self.push_earnings is not None else True,
+            # SMS preferences
+            'smsSecurity': self.sms_security if self.sms_security is not None else False,
+            'smsPriceAlerts': self.sms_price_alerts if self.sms_price_alerts is not None else self.sms_alerts,
+            # Quiet hours
+            'quietHoursEnabled': self.quiet_hours_enabled if self.quiet_hours_enabled is not None else False,
+            'quietHoursStart': self.quiet_hours_start.strftime('%H:%M') if self.quiet_hours_start else None,
+            'quietHoursEnd': self.quiet_hours_end.strftime('%H:%M') if self.quiet_hours_end else None,
+        }
 
 
 class UserDashboardConfig(db.Model):

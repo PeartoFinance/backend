@@ -74,7 +74,11 @@ def login():
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         user_agent = request.headers.get('User-Agent', 'Unknown device')
         track_login(user.id, success=True, method='email', ip=ip_address)
-        send_login_notification_email(user.email, user.name, ip_address, user_agent)
+        
+        # Check user preferences before sending login notification
+        from services.preference_checker import should_send_notification
+        if should_send_notification(user.id, 'security', 'email'):
+            send_login_notification_email(user.email, user.name, ip_address, user_agent)
     except Exception as e:
         print(f'[Auth] Login notification failed: {e}')
     
@@ -148,7 +152,11 @@ def signup():
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         track_signup(user.id, method='email', ip=ip_address)
-        send_welcome_email(user.email, user.name)
+        
+        # Check preferences (default True for account/welcome)
+        from services.preference_checker import should_send_notification
+        if should_send_notification(user.id, 'account', 'email'):
+            send_welcome_email(user.email, user.name)
     except Exception as e:
         print(f'[Auth] Signup tracking/email failed: {e}')
     
@@ -323,11 +331,14 @@ def google_signin():
     }
     token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
     
-    # Send Google login notification email
+    # Send Google login notification email (check preferences first)
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         user_agent = request.headers.get('User-Agent', 'Unknown device')
-        send_google_login_email(user.email, user.name, ip_address, user_agent)
+        
+        from services.preference_checker import should_send_notification
+        if should_send_notification(user.id, 'security', 'email'):
+            send_google_login_email(user.email, user.name, ip_address, user_agent)
     except Exception as e:
         print(f'[Auth] Google login email failed: {e}')
     

@@ -30,23 +30,34 @@ def send_notification(
     Returns:
         Dict with status for each channel
     """
-    from models import UserNotificationPref
+    from services.preference_checker import should_send_notification
     
     results = {}
     
-    # Get user notification preferences
+    # Map notification type to preference type
+    notification_type_map = {
+        'price_alert': 'price_alert',
+        'welcome': 'account',
+        'security': 'security',
+        'earnings_reminder': 'earnings',
+        'daily_digest': 'daily_digest',
+        'news': 'news',
+    }
+    pref_notification_type = notification_type_map.get(notification_type, 'account')
+    
+    # Determine which channels to use based on user preferences
     if channels is None:
-        prefs = UserNotificationPref.query.filter_by(user_id=user_id).first()
-        if prefs:
-            channels = []
-            if prefs.email_alerts:
-                channels.append('email')
-            if prefs.push_alerts:
-                channels.append('push')
-            if prefs.sms_alerts:
-                channels.append('sms')
-        else:
-            channels = ['email', 'push']  # Default
+        channels = []
+        if should_send_notification(user_id, pref_notification_type, 'email'):
+            channels.append('email')
+        if should_send_notification(user_id, pref_notification_type, 'push'):
+            channels.append('push')
+        if should_send_notification(user_id, pref_notification_type, 'sms'):
+            channels.append('sms')
+        
+        # Default to at least email/push if no channels determined
+        if not channels:
+            channels = ['email', 'push']
     
     # Send via each channel
     if 'email' in channels:
@@ -155,6 +166,12 @@ def send_digest_email(
     """
     Send daily market digest email.
     """
+    from services.preference_checker import should_send_notification
+    
+    # Double check preference (safety net)
+    if not should_send_notification(user_id, 'daily_digest', 'email'):
+        return False
+        
     try:
         from .email_service import EmailService
         

@@ -125,20 +125,23 @@ def send_daily_digest() -> Dict[str, Any]:
     try:
         app = get_app()
         with app.app_context():
-            from models import db, User, UserNotificationPref, UserWatchlist, MarketData
+            from models import db, User, UserWatchlist, MarketData
             from notifications import send_digest_email
+            from services.preference_checker import should_send_notification
             
             digests_sent = 0
+            skipped = 0
             
-            # Get users who have email notifications enabled
-            users = db.session.query(User).join(
-                UserNotificationPref, User.id == UserNotificationPref.user_id
-            ).filter(
-                UserNotificationPref.email_alerts == True
-            ).all()
+            # Get all active users
+            users = User.query.filter_by(account_status='active').all()
             
             for user in users:
                 try:
+                    # Check if user wants daily digest emails
+                    if not should_send_notification(user.id, 'daily_digest', 'email'):
+                        skipped += 1
+                        continue
+                    
                     # Get user's watchlist symbols
                     watchlist = UserWatchlist.query.filter_by(user_id=user.id).all()
                     symbols = [w.symbol for w in watchlist]
@@ -161,8 +164,8 @@ def send_daily_digest() -> Dict[str, Any]:
                 except Exception as e:
                     logger.warning(f"Failed to send digest to user {user.id}: {e}")
             
-            logger.info(f"Daily digest complete: {digests_sent} emails sent")
-            return {'status': 'ok', 'digests_sent': digests_sent}
+            logger.info(f"Daily digest complete: {digests_sent} emails sent, {skipped} skipped (preferences)")
+            return {'status': 'ok', 'digests_sent': digests_sent, 'skipped': skipped}
     except Exception as e:
         logger.error(f"Daily digest job failed: {e}")
         return {'status': 'error', 'error': str(e)}
