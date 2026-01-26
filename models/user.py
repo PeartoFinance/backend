@@ -62,7 +62,8 @@ class User(db.Model):
             'referralCode': self.referral_code,
             'referredBy': self.referred_by,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'lastLoginAt': self.last_login_at.isoformat() if self.last_login_at else None
+            'lastLoginAt': self.last_login_at.isoformat() if self.last_login_at else None,
+            'hasPassword': bool(self.password)
         }
 
 

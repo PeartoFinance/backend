@@ -444,7 +444,7 @@ def send_google_login_email(user_email: str, user_name: str,
                              ip_address: str = 'Unknown',
                              user_agent: str = 'Unknown device') -> bool:
     """Send Google OAuth login notification email"""
-    return _email_service.send_email(user_email, 'google_login', {
+    return _email_service.send_email_async(user_email, 'google_login', {
         'user_name': user_name,
         'login_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'device_info': user_agent[:50] if user_agent else 'Unknown device',

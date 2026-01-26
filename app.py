@@ -31,20 +31,21 @@ migrate = Migrate(app, db)
 
 
 # Configure CORS - explicitly list all allowed origins (cannot use * with credentials)
+import re
+
+# Configure CORS - use regex for local network IPs to avoid "PreflightMissingAllowOriginHeader"
 CORS(app, 
      origins=[
          "http://localhost:3000",
          "http://localhost:3001",
          "http://127.0.0.1:3000",
-         "http://192.168.1.71:3000",
-         "http://192.168.1.71:3001",
-         "http://192.168.1.71:5000",
          "https://pearto.com",
          "https://www.pearto.com",
          "https://test.pearto.com",
-         "http://192.168.1.71:5000",
          "https://frontend-admin-pearto.vercel.app",
          "https://stocks-nine-blush.vercel.app",
+         re.compile(r"^http://192\.168\.\d{1,3}\.\d{1,3}:\d{1,5}$"),  # Matches any local IP
+         re.compile(r"^http://127\.0\.0\.1:\d{1,5}$"),               # Matches localhost with any port
      ],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "X-Admin-Secret", "X-Admin-Country", "X-User-Country", "X-User-Email", "X-Session-Token"],
@@ -137,7 +138,12 @@ app.register_blueprint(cron_bp, url_prefix='/api/cron')
 
 # Market status routes (market hours, open/close status)
 from routes.market_status import market_status_bp
+
 app.register_blueprint(market_status_bp, url_prefix='/api/market')
+
+# Admin Vendors
+from routes.admin.vendors import vendors_bp
+app.register_blueprint(vendors_bp, url_prefix='/api/admin')
 
 
 # Error handlers

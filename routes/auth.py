@@ -68,6 +68,23 @@ def login():
     
     # Update last login
     user.last_login_at = datetime.now(timezone.utc)
+    
+    # Create/Update session
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+        
+    # Clear old sessions
+    UserSession.query.filter_by(user_id=user.id).delete()
+    
+    # Create new session
+    session = UserSession(
+        user_id=user.id,
+        token=token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS),
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(session)
     db.session.commit()
     
     # Track login activity
@@ -322,6 +339,13 @@ def google_signin():
             send_welcome_email(user.email, user.name)
         except Exception as e:
             print(f'[Auth] Welcome email failed: {e}')
+
+        # Track signup activity
+        try:
+            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+            track_signup(user.id, method='google', ip=ip_address)
+        except Exception as e:
+            print(f'[Auth] Signup tracking failed: {e}')
     
     # Generate JWT token
     payload = {
@@ -348,10 +372,13 @@ def google_signin():
     db.session.commit()
 
 
-    # Send Google login notification email
+    # Track login and send notification
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         user_agent = request.headers.get('User-Agent', 'Unknown device')
+        
+        # Track login
+        track_login(user.id, success=True, method='google', ip=ip_address)
         
         from services.preference_checker import should_send_notification
         if should_send_notification(user.id, 'security', 'email'):

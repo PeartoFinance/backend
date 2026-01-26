@@ -513,3 +513,66 @@ def sync_stock_news(symbol: str) -> Dict[str, Any]:
         db.session.rollback()
         logger.error(f"Error syncing news for {symbol}: {e}")
         return {'status': 'error', 'message': str(e)}
+
+
+def fetch_stock_news_preview(symbol: str) -> Dict[str, Any]:
+    """
+    Fetch news for a specific stock from yfinance and return as list (without saving).
+    """
+    import hashlib
+    import re
+    
+    symbol = symbol.upper()
+    try:
+        ticker = yf.Ticker(symbol)
+        news = ticker.news
+        
+        if not news:
+            return {'status': 'ok', 'items': [], 'message': f'No news found for {symbol}'}
+        
+        preview_items = []
+        for item in news:
+            # Extract content
+            content = item.get('content', item)
+            title = content.get('title')
+            link = content.get('canonicalUrl', {}).get('url') or content.get('link')
+            
+            if not title or not link:
+                continue
+                
+            # Parse date
+            pub_date = None
+            pub_date_str = content.get('pubDate') or content.get('pubtime')
+            if pub_date_str:
+                try:
+                    # Keep as string for JSON serialization
+                    pub_date = pub_date_str
+                except:
+                    pub_date = datetime.utcnow().isoformat()
+            else:
+                pub_date = datetime.utcnow().isoformat()
+
+            # Get image
+            image_url = None
+            thumbnail = content.get('thumbnail', {})
+            if thumbnail:
+                resolutions = thumbnail.get('resolutions', [])
+                if resolutions:
+                    image_url = resolutions[-1].get('url')
+
+            preview_items.append({
+                'title': title,
+                'summary': content.get('summary') or title,
+                'canonical_url': link,
+                'source': content.get('provider', {}).get('displayName') or 'Yahoo Finance',
+                'published_at': pub_date,
+                'related_symbol': symbol,
+                'image': image_url,
+                'source_type': 'yfinance'
+            })
+            
+        return {'status': 'success', 'items': preview_items}
+        
+    except Exception as e:
+        logger.error(f"Error fetching news preview for {symbol}: {e}")
+        return {'status': 'error', 'message': str(e)}

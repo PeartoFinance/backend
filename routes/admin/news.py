@@ -42,6 +42,27 @@ def get_news():
         
         if search:
             query = query.filter(NewsItem.title.ilike(f'%{search}%'))
+            
+        # Date filtering
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        if start_date:
+            try:
+                start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                query = query.filter(NewsItem.published_at >= start)
+            except ValueError:
+                pass
+                
+        if end_date:
+            try:
+                # Add 1 day to end_date to include the full day if it's just a date string
+                end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                if len(end_date) <= 10: # YYYY-MM-DD
+                    end = end.replace(hour=23, minute=59, second=59)
+                query = query.filter(NewsItem.published_at <= end)
+            except ValueError:
+                pass
         
         # Get total count
         total = query.count()
@@ -170,6 +191,120 @@ def fetch_news_from_sources():
             'message': f'Fetched {len(results)} news items'
         })
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@news_bp.route('/news/import-company', methods=['POST'])
+@admin_required
+def import_company_news():
+    """Import news for a specific company/symbol from Yahoo Finance"""
+    try:
+        from handlers.market_data.stock_handler import sync_stock_news
+        
+        data = request.get_json()
+        symbol = data.get('symbol', '').strip()
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = sync_stock_news(symbol)
+        
+        if result.get('status') == 'error':
+            return jsonify({'error': result.get('message')}), 500
+            
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@news_bp.route('/news/external-search', methods=['POST'])
+@admin_required
+def search_external_news():
+    """Search for news from external sources (preview only)"""
+    try:
+        from handlers.market_data.stock_handler import fetch_stock_news_preview
+        
+        data = request.get_json()
+        symbol = data.get('symbol', '').strip()
+        
+        if not symbol:
+            return jsonify({'error': 'Symbol is required'}), 400
+            
+        result = fetch_stock_news_preview(symbol)
+        
+        if result.get('status') == 'error':
+            return jsonify({'error': result.get('message')}), 500
+            
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@news_bp.route('/news/import-bulk', methods=['POST'])
+@admin_required
+def import_bulk_news():
+    """Import specific selected news items"""
+    try:
+        import hashlib
+        import re
+        
+        data = request.get_json()
+        items = data.get('items', [])
+        
+        if not items:
+            return jsonify({'error': 'No items provided'}), 400
+            
+        imported = 0
+        
+        for item in items:
+            title = item.get('title')
+            link = item.get('canonical_url')
+            
+            if not title or not link:
+                continue
+                
+            # Generate hash
+            item_hash = hashlib.sha256(f"{link}|{title}".encode('utf-8')).hexdigest()
+            
+            # Check existing
+            if NewsItem.query.filter_by(hash=item_hash).first():
+                continue
+                
+            # Create slug
+            slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:100]
+            if NewsItem.query.filter_by(slug=slug).first():
+                slug = f"{slug}-{int(datetime.utcnow().timestamp())}"
+            
+            # Parse date
+            pub_date = datetime.utcnow()
+            if item.get('published_at'):
+                try:
+                    pub_date = datetime.fromisoformat(item.get('published_at').replace('Z', '+00:00'))
+                except:
+                    pass
+            
+            news_item = NewsItem(
+                title=title,
+                summary=item.get('summary'),
+                canonical_url=link,
+                source=item.get('source', 'External'),
+                published_at=pub_date,
+                hash=item_hash,
+                slug=slug,
+                related_symbol=item.get('related_symbol'),
+                curated_status='published',
+                source_type='yfinance',
+                image=item.get('image'),
+                created_at=datetime.utcnow()
+            )
+            db.session.add(news_item)
+            imported += 1
+            
+        db.session.commit()
+        return jsonify({'success': True, 'imported': imported})
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 

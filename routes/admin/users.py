@@ -5,7 +5,7 @@ CRUD for /api/admin/users
 import bcrypt
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timezone
-from models import db, User, Role
+from models import db, User, Role, LoginEvent, UserActivity
 
 users_bp = Blueprint('admin_users', __name__)
 
@@ -26,14 +26,42 @@ def get_users():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @users_bp.route('/users/<int:user_id>', methods=['GET'])
 @admin_required
 def get_user(user_id):
-    """Get single user"""
+    """Get single user full profile"""
     try:
         user = User.query.get_or_404(user_id)
-        return jsonify(user.to_dict())
+        
+        # Fetch login history
+        logins = LoginEvent.query.filter_by(user_id=user_id).order_by(LoginEvent.created_at.desc()).limit(10).all()
+        
+        # Fetch activity log
+        activities = UserActivity.query.filter_by(user_id=user_id).order_by(UserActivity.created_at.desc()).limit(50).all()
+        
+        user_data = user.to_dict()
+        
+        # Append extra admin-only fields to user_data if not present
+        user_data['lastLoginIp'] = logins[0].ip_address if logins else None
+        
+        return jsonify({
+            'profile': user_data,
+            'loginHistory': [{
+                'id': l.id,
+                'date': l.created_at.isoformat() if l.created_at else None,
+                'ip': l.ip_address,
+                'userAgent': l.user_agent,
+                'success': l.success,
+                'location': l.location
+            } for l in logins],
+            'activityLog': [{
+                'id': a.id,
+                'action': a.action,
+                'date': a.created_at.isoformat() if a.created_at else None,
+                'details': a.details,
+                'ip': a.ip_address
+            } for a in activities]
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
