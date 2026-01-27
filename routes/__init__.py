@@ -20,6 +20,7 @@ from .pages import pages_bp
 from .media import media_bp
 from .education import education_bp
 from .navigation import navigation_bp
+from .news_preferences import news_prefs_bp
 
 __all__ = [
     'auth_bp',
@@ -41,4 +42,5 @@ __all__ = [
     'media_bp',
     'education_bp',
     'navigation_bp',
+    'news_prefs_bp',
 ]

@@ -11,10 +11,12 @@ from .market_jobs import (
     update_all_commodities,
     update_earnings_calendar,
     update_dividends,
+
 )
 from .notification_jobs import (
     check_watchlist_alerts,
     send_daily_digest,
+    process_news_notifications,
 )
 from .system_jobs import cleanup_deleted_accounts
 
@@ -31,4 +33,5 @@ __all__ = [
     'check_watchlist_alerts',
     'send_daily_digest',
     'cleanup_deleted_accounts',
+    'process_news_notifications',
 ]

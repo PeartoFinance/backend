@@ -224,3 +224,36 @@ def check_earnings_alerts() -> Dict[str, Any]:
         logger.error(f"Earnings alerts check failed: {e}")
         return {'status': 'error', 'error': str(e)}
 
+# ==================== NEWS NOTIFICATIONS ====================
+def process_news_notifications() -> Dict[str, Any]:
+    """
+    Process news notifications for all users
+    Fetches recent news and sends to users based on their preferences
+    
+    Returns:
+        Dictionary with job statistics
+    """
+    logger.info("Starting news notification job")
+    start_time = datetime.utcnow()
+    
+    try:
+        app = get_app()
+        with app.app_context():
+            from handlers.market_data.news_notification_handler import process_news_notifications as fetch_and_send_news
+            
+            result = fetch_and_send_news()
+            
+            elapsed_time = (datetime.utcnow() - start_time).total_seconds()
+            result['elapsed_seconds'] = elapsed_time
+            
+            logger.info(f"News notification job completed in {elapsed_time:.2f}s - {result}")
+            
+            return result
+    
+    except Exception as e:
+        logger.error(f"News notification job failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'elapsed_seconds': (datetime.utcnow() - start_time).total_seconds()
+        }

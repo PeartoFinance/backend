@@ -182,6 +182,9 @@ class UserNotificationPref(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
+    __table_args__ = (
+        db.UniqueConstraint('user_id', name='ux_user_notification_prefs_user_id'),
+    )
     def to_dict(self):
         return {
             # Email preferences
@@ -206,6 +209,39 @@ class UserNotificationPref(db.Model):
             'quietHoursStart': self.quiet_hours_start.strftime('%H:%M') if self.quiet_hours_start else None,
             'quietHoursEnd': self.quiet_hours_end.strftime('%H:%M') if self.quiet_hours_end else None,
         }
+    
+
+# ============== user news preference table =================
+class NewsPreference(db.Model):
+    __tablename__ = 'news_preferences'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+
+    companies = db.Column(db.JSON)     # ["AAPL", "TSLA"]
+    categories = db.Column(db.JSON)    # ["finance", "tech"]
+    news_type = db.Column(db.Enum('company', 'independent'), nullable=False)
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+# To make Cron safe and idempotent.
+class NewsNotification(db.Model):
+        __tablename__ = 'news_notifications'
+
+        id = db.Column(db.Integer, primary_key=True)
+        user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+        news_id = db.Column(db.Integer, nullable=False)
+
+        sent_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+        __table_args__ = (
+            db.UniqueConstraint('user_id', 'news_id', name='ux_user_news_notification'),
+        )
+
+
+# ===================
 
 
 class UserDashboardConfig(db.Model):

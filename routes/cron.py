@@ -284,3 +284,21 @@ def cron_import_biz_profiles():
         return jsonify({'ok': True, **result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== NEWS FETCHING ====================
+@cron_bp.route('/news-notifications', methods=['GET', 'POST'])
+def cron_news_notifications():
+    """
+    Fetch recent news and send notifications to users based on preferences.
+    cURL: curl -X POST http://localhost:5000/api/cron/news-notifications
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import process_news_notifications
+        result = process_news_notifications()
+        return jsonify({'ok': result['success'], **result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e), 'ok': False}), 500
