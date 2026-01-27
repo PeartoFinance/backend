@@ -63,6 +63,16 @@ from .dividend_handler import (
     DIVIDEND_STOCKS,
 )
 
+from .news_notification_handler import (
+    process_news_notifications,
+    send_user_notification,
+)
+
+from .news_fetch_handler import (
+    fetch_recent_news,
+    match_news_to_user_preferences,
+)
+
 __all__ = [
     # Stock
     'get_stock_quote',
@@ -108,5 +118,11 @@ __all__ = [
     'get_ex_dividend_calendar',
     'import_dividends_to_db',
     'DIVIDEND_STOCKS',
+    # news fetch
+    'fetch_recent_news',
+    'match_news_to_user_preferences',
+    # news notification
+    'process_news_notifications',
+    'send_user_notification',
 ]
 

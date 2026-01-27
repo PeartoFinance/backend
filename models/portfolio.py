@@ -32,6 +32,32 @@ class UserPortfolio(db.Model):
             'totalGainLoss': float(self.total_gain_loss) if self.total_gain_loss else 0
         }
 
+# user investments goals and preferences for portfolio health score
+class UserInvestmentGoal(db.Model):
+    __tablename__ = 'user_investment_goals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+
+    age = db.Column(db.Integer)
+
+    # Target allocation (percent)
+    target_stocks_percent = db.Column(db.Integer, default=60)
+    target_bonds_percent = db.Column(db.Integer, default=20)
+    target_cash_percent = db.Column(db.Integer, default=10)
+    target_crypto_percent = db.Column(db.Integer, default=5)
+    target_commodities_percent = db.Column(db.Integer, default=5)
+
+    risk_tolerance = db.Column(
+        db.Enum('conservative', 'moderate', 'aggressive'),
+        default='moderate'
+    )
+     # Benchmarks to compare against
+    benchmark_symbol = db.Column(db.String(20), default='^GSPC')
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class PortfolioHolding(db.Model):
     """Portfolio stock/crypto holdings"""

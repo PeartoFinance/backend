@@ -22,6 +22,8 @@ from .user import (
     LoginEvent,
     Role,
     AdminUser,
+    NewsPreference,
+    NewsNotification,
 )
 
 from .market import (
@@ -89,6 +91,7 @@ from .portfolio import (
     Withdrawal,
     Order,
     OrderItem,
+    UserInvestmentGoal,
 )
 
 # Settings/Config models
@@ -178,7 +181,7 @@ __all__ = [
     # User
     'User', 'PasswordResetToken', 'UserSession', 'UserDevice', 'UserActivity',
     'UserAlert', 'UserNotificationPref', 'UserDashboardConfig', 'UserDocument',
-    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role', 'AdminUser',
+    'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role', 'AdminUser','NewsPreference', 'NewsNotification',
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
@@ -194,7 +197,7 @@ __all__ = [
     # Portfolio
     'UserPortfolio', 'PortfolioHolding', 'PortfolioTransaction', 'Watchlist',
     'WatchlistItem', 'UserWatchlist', 'PaperTradingAccount', 'PaperHolding',
-    'PaperTransaction', 'WealthState', 'Transaction', 'Deposit', 'Withdrawal', 'Order', 'OrderItem',
+    'PaperTransaction', 'WealthState', 'Transaction', 'Deposit', 'Withdrawal', 'Order', 'OrderItem','UserInvestmentGoal',
     # Settings
     'Settings', 'Appearance', 'Country', 'APIRegistry', 'ToolSettings',
     'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product', 'MarketHours',

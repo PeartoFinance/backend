@@ -6,9 +6,81 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 import uuid
 from routes.decorators import auth_required
-from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData
+from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, UserInvestmentGoal
+from services.portfolio_service import calculate_portfolio_health
 
 portfolio_bp = Blueprint('portfolio', __name__)
+
+
+@portfolio_bp.route('/analysis/health-score', methods=['GET'])
+@auth_required
+def get_portfolio_health_score():
+    """Calculate and return the user's portfolio health score"""
+    result = calculate_portfolio_health(request.user.id)
+    return jsonify(result)
+
+
+@portfolio_bp.route('/goals', methods=['GET'])
+@auth_required
+def get_portfolio_goals():
+    """Get user's investment goals"""
+    goals = UserInvestmentGoal.query.filter_by(user_id=request.user.id).first()
+    if not goals:
+        # Return defaults if not set
+        return jsonify({
+            'target_stocks_percent': 60,
+            'target_bonds_percent': 20,
+            'target_cash_percent': 10,
+            'target_crypto_percent': 5,
+            'target_commodities_percent': 5,
+            'risk_tolerance': 'moderate',
+            'benchmark_symbol': '^GSPC'
+        })
+    
+    return jsonify({
+        'target_stocks_percent': goals.target_stocks_percent,
+        'target_bonds_percent': goals.target_bonds_percent,
+        'target_cash_percent': goals.target_cash_percent,
+        'target_crypto_percent': goals.target_crypto_percent,
+        'target_commodities_percent': goals.target_commodities_percent,
+        'risk_tolerance': goals.risk_tolerance,
+        'benchmark_symbol': goals.benchmark_symbol
+    })
+
+
+@portfolio_bp.route('/goals', methods=['POST', 'PUT'])
+@auth_required
+def update_portfolio_goals():
+    """Create or update user's investment goals"""
+    data = request.get_json()
+    
+    goals = UserInvestmentGoal.query.filter_by(user_id=request.user.id).first()
+    
+    if not goals:
+        goals = UserInvestmentGoal(user_id=request.user.id)
+        db.session.add(goals)
+    
+    # Update fields
+    goals.target_stocks_percent = data.get('target_stocks_percent', goals.target_stocks_percent)
+    goals.target_bonds_percent = data.get('target_bonds_percent', goals.target_bonds_percent)
+    goals.target_cash_percent = data.get('target_cash_percent', goals.target_cash_percent)
+    goals.target_crypto_percent = data.get('target_crypto_percent', goals.target_crypto_percent)
+    goals.target_commodities_percent = data.get('target_commodities_percent', goals.target_commodities_percent)
+    goals.risk_tolerance = data.get('risk_tolerance', goals.risk_tolerance)
+    goals.benchmark_symbol = data.get('benchmark_symbol', goals.benchmark_symbol)
+    goals.age = data.get('age', goals.age)
+    
+    # Validation: Ensure total is 100%
+    total = (goals.target_stocks_percent + goals.target_bonds_percent + 
+             goals.target_cash_percent + goals.target_crypto_percent + 
+             goals.target_commodities_percent)
+    
+    if total != 100:
+        return jsonify({'error': f'Total allocation must be 100%. Current total: {total}%'}), 400
+        
+    db.session.commit()
+    
+    return jsonify({'message': 'Investment goals updated successfully'})
 
 
 @portfolio_bp.route('/watchlist', methods=['GET'])

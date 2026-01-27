@@ -29,6 +29,9 @@ db.init_app(app)
 # For migration
 migrate = Migrate(app, db)
 
+# Import all models so Alembic can detect them during migration
+import models
+
 
 # Configure CORS - explicitly list all allowed origins (cannot use * with credentials)
 CORS(app, 
@@ -98,6 +101,7 @@ from routes.jobs import jobs_bp
 from routes.navigation import navigation_bp
 from routes.social import social_bp
 from routes.backup import backup_bp
+from routes.news_preferences import news_prefs_bp
 
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -130,6 +134,7 @@ from routes.alerts import alerts_bp
 from routes.documents import documents_bp
 app.register_blueprint(alerts_bp, url_prefix='/api/user/alerts')
 app.register_blueprint(documents_bp, url_prefix='/api/user/documents')
+app.register_blueprint(news_prefs_bp, url_prefix='/api/user/news-preferences')
 
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
