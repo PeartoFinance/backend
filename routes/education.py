@@ -590,14 +590,17 @@ def get_my_course(course_id):
                 "instructor": {
                     "id": instructor.id,
                     "name": instructor.name,
-                    "title": instructor.title
+                    "title": instructor.title,
+                    "bio": instructor.bio,
+                    "avatarUrl": instructor.avatar_url,
                 } if instructor else None,
                 "modules": [
                     {
                         "id": m.id,
                         "title": m.title,
                         "durationMinutes": m.duration_minutes,
-                        "isFree": m.is_free
+                        "isFree": m.is_free,
+                        "videoUrl": m.video_url,
                     }
                     for m in modules
                 ]

@@ -82,6 +82,16 @@ RULES:
 2. After tool results, provide a friendly summary
 3. Be concise and helpful"""
         
+        context_data = data.get('context', {})
+        
+        if context_data and isinstance(context_data, dict):
+            page_type = context_data.get('pageType', 'general')
+            page_data = context_data.get('pageData', {})
+            
+            system_prompt += f"\n\nCURRENT CONTEXT ({page_type}):\n"
+            for key, value in page_data.items():
+                system_prompt += f"- {key}: {value}\n"
+                
         # Initial AI call
         messages = [
             {"role": "system", "content": system_prompt},
@@ -89,8 +99,8 @@ RULES:
             {"role": "user", "content": message}
         ]
         
-        context = {'page_type': 'assistant', 'history': messages[:-1]}
-        ai_result = loop.run_until_complete(ai_service.chat(message, context, {'max_tokens': 1000}))
+        ai_context = {'page_type': 'assistant', 'history': messages[:-1]}
+        ai_result = loop.run_until_complete(ai_service.chat(message, ai_context, {'max_tokens': 1000}))
         ai_response = ai_result.get('response', '')
         
         # Parse and execute tools if enabled

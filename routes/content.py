@@ -7,6 +7,7 @@ from sqlalchemy import desc
 from models.base import db
 from models.media import TVChannel, RadioStation, TrendingTopic, ForexRate
 from models.article import NewsItem
+from models.misc import Testimonial, FAQ
 
 content_bp = Blueprint('content', __name__)
 
@@ -147,3 +148,72 @@ def get_forex_rates():
         {'pair': 'USD/CAD', 'rate': 1.3654, 'change': 0.0016, 'changePercent': 0.12, 'high': 1.3662, 'low': 1.3646},
         {'pair': 'USD/CHF', 'rate': 0.8812, 'change': 0.0075, 'changePercent': 0.85, 'high': 0.8849, 'low': 0.8775},
     ])
+
+
+@content_bp.route('/testimonials', methods=['GET'])
+def get_testimonials():
+    """Get active testimonials"""
+    limit = min(int(request.args.get('limit', 10)), 50)
+    featured = request.args.get('featured')
+    header_country = request.headers.get('X-User-Country')
+    
+    query = Testimonial.query.filter(Testimonial.is_active == True)
+    
+    if featured == 'true':
+        query = query.filter(Testimonial.is_featured == True)
+        
+    if header_country:
+        hc = header_country.strip().upper()
+        # Filter by specific country or global, similar to other content
+        query = query.filter(Testimonial.country_code.in_([hc, 'GLOBAL']))
+    
+    # Order by featured first, then newest
+    testimonials = query.order_by(
+        desc(Testimonial.is_featured),
+        desc(Testimonial.created_at)
+    ).limit(limit).all()
+        
+    return jsonify([{
+        'id': t.id,
+        'name': t.name,
+        'title': t.title,
+        'company': t.company,
+        'avatarUrl': t.avatar_url,
+        'content': t.content,
+        'rating': t.rating,
+        'countryCode': t.country_code,
+        'createdAt': t.created_at.isoformat()
+    } for t in testimonials])
+
+@content_bp.route('/faq', methods=['GET'])
+def get_faqs():
+    """Get active FAQs"""
+    # limit = min(int(request.args.get('limit', 50)), 100) # Typically show all or many
+    category = request.args.get('category')
+    homepage = request.args.get('homepage')
+    header_country = request.headers.get('X-User-Country')
+    
+    query = FAQ.query.filter(FAQ.active == True)
+    
+    if category:
+        query = query.filter(FAQ.category == category)
+        
+    if homepage == 'true':
+        query = query.filter(FAQ.show_on_homepage == True)
+        
+    if header_country:
+        hc = header_country.strip().upper()
+        query = query.filter(FAQ.country_code.in_([hc, 'GLOBAL']))
+    
+    # Order by order_index asc, then created_at desc
+    faqs = query.order_by(FAQ.order_index.asc(), FAQ.created_at.desc()).all()
+        
+    return jsonify([{
+        'id': f.id,
+        'question': f.question,
+        'answer': f.answer,
+        'category': f.category,
+        'active': f.active,
+        'orderIndex': f.order_index,
+        'countryCode': f.country_code
+    } for f in faqs])

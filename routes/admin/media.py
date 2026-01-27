@@ -228,3 +228,142 @@ def import_radio_stations():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# SPORTS EVENTS
+# ============================================================================
+
+@media_bp.route('/media/sports-events', methods=['GET'])
+@admin_required
+def get_sports_events():
+    """List all sports events (country-filtered)"""
+    try:
+        from models import SportsEvent
+        country = getattr(request, 'user_country', 'US')
+        
+        events = SportsEvent.query.filter(
+            (SportsEvent.country_code == country) | 
+            (SportsEvent.country_code == 'GLOBAL')
+        ).order_by(SportsEvent.event_date.desc()).all()
+        
+        return jsonify([{
+            'id': e.id,
+            'name': e.name,
+            'sportType': e.sport_type,
+            'league': e.league,
+            'venue': e.venue,
+            'teamHome': e.team_home,
+            'teamAway': e.team_away,
+            'scoreHome': e.score_home,
+            'scoreAway': e.score_away,
+            'eventDate': e.event_date.isoformat() if e.event_date else None,
+            'status': e.status,
+            'streamUrl': e.stream_url,
+            'thumbnailUrl': e.thumbnail_url,
+            'countryCode': e.country_code,
+            'isLive': e.is_live,
+            'isActive': e.is_active
+        } for e in events])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@media_bp.route('/media/sports-events', methods=['POST'])
+@admin_required
+def create_sports_event():
+    """Create a sports event"""
+    try:
+        from models import SportsEvent
+        data = request.get_json()
+        
+        # Parse date if provided
+        event_date = None
+        if data.get('eventDate'):
+            try:
+                event_date = datetime.fromisoformat(data['eventDate'].replace('Z', '+00:00'))
+            except:
+                pass
+
+        event = SportsEvent(
+            name=data['name'],
+            sport_type=data.get('sportType'),
+            league=data.get('league'),
+            venue=data.get('venue'),
+            team_home=data.get('teamHome'),
+            team_away=data.get('teamAway'),
+            score_home=data.get('scoreHome'),
+            score_away=data.get('scoreAway'),
+            event_date=event_date,
+            status=data.get('status', 'scheduled'),
+            stream_url=data.get('streamUrl'),
+            thumbnail_url=data.get('thumbnailUrl'),
+            country_code=data.get('countryCode', getattr(request, 'user_country', 'US')),
+            is_live=data.get('isLive', False),
+            is_active=data.get('isActive', True)
+        )
+        db.session.add(event)
+        db.session.commit()
+        return jsonify({'ok': True, 'id': event.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@media_bp.route('/media/sports-events/<int:id>', methods=['PUT', 'PATCH'])
+@admin_required
+def update_sports_event(id):
+    """Update a sports event"""
+    try:
+        from models import SportsEvent
+        event = SportsEvent.query.get_or_404(id)
+        data = request.get_json()
+        
+        # Mapping frontend camelCase to model snake_case
+        field_map = {
+            'name': 'name',
+            'sportType': 'sport_type',
+            'league': 'league',
+            'venue': 'venue',
+            'teamHome': 'team_home',
+            'teamAway': 'team_away',
+            'scoreHome': 'score_home',
+            'scoreAway': 'score_away',
+            'status': 'status',
+            'streamUrl': 'stream_url',
+            'thumbnailUrl': 'thumbnail_url',
+            'countryCode': 'country_code',
+            'isLive': 'is_live',
+            'isActive': 'is_active'
+        }
+        
+        for key, model_field in field_map.items():
+            if key in data:
+                setattr(event, model_field, data[key])
+                
+        if 'eventDate' in data:
+            try:
+                event.event_date = datetime.fromisoformat(data['eventDate'].replace('Z', '+00:00')) if data['eventDate'] else None
+            except:
+                pass
+
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@media_bp.route('/media/sports-events/<int:id>', methods=['DELETE'])
+@admin_required
+def delete_sports_event(id):
+    """Delete a sports event"""
+    try:
+        from models import SportsEvent
+        event = SportsEvent.query.get_or_404(id)
+        db.session.delete(event)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

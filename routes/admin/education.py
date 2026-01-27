@@ -45,7 +45,7 @@ def list_courses():
             country = getattr(request, 'user_country', 'US')
 
         query = Course.query.filter(
-            (Course.country_code == country)
+            (Course.country_code == country) | (Course.country_code == 'GLOBAL')
         )
 
         courses = query.order_by(Course.created_at.desc()).all()

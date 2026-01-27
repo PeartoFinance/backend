@@ -145,6 +145,14 @@ app.register_blueprint(market_status_bp, url_prefix='/api/market')
 from routes.admin.vendors import vendors_bp
 app.register_blueprint(vendors_bp, url_prefix='/api/admin')
 
+# Admin Testimonials
+from routes.admin.testimonials import admin_testimonials_bp
+app.register_blueprint(admin_testimonials_bp, url_prefix='/api/admin')
+
+# Admin FAQ
+from routes.admin.faq import admin_faq_bp
+app.register_blueprint(admin_faq_bp, url_prefix='/api/admin')
+
 
 # Error handlers
 @app.errorhandler(404)
