@@ -297,6 +297,7 @@ If this wasn't you, please secure your account.'''
 <html>
 <head>
     <meta charset="utf-8">
+<<<<<<< Updated upstream
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
@@ -348,6 +349,8 @@ Read more: {{news_url}}'''
 <html>
 <head>
     <meta charset="utf-8">
+=======
+>>>>>>> Stashed changes
 </head>
 <body style="font-family: sans-serif; background-color: #f4f7fa; padding: 20px;">
     <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
