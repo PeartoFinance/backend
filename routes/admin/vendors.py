@@ -8,7 +8,7 @@ import bcrypt
 import json
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
-from models import db, Vendor, VendorAPIKey, VendorCustomAPI, AuditEvent
+from models import db, Vendor, VendorAPIKey, VendorCustomAPI, AuditEvent, VendorReview, VendorHistory
 from ..decorators import admin_required
 
 vendors_bp = Blueprint('admin_vendors', __name__)
@@ -37,13 +37,15 @@ def get_vendors():
     """List all vendors"""
     try:
         vendors = Vendor.query.order_by(Vendor.created_at.desc()).all()
-        # Enrich with key count if possible, or just raw
         results = []
         for v in vendors:
             v_dict = {
                 'id': v.id,
                 'name': v.name,
                 'email': v.email,
+                'category': v.category,
+                'rating': float(v.rating) if v.rating else 0,
+                'isFeatured': v.is_featured,
                 'status': v.status,
                 'countryCode': v.country_code,
                 'createdAt': v.created_at.isoformat() if v.created_at else None,
@@ -71,6 +73,10 @@ def create_vendor():
             email=data.get('email'),
             phone=data.get('phone'),
             description=data.get('description'),
+            category=data.get('category'),
+            services=data.get('services', []),
+            is_featured=data.get('isFeatured', False),
+            metadata_json=data.get('metadata', {}),
             website=data.get('website'),
             logo_url=data.get('logoUrl'),
             country_code=data.get('countryCode', 'US'),
@@ -104,6 +110,12 @@ def get_vendor(vendor_id):
             'email': vendor.email,
             'phone': vendor.phone,
             'description': vendor.description,
+            'category': vendor.category,
+            'services': vendor.services,
+            'rating': float(vendor.rating) if vendor.rating else 0,
+            'reviewCount': vendor.review_count,
+            'isFeatured': vendor.is_featured,
+            'metadata': vendor.metadata_json or {},
             'website': vendor.website,
             'logoUrl': vendor.logo_url,
             'status': vendor.status,
@@ -131,6 +143,14 @@ def update_vendor(vendor_id):
             changes.append('name')
         if 'email' in data:
             vendor.email = data['email']
+        if 'category' in data:
+            vendor.category = data['category']
+        if 'services' in data:
+            vendor.services = data['services']
+        if 'isFeatured' in data:
+            vendor.is_featured = data['isFeatured']
+        if 'metadata' in data:
+            vendor.metadata_json = data['metadata']
         if 'status' in data:
             vendor.status = data['status']
             changes.append(f"status->{data['status']}")
@@ -318,6 +338,127 @@ def delete_webhook(vendor_id, webhook_id):
         log_audit('VENDOR_WEBHOOK_DELETE', 'vendor_webhook', webhook_id)
         db.session.commit()
         return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ==========================================
+# Reviews Management
+# ==========================================
+
+@vendors_bp.route('/vendors/<vendor_id>/reviews', methods=['GET'])
+@admin_required
+def get_admin_reviews(vendor_id):
+    try:
+        reviews = VendorReview.query.filter_by(vendor_id=vendor_id).order_by(VendorReview.created_at.desc()).all()
+        results = [{
+            'id': r.id,
+            'userName': r.user.name if r.user else 'Anonymous',
+            'rating': r.rating,
+            'comment': r.comment,
+            'date': r.created_at.isoformat(),
+            'isVerified': r.is_verified_customer
+        } for r in reviews]
+        return jsonify({'reviews': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/reviews/<review_id>', methods=['DELETE'])
+@admin_required
+def delete_review(review_id):
+    try:
+        review = VendorReview.query.get_or_404(review_id)
+        vendor_id = review.vendor_id
+        db.session.delete(review)
+        
+        # Update vendor rating stats
+        # Recalculate average
+        remaining = VendorReview.query.filter_by(vendor_id=vendor_id).all()
+        if remaining:
+            avg = sum(r.rating for r in remaining) / len(remaining)
+            count = len(remaining)
+        else:
+            avg = 0
+            count = 0
+            
+        vendor = Vendor.query.get(vendor_id)
+        if vendor:
+            vendor.rating = avg
+            vendor.review_count = count
+            
+        log_audit('VENDOR_REVIEW_DELETE', 'vendor_review', review_id)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ==========================================
+# History / Analytics Management
+# ==========================================
+
+@vendors_bp.route('/vendors/<vendor_id>/history', methods=['GET'])
+@admin_required
+def get_admin_history(vendor_id):
+    try:
+        # Group by date for the UI
+        history = VendorHistory.query.filter_by(vendor_id=vendor_id).order_by(VendorHistory.recorded_at.desc()).all()
+        
+        # Grouping
+        grouped = {}
+        for h in history:
+            date_str = h.recorded_at.date().isoformat()
+            if date_str not in grouped:
+                grouped[date_str] = {
+                    'id': h.recorded_at.replace(microsecond=0).isoformat(), # Use timestamp as group ID
+                    'date': h.recorded_at.isoformat(),
+                    'metrics': {}
+                }
+            grouped[date_str]['metrics'][h.metric_type] = float(h.value)
+            
+        results = list(grouped.values())
+        return jsonify({'history': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/vendors/<vendor_id>/history', methods=['POST'])
+@admin_required
+def add_history_point(vendor_id):
+    try:
+        data = request.get_json()
+        date_str = data.get('date') # YYYY-MM-DD
+        metrics = data.get('metrics', {})
+        
+        if not date_str or not metrics:
+            return jsonify({'error': 'Date and metrics required'}), 400
+            
+        # Parse date
+        recorded_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')) if 'T' in date_str else datetime.strptime(date_str, '%Y-%m-%d')
+        
+        created_ids = []
+        
+        for key, val in metrics.items():
+            # Validate value is number
+            try:
+                numeric_val = float(val)
+            except:
+                continue
+                
+            entry_id = str(uuid.uuid4()) # actually VendorHistory uses int ID auth-increment, let's omit ID
+            # But wait, model says: id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+            
+            entry = VendorHistory(
+                vendor_id=vendor_id,
+                metric_type=key,
+                value=numeric_val,
+                recorded_at=recorded_at
+            )
+            db.session.add(entry)
+            created_ids.append(key)
+            
+        log_audit('VENDOR_HISTORY_ADD', 'vendor_history', vendor_id, {'metrics': created_ids})
+        db.session.commit()
+        return jsonify({'ok': True, 'count': len(created_ids)}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

@@ -17,6 +17,8 @@ from .crypto_handler import (
     get_crypto_quote,
     get_multiple_crypto_quotes,
     import_cryptos_to_db,
+    import_crypto_to_db,
+    get_crypto_history,
     TOP_CRYPTOS,
 )
 
@@ -86,6 +88,8 @@ __all__ = [
     'get_crypto_quote',
     'get_multiple_crypto_quotes',
     'import_cryptos_to_db',
+    'import_crypto_to_db',
+    'get_crypto_history',
     'TOP_CRYPTOS',
     # Index
     'get_index_quote',

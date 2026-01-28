@@ -15,6 +15,12 @@ class Vendor(db.Model):
     email = db.Column(db.String(255))
     phone = db.Column(db.String(50))
     description = db.Column(db.Text)
+    category = db.Column(db.String(100))
+    services = db.Column(db.JSON)
+    rating = db.Column(db.Numeric(3, 2), default=0.00)
+    review_count = db.Column(db.Integer, default=0)
+    is_featured = db.Column(db.Boolean, default=False)
+    metadata_json = db.Column('metadata', db.JSON) # metadata is reserved in some contexts, mapping explicitly
     logo_url = db.Column(db.Text)
     website = db.Column(db.String(255))
     status = db.Column(db.Enum('pending', 'active', 'suspended'), default='pending')

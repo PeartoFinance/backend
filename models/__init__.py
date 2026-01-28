@@ -138,6 +138,8 @@ from .admin import (
     Task,
 )
 
+from .vendor_data import VendorReview, VendorHistory
+
 # Misc models
 from .misc import (
     FAQ,

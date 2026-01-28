@@ -139,6 +139,10 @@ app.register_blueprint(alerts_bp, url_prefix='/api/user/alerts')
 app.register_blueprint(documents_bp, url_prefix='/api/user/documents')
 app.register_blueprint(news_prefs_bp, url_prefix='/api/user/news-preferences')
 
+# Public Vendor Routes
+from routes.public_vendors import public_vendors_bp
+app.register_blueprint(public_vendors_bp)
+
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
 app.register_blueprint(cron_bp, url_prefix='/api/cron')

@@ -9,63 +9,39 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Top cryptocurrencies with their Yahoo Finance symbols (format: SYMBOL-USD)
-TOP_CRYPTOS = [
-    'BTC-USD',   # Bitcoin
-    'ETH-USD',   # Ethereum
-    'BNB-USD',   # Binance Coin
-    'XRP-USD',   # Ripple
-    'SOL-USD',   # Solana
-    'ADA-USD',   # Cardano
-    'DOGE-USD',  # Dogecoin
-    'AVAX-USD',  # Avalanche
-    'DOT-USD',   # Polkadot
-    'MATIC-USD', # Polygon
-    'SHIB-USD',  # Shiba Inu
-    'LTC-USD',   # Litecoin
-    'TRX-USD',   # TRON
-    'ATOM-USD',  # Cosmos
-    'LINK-USD',  # Chainlink
-    'UNI-USD',   # Uniswap
-    'XLM-USD',   # Stellar
-    'BCH-USD',   # Bitcoin Cash
-    'ETC-USD',   # Ethereum Classic
-    'FIL-USD',   # Filecoin
-]
-
 
 def get_crypto_quote(symbol: str) -> Optional[Dict[str, Any]]:
     """
-    Get real-time cryptocurrency quote.
+    Get real-time crypto quote for a single symbol.
     
     Args:
-        symbol: Crypto ticker symbol (e.g., 'BTC-USD' or 'BTC')
+        symbol: Crypto ticker symbol (e.g., 'BTC-USD')
     
     Returns:
-        Dictionary with crypto quote data or None if error
+        Dictionary with crypto quote data or None if error/not crypto
     """
-    # Ensure symbol has -USD suffix
-    if not symbol.endswith('-USD'):
-        symbol = f"{symbol}-USD"
-    
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
+        
+        # Verify it's a crypto asset
+        quote_type = info.get('quoteType')
+        if quote_type != 'CRYPTOCURRENCY':
+            logger.warning(f"{symbol} is not a cryptocurrency (type: {quote_type})")
+            # We might still want to proceed if it's strictly requested as crypto, 
+            # but strictly speaking we should filter. For now, let's allow but warn.
         
         if not info or 'symbol' not in info:
             return None
         
         return {
             'symbol': info.get('symbol', symbol),
-            'name': info.get('shortName') or info.get('name') or info.get('longName'),
-            'price': info.get('regularMarketPrice'),
+            'name': info.get('shortName') or info.get('longName'),
+            'price': info.get('currentPrice') or info.get('regularMarketPrice'),
             'change': info.get('regularMarketChange'),
             'changePercent': info.get('regularMarketChangePercent'),
-            'volume': info.get('regularMarketVolume') or info.get('volume24Hr'),
+            'volume': info.get('regularMarketVolume') or info.get('volume'),
             'marketCap': info.get('marketCap'),
-            'circulatingSupply': info.get('circulatingSupply'),
-            'totalSupply': info.get('totalSupply'),
-            'maxSupply': info.get('maxSupply'),
             'high52w': info.get('fiftyTwoWeekHigh'),
             'low52w': info.get('fiftyTwoWeekLow'),
             'previousClose': info.get('previousClose') or info.get('regularMarketPreviousClose'),
@@ -73,60 +49,21 @@ def get_crypto_quote(symbol: str) -> Optional[Dict[str, Any]]:
             'dayHigh': info.get('dayHigh') or info.get('regularMarketDayHigh'),
             'dayLow': info.get('dayLow') or info.get('regularMarketDayLow'),
             'avgVolume': info.get('averageVolume'),
-            'currency': 'USD',
-            'exchange': info.get('exchange'),
+            'circulatingSupply': info.get('circulatingSupply'),
+            'totalSupply': info.get('totalSupply'),
+            'maxSupply': info.get('maxSupply'),
+            'currency': info.get('currency', 'USD'),
+            'quoteType': 'CRYPTOCURRENCY',
+            'description': info.get('description') or info.get('longBusinessSummary'),
+            'logoUrl': info.get('logo_url'),
+            # Mapper for unified MarketData model compatibility
+            'sector': 'Cryptocurrency',
+            'industry': 'Digital Assets',
+            'exchange': 'CCC', # Common code for CryptoCompare or generic crypto
         }
     except Exception as e:
         logger.error(f"Error fetching crypto quote for {symbol}: {e}")
         return None
-
-
-def get_multiple_crypto_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
-    """
-    Get real-time quotes for multiple cryptocurrencies.
-    
-    Args:
-        symbols: List of crypto ticker symbols (with or without -USD suffix)
-    
-    Returns:
-        List of dictionaries with crypto quote data
-    """
-    results = []
-    
-    # Ensure all symbols have -USD suffix
-    normalized_symbols = []
-    for sym in symbols:
-        if not sym.endswith('-USD'):
-            normalized_symbols.append(f"{sym}-USD")
-        else:
-            normalized_symbols.append(sym)
-    
-    try:
-        tickers = yf.Tickers(' '.join(normalized_symbols))
-        for symbol in normalized_symbols:
-            try:
-                ticker = tickers.tickers.get(symbol.upper())
-                if ticker:
-                    info = ticker.info
-                    if info and ('symbol' in info or 'shortName' in info):
-                        results.append({
-                            'symbol': info.get('symbol', symbol),
-                            'name': info.get('shortName') or info.get('name'),
-                            'price': info.get('regularMarketPrice'),
-                            'change': info.get('regularMarketChange'),
-                            'changePercent': info.get('regularMarketChangePercent'),
-                            'volume': info.get('regularMarketVolume'),
-                            'marketCap': info.get('marketCap'),
-                            'high52w': info.get('fiftyTwoWeekHigh'),
-                            'low52w': info.get('fiftyTwoWeekLow'),
-                            'currency': 'USD',
-                        })
-            except Exception as e:
-                logger.warning(f"Error fetching crypto {symbol}: {e}")
-    except Exception as e:
-        logger.error(f"Error fetching multiple crypto quotes: {e}")
-    
-    return results
 
 
 def get_crypto_history(
@@ -138,17 +75,13 @@ def get_crypto_history(
     Get historical OHLCV data for a cryptocurrency.
     
     Args:
-        symbol: Crypto ticker symbol (e.g., 'BTC-USD' or 'BTC')
+        symbol: Crypto ticker symbol
         period: Valid periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
         interval: Valid intervals: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
     
     Returns:
         List of OHLCV dictionaries
     """
-    # Ensure symbol has -USD suffix
-    if not symbol.endswith('-USD'):
-        symbol = f"{symbol}-USD"
-    
     try:
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period=period, interval=interval)
@@ -158,8 +91,9 @@ def get_crypto_history(
         
         results = []
         for date, row in hist.iterrows():
+            formatted_date = date.isoformat() if hasattr(date, 'isoformat') else str(date)
             results.append({
-                'date': date.strftime('%Y-%m-%d') if hasattr(date, 'strftime') else str(date),
+                'date': formatted_date,
                 'open': float(row['Open']) if row['Open'] else None,
                 'high': float(row['High']) if row['High'] else None,
                 'low': float(row['Low']) if row['Low'] else None,
@@ -172,112 +106,139 @@ def get_crypto_history(
         return []
 
 
-def get_top_cryptos(limit: int = 20) -> List[Dict[str, Any]]:
+def import_crypto_to_db(symbol: str, db_session=None) -> bool:
     """
-    Get quotes for top cryptocurrencies.
+    Import crypto data to database.
     
     Args:
-        limit: Number of top cryptos to return (max 20)
-    
+        symbol: Crypto ticker symbol
+        db_session: SQLAlchemy session
+        
     Returns:
-        List of crypto quote dictionaries
-    """
-    symbols = TOP_CRYPTOS[:min(limit, len(TOP_CRYPTOS))]
-    return get_multiple_crypto_quotes(symbols)
-
-
-def import_cryptos_to_db(symbols: List[str] = None, db_session=None, country_code: str = 'GLOBAL') -> Dict[str, int]:
-    """
-    Import cryptocurrency data to database.
-    
-    Args:
-        symbols: List of crypto ticker symbols (defaults to TOP_CRYPTOS)
-        db_session: SQLAlchemy database session
-        country_code: Country code to assign (default: GLOBAL since crypto is global)
-    
-    Returns:
-        Dictionary with counts of imported and updated records
+        True if success, False otherwise
     """
     from models import db, MarketData
     
-    if symbols is None:
-        symbols = TOP_CRYPTOS
-    
     session = db_session or db.session
+    try:
+        symbol = symbol.upper()
+        quote = get_crypto_quote(symbol)
+        if not quote:
+            return False
+            
+        # Check if exists
+        existing = MarketData.query.filter_by(
+            symbol=symbol,
+            asset_type='crypto',
+            country_code='GLOBAL'
+        ).first()
+        
+        if existing:
+            # Update
+            existing.name = quote.get('name')
+            existing.price = quote.get('price')
+            existing.change = quote.get('change')
+            existing.change_percent = quote.get('changePercent')
+            existing.volume = quote.get('volume')
+            existing.market_cap = quote.get('marketCap')
+            existing.high52w = quote.get('high52w')
+            existing._52_week_high = quote.get('high52w') # db column name mapping
+            existing._52_week_low = quote.get('low52w')
+            existing.previous_close = quote.get('previousClose')
+            existing.open_price = quote.get('open')
+            existing.day_high = quote.get('dayHigh')
+            existing.day_low = quote.get('dayLow')
+            existing.avg_volume = quote.get('avgVolume')
+            existing.description = quote.get('description')
+            existing.last_updated = datetime.utcnow()
+            # Store supply info in extra fields if available or map to strict columns
+            existing.shares_outstanding = quote.get('circulatingSupply') 
+        else:
+            # Create
+            new_crypto = MarketData(
+                symbol=symbol,
+                name=quote.get('name', symbol),
+                price=quote.get('price', 0),
+                change=quote.get('change', 0),
+                change_percent=quote.get('changePercent', 0),
+                volume=quote.get('volume'),
+                market_cap=quote.get('marketCap'),
+                _52_week_high=quote.get('high52w'),
+                _52_week_low=quote.get('low52w'),
+                previous_close=quote.get('previousClose'),
+                open_price=quote.get('open'),
+                day_high=quote.get('dayHigh'),
+                day_low=quote.get('dayLow'),
+                avg_volume=quote.get('avgVolume'),
+                shares_outstanding=quote.get('circulatingSupply'),
+                description=quote.get('description'),
+                asset_type='crypto',
+                country_code='GLOBAL',
+                is_listed=True,
+                sector='Cryptocurrency',
+                industry='Digital Assets',
+                currency='USD',
+                last_updated=datetime.utcnow()
+            )
+            session.add(new_crypto)
+            
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error importing crypto {symbol}: {e}")
+        return False
+
+
+TOP_CRYPTOS = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD', 'SOL-USD', 'DOT-USD']
+
+def get_multiple_crypto_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
+    """
+    Get real-time quotes for multiple crypto symbols.
+    """
+    results = []
+    # yfinance Tickers can handle multiple space-separated symbols
+    try:
+        tickers = yf.Tickers(' '.join(symbols))
+        for symbol in symbols:
+            try:
+                # Accessing the ticker object directly
+                ticker = tickers.tickers.get(symbol.upper())
+                if ticker:
+                    info = ticker.info
+                    # Basic validation
+                    if info and 'symbol' in info:
+                         results.append({
+                            'symbol': info.get('symbol', symbol),
+                            'name': info.get('shortName') or info.get('longName'),
+                            'price': info.get('currentPrice') or info.get('regularMarketPrice'),
+                            'change': info.get('regularMarketChange'),
+                            'changePercent': info.get('regularMarketChangePercent'),
+                            'volume': info.get('regularMarketVolume') or info.get('volume'),
+                            'marketCap': info.get('marketCap'),
+                            'currency': info.get('currency', 'USD'),
+                            'quoteType': 'CRYPTOCURRENCY',
+                        })
+            except Exception as e:
+                logger.warning(f"Error fetching {symbol}: {e}")
+    except Exception as e:
+         logger.error(f"Error fetching multiple crypto quotes: {e}")
+    
+    return results
+
+
+def import_cryptos_to_db(symbols: List[str], db_session=None) -> Dict[str, int]:
+    """
+    Import list of keys to DB. Wrapper around single import for now or bulk optimization.
+    """
     imported = 0
-    updated = 0
     errors = 0
     
     for symbol in symbols:
-        try:
-            quote = get_crypto_quote(symbol)
-            if not quote:
-                errors += 1
-                continue
-            
-            # Normalize symbol (remove -USD for storage if needed)
-            store_symbol = quote.get('symbol', symbol)
-            
-            # Check if exists
-            existing = MarketData.query.filter_by(
-                symbol=store_symbol,
-                asset_type='crypto',
-                country_code=country_code
-            ).first()
-            
-            if existing:
-                # Update existing record
-                existing.name = quote.get('name')
-                existing.price = quote.get('price')
-                existing.change = quote.get('change')
-                existing.change_percent = quote.get('changePercent')
-                existing.volume = quote.get('volume')
-                existing.market_cap = quote.get('marketCap')
-                existing._52_week_high = quote.get('high52w')
-                existing._52_week_low = quote.get('low52w')
-                existing.previous_close = quote.get('previousClose')
-                existing.open_price = quote.get('open')
-                existing.day_high = quote.get('dayHigh')
-                existing.day_low = quote.get('dayLow')
-                existing.avg_volume = quote.get('avgVolume')
-                existing.currency = 'USD'
-                existing.exchange = quote.get('exchange')
-                existing.last_updated = datetime.utcnow()
-                updated += 1
-            else:
-                # Create new record
-                new_crypto = MarketData(
-                    symbol=store_symbol,
-                    name=quote.get('name'),
-                    price=quote.get('price'),
-                    change=quote.get('change'),
-                    change_percent=quote.get('changePercent'),
-                    volume=quote.get('volume'),
-                    market_cap=quote.get('marketCap'),
-                    _52_week_high=quote.get('high52w'),
-                    _52_week_low=quote.get('low52w'),
-                    previous_close=quote.get('previousClose'),
-                    open_price=quote.get('open'),
-                    day_high=quote.get('dayHigh'),
-                    day_low=quote.get('dayLow'),
-                    avg_volume=quote.get('avgVolume'),
-                    currency='USD',
-                    exchange=quote.get('exchange'),
-                    asset_type='crypto',
-                    country_code=country_code,
-                    last_updated=datetime.utcnow(),
-                )
-                session.add(new_crypto)
-                imported += 1
-        except Exception as e:
-            logger.error(f"Error importing crypto {symbol}: {e}")
+        if import_crypto_to_db(symbol, db_session):
+            imported += 1
+        else:
             errors += 1
-    
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error committing cryptos to database: {e}")
-        return {'imported': 0, 'updated': 0, 'errors': len(symbols)}
-    
-    return {'imported': imported, 'updated': updated, 'errors': errors}
+            
+    return {'imported': imported, 'errors': errors}
+

@@ -65,6 +65,9 @@ def get_global():
 @crypto_bp.route('/coin/<symbol>', methods=['GET'])
 def get_coin(symbol):
     """Get single cryptocurrency details"""
+    from handlers.market_data.crypto_handler import import_crypto_to_db
+
+    symbol = symbol.upper()
     header_country = request.headers.get('X-User-Country')
     if header_country:
         hc = header_country.strip().upper()
@@ -73,15 +76,50 @@ def get_coin(symbol):
         country_filter = (MarketPrice.country_code == 'GLOBAL')
 
     crypto = MarketPrice.query.filter(
-        MarketPrice.symbol == symbol.upper(),
+        MarketPrice.symbol == symbol,
         MarketPrice.asset_type == 'crypto',
         country_filter
     ).first()
     
+    # Auto-discovery if not found
+    if not crypto:
+        try:
+            success = import_crypto_to_db(symbol)
+            if success:
+                crypto = MarketPrice.query.filter(
+                    MarketPrice.symbol == symbol,
+                    MarketPrice.asset_type == 'crypto',
+                    country_filter
+                ).first()
+        except Exception as e:
+            print(f"Error auto-importing crypto {symbol}: {e}")
+
     if not crypto:
         return jsonify({'error': 'Cryptocurrency not found'}), 404
     
     return jsonify(crypto.to_dict())
+
+
+@crypto_bp.route('/history/<symbol>', methods=['GET'])
+def get_history(symbol):
+    """Get cryptocurrency historical data"""
+    from handlers.market_data.crypto_handler import get_crypto_history
+    
+    symbol = symbol.upper()
+    period = request.args.get('period', '1mo')
+    interval = request.args.get('interval', '1d')
+    
+    try:
+        history = get_crypto_history(symbol, period=period, interval=interval)
+        
+        return jsonify({
+            'symbol': symbol,
+            'period': period,
+            'interval': interval,
+            'data': history
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @crypto_bp.route('/coins', methods=['GET'])

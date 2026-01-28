@@ -7,7 +7,7 @@ from models import User, NewsPreference, NewsNotification, NewsItem, UserNotific
 from models.base import db
 from .news_fetch_handler import fetch_recent_news, match_news_to_user_preferences
 from notifications.push_service import send_push_notification
-from handlers.email_service import send_email
+from handlers.email_service import _email_service
 import logging
 import os
 
@@ -153,11 +153,10 @@ def send_user_notification(user: 'User', news_item: NewsItem, notif_prefs: 'User
     email_sent = False
     if notif_prefs and notif_prefs.email_news:
         try:
-            send_email(
+            _email_service.send_email(
                 to=user.email,
-                template='news_notification',
-                subject=title,
-                variables={
+                template_type='news_notification',
+                data={
                     'user_name': user.name,
                     'news_title': news_item.title,
                     'news_summary': message,

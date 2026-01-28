@@ -8,8 +8,20 @@ from models import (
     db, MarketData, MarketIndices, CommodityData, StockOffer,
     Dividend, BulkTransaction
 )
+from handlers.market_data.calendar_handler import get_economic_events
 
 market_bp = Blueprint('market', __name__)
+
+
+@market_bp.route('/calendar', methods=['GET'])
+def get_calendar():
+    """Get economic calendar events"""
+    start = request.args.get('start')
+    end = request.args.get('end')
+    limit = min(int(request.args.get('limit', 50)), 100)
+    
+    events = get_economic_events(start, end, limit)
+    return jsonify(events)
 
 
 @market_bp.route('/overview', methods=['GET'])
