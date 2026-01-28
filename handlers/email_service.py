@@ -300,6 +300,7 @@ If this wasn't you, please secure your account.'''
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
@@ -351,6 +352,8 @@ Read more: {{news_url}}'''
 <html>
 <head>
     <meta charset="utf-8">
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
