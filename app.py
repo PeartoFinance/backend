@@ -103,6 +103,7 @@ from routes.navigation import navigation_bp
 from routes.social import social_bp
 from routes.backup import backup_bp
 from routes.news_preferences import news_prefs_bp
+from routes.currency import currency_bp
 
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -129,6 +130,7 @@ app.register_blueprint(jobs_bp, url_prefix='/api/admin/jobs')
 app.register_blueprint(navigation_bp, url_prefix='/api')
 app.register_blueprint(social_bp, url_prefix='/api/social')
 app.register_blueprint(backup_bp, url_prefix='/api/backup')
+app.register_blueprint(currency_bp)
 
 # User feature routes
 from routes.alerts import alerts_bp

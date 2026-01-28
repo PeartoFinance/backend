@@ -152,6 +152,8 @@ def _register_market_jobs():
         replace_existing=True
     )
     
+
+    
     logger.info("Market jobs registered")
 
 

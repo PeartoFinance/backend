@@ -289,6 +289,57 @@ IP: {{ip_address}}
 
 If this wasn't you, please secure your account.'''
     },
+
+    'news_notification': {
+        'subject': '{{news_title}}',
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: #1a1a2e; border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">📰 Market News Update</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333;">Hi {{user_name}},</p>
+            <p style="font-size: 16px; color: #333;">Here is a news update that matches your interests:</p>
+            
+            <div style="margin: 25px 0; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+                {% if news_image %}
+                <img src="{{news_image}}" alt="News Image" style="width: 100%; height: 200px; object-fit: cover;">
+                {% endif %}
+                <div style="padding: 20px;">
+                    <h2 style="margin: 0 0 10px 0; font-size: 20px; color: #1a1a2e;">{{news_title}}</h2>
+                    <p style="font-size: 14px; color: #666; margin-bottom: 15px;">Source: {{news_source}}</p>
+                    <p style="font-size: 15px; color: #444; line-height: 1.6;">{{news_summary}}</p>
+                    <div style="margin-top: 20px;">
+                        <a href="{{news_url}}" style="display: inline-block; background: #667eea; color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: 600;">Read Full Article</a>
+                    </div>
+                </div>
+            </div>
+            
+            <p style="font-size: 13px; color: #999; text-align: center; margin-top: 30px;">
+                You received this because of your news preferences on {{app_name}}.
+            </p>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''Market News Update
+
+Hi {{user_name}},
+
+{{news_title}}
+Source: {{news_source}}
+
+{{news_summary}}
+
+Read more: {{news_url}}'''
+    },
 }
 
 
@@ -450,6 +501,19 @@ def send_google_login_email(user_email: str, user_name: str,
         'device_info': user_agent[:50] if user_agent else 'Unknown device',
         'ip_address': ip_address,
     })
+
+
+def send_email(to: str, template: str, subject: str = None, variables: dict = None) -> bool:
+    """
+    Generic convenience function to send an email using a template.
+    Matches the signature expected by news_notification_handler.
+    """
+    data = variables or {}
+    # If subject is provided, it will override the template's default subject
+    # but the current EmailService.send_email doesn't support direct subject override easily
+    # without modifying the TEMPLATES dict or the method.
+    # For now, we'll just pass the data.
+    return _email_service.send_email_async(to, template, data)
 
 
 def send_phone_verification_sms(phone: str, code: str) -> bool:

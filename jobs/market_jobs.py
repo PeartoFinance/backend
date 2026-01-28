@@ -293,3 +293,30 @@ def update_financials() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Financials update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+
+
+def update_all_forex() -> Dict[str, Any]:
+    """
+    Update all forex exchange rates from yfinance.
+    """
+    logger.info("Starting forex update job")
+    start_time = datetime.utcnow()
+    
+    try:
+        from handlers.market_data.forex_handler import import_forex_to_db
+        
+        app = get_app()
+        with app.app_context():
+            result = import_forex_to_db()
+            
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"Forex update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")
+            
+            return {
+                'status': 'ok',
+                **result,
+                'elapsed_seconds': elapsed
+            }
+    except Exception as e:
+        logger.error(f"Forex update job failed: {e}")
+        return {'status': 'error', 'error': str(e)}
