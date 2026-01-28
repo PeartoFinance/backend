@@ -146,6 +146,7 @@ def cron_all_market():
             update_all_indices,
             update_all_commodities,
             update_business_profiles,
+            update_all_forex,
         )
         
         results = {
@@ -154,6 +155,7 @@ def cron_all_market():
             'indices': update_all_indices(),
             'commodities': update_all_commodities(),
             'business_profiles': update_business_profiles(),
+            'forex': update_all_forex(),
         }
         return jsonify({'ok': True, 'results': results})
     except Exception as e:
@@ -162,7 +164,7 @@ def cron_all_market():
 
 @cron_bp.route('/business-profiles', methods=['GET', 'POST'])
 def cron_update_business_profiles():
-    """cURL: curl -X POST http://localhost:5000/api/cron/business-profiles?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://api.pearto.com/api/cron/business-profiles?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -178,7 +180,7 @@ def cron_update_business_profiles():
 def cron_cleanup_accounts():
     """
     Permanently delete accounts marked for deletion > 30 days ago.
-    cURL: curl -X POST http://localhost:5000/api/cron/cleanup-accounts?token=YOUR_TOKEN
+    cURL: curl -X POST https://api.pearto.com/api/cron/cleanup-accounts?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -195,7 +197,7 @@ def cron_cleanup_accounts():
 def cron_update_financials():
     """
     Sync financial statements for all listed stocks.
-    cURL: curl -X POST http://localhost:5000/api/cron/financials?token=YOUR_TOKEN
+    cURL: curl -X POST https://api.pearto.com/api/cron/financials?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -231,7 +233,6 @@ def cron_update_forecast():
             result = sync_forecast_data(stock.symbol)
             results.append({'symbol': stock.symbol, 'status': result.get('status')})
 
-        return jsonify({'ok': True, 'synced': len(results), 'results': results})
         return jsonify({'ok': True, 'synced': len(results), 'results': results})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -291,7 +292,7 @@ def cron_import_biz_profiles():
 def cron_news_notifications():
     """
     Fetch recent news and send notifications to users based on preferences.
-    cURL: curl -X POST http://localhost:5000/api/cron/news-notifications
+    cURL: curl -X POST https://api.pearto.com/api/cron/news-notifications?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -302,3 +303,17 @@ def cron_news_notifications():
         return jsonify({'ok': result['success'], **result}), 200
     except Exception as e:
         return jsonify({'error': str(e), 'ok': False}), 500
+
+
+@cron_bp.route('/forex', methods=['GET', 'POST'])
+def cron_update_forex():
+    """cURL: curl -X POST https://api.pearto.com/api/cron/forex?token=YOUR_TOKEN"""
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.market_jobs import update_all_forex
+        result = update_all_forex()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
