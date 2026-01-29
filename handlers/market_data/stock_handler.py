@@ -297,15 +297,7 @@ def get_analyst_price_targets(symbol: str) -> Optional[Dict[str, Any]]:
 
 def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str = 'GLOBAL') -> Dict[str, int]:
     """
-    Import stock data to database.
-    
-    Args:
-        symbols: List of stock ticker symbols
-        db_session: SQLAlchemy database session (optional, will import from models if not provided)
-        country_code: Country code to assign to imported stocks (default: US)
-    
-    Returns:
-        Dictionary with counts of imported and updated records
+    Import stock data to database using bulk fetching to prevent IP bans.
     """
     from models import db, MarketData
     
@@ -314,116 +306,89 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
     updated = 0
     errors = 0
     
-    for symbol in symbols:
-        try:
-            symbol = symbol.upper()
-            quote = get_stock_quote(symbol)
-            if not quote:
-                errors += 1
-                continue
-            
-            # Determine asset type (ETF vs Stock)
-            quote_type = quote.get('quoteType')
-            asset_type = 'etf' if quote_type == 'ETF' else 'stock'
-            
-            # Yahoo Finance data is GLOBAL by default unless specified otherwise
-            target_country = country_code
-            
-            # Check if exists (check symbol, asset_type, AND country_code)
-            existing = MarketData.query.filter_by(
-                symbol=symbol,
-                asset_type=asset_type,
-                country_code=target_country
-            ).first()
-            
-            if existing:
-                # Update existing record
-                existing.name = quote.get('name')
-                existing.price = quote.get('price')
-                existing.change = quote.get('change')
-                existing.change_percent = quote.get('changePercent')
-                existing.volume = quote.get('volume')
-                existing.market_cap = quote.get('marketCap')
-                existing.pe_ratio = quote.get('peRatio')
-                existing._52_week_high = quote.get('high52w')
-                existing._52_week_low = quote.get('low52w')
-                existing.previous_close = quote.get('previousClose')
-                existing.open_price = quote.get('open')
-                existing.day_high = quote.get('dayHigh')
-                existing.day_low = quote.get('dayLow')
-                existing.avg_volume = quote.get('avgVolume')
-                existing.beta = quote.get('beta')
-                existing.forward_pe = quote.get('forwardPe')
-                existing.trailing_pe = quote.get('peRatio')
-                existing.eps = quote.get('eps')
-                existing.dividend_yield = quote.get('dividendYield')
-                existing.dividend_rate = quote.get('dividendRate')
-                existing.book_value = quote.get('bookValue')
-                existing.price_to_book = quote.get('priceToBook')
-                existing.shares_outstanding = quote.get('sharesOutstanding')
-                existing.float_shares = quote.get('floatShares')
-                existing.short_ratio = quote.get('shortRatio')
-                existing.sector = quote.get('sector')
-                existing.industry = quote.get('industry')
-                existing.exchange = quote.get('exchange')
-                existing.currency = quote.get('currency', 'USD')
-                existing.website = quote.get('website')
-                existing.logo_url = quote.get('logoUrl')
-                existing.description = quote.get('description')
-                existing.last_updated = datetime.utcnow()
-                updated += 1
-            else:
-                # Create new record
-                new_stock = MarketData(
-                    symbol=symbol,
-                    name=quote.get('name', symbol),
-                    price=quote.get('price', 0),
-                    change=quote.get('change', 0),
-                    change_percent=quote.get('changePercent', 0),
-                    volume=quote.get('volume'),
-                    market_cap=quote.get('marketCap'),
-                    pe_ratio=quote.get('peRatio'),
-                    _52_week_high=quote.get('high52w'),
-                    _52_week_low=quote.get('low52w'),
-                    previous_close=quote.get('previousClose'),
-                    open_price=quote.get('open'),
-                    day_high=quote.get('dayHigh'),
-                    day_low=quote.get('dayLow'),
-                    avg_volume=quote.get('avgVolume'),
-                    beta=quote.get('beta'),
-                    forward_pe=quote.get('forwardPe'),
-                    trailing_pe=quote.get('peRatio'),
-                    eps=quote.get('eps'),
-                    dividend_yield=quote.get('dividendYield'),
-                    dividend_rate=quote.get('dividendRate'),
-                    book_value=quote.get('bookValue'),
-                    price_to_book=quote.get('priceToBook'),
-                    shares_outstanding=quote.get('sharesOutstanding'),
-                    float_shares=quote.get('floatShares'),
-                    short_ratio=quote.get('shortRatio'),
-                    sector=quote.get('sector'),
-                    industry=quote.get('industry'),
-                    exchange=quote.get('exchange'),
-                    currency=quote.get('currency', 'USD'),
-                    asset_type=asset_type,
-                    country_code=target_country,
-                    is_listed=True,
-                    website=quote.get('website'),
-                    logo_url=quote.get('logoUrl'),
-                    description=quote.get('description'),
-                    last_updated=datetime.utcnow()
-                )
-                session.add(new_stock)
-                imported += 1
-        except Exception as e:
-            logger.error(f"Error importing {symbol}: {e}")
-            errors += 1
-    
     try:
+        # Bulk fetch all prices in one request (much faster and safer for production)
+        import yfinance as yf
+        tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=True, progress=False)
+        
+        for symbol in symbols:
+            try:
+                symbol = symbol.upper()
+                
+                # Get data for this specific ticker from the bulk result
+                if len(symbols) > 1:
+                    ticker_df = tickers_data[symbol]
+                else:
+                    ticker_df = tickers_data
+                    
+                if ticker_df.empty:
+                    # Fallback to single quote if bulk failed for this symbol
+                    quote = get_stock_quote(symbol)
+                else:
+                    # Extract basic info from bulk data
+                    latest_price = float(ticker_df['Close'].iloc[-1])
+                    prev_close = float(ticker_df['Open'].iloc[0])
+                    change = latest_price - prev_close
+                    change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+                    
+                    quote = {
+                        'symbol': symbol,
+                        'price': latest_price,
+                        'change': change,
+                        'changePercent': change_pct,
+                        'volume': int(ticker_df['Volume'].iloc[-1]),
+                        'open': float(ticker_df['Open'].iloc[-1]),
+                        'dayHigh': float(ticker_df['High'].max()),
+                        'dayLow': float(ticker_df['Low'].min()),
+                    }
+
+                if not quote or not quote.get('price'):
+                    errors += 1
+                    continue
+                
+                # Check if exists
+                existing = MarketData.query.filter_by(
+                    symbol=symbol,
+                    country_code=country_code
+                ).first()
+                
+                if existing:
+                    # Update price and basic metrics
+                    existing.price = quote.get('price')
+                    existing.change = quote.get('change')
+                    existing.change_percent = quote.get('changePercent')
+                    existing.volume = quote.get('volume')
+                    existing.open_price = quote.get('open')
+                    existing.day_high = quote.get('dayHigh')
+                    existing.day_low = quote.get('dayLow')
+                    existing.last_updated = datetime.utcnow()
+                    updated += 1
+                else:
+                    # For new stocks, we still need full info once
+                    full_quote = get_stock_quote(symbol)
+                    if full_quote:
+                        new_stock = MarketData(
+                            symbol=symbol,
+                            name=full_quote.get('name', symbol),
+                            price=full_quote.get('price', 0),
+                            change=full_quote.get('change', 0),
+                            change_percent=full_quote.get('changePercent', 0),
+                            asset_type='etf' if full_quote.get('quoteType') == 'ETF' else 'stock',
+                            country_code=country_code,
+                            is_listed=True,
+                            currency=full_quote.get('currency', 'USD'),
+                            last_updated=datetime.utcnow()
+                        )
+                        session.add(new_stock)
+                        imported += 1
+            except Exception as e:
+                logger.error(f"Error processing {symbol} in bulk: {e}")
+                errors += 1
+                
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"Error committing to database: {e}")
+        logger.error(f"Bulk import failed: {e}")
         return {'imported': 0, 'updated': 0, 'errors': len(symbols)}
     
     return {'imported': imported, 'updated': updated, 'errors': errors}
