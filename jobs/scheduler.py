@@ -185,6 +185,22 @@ def _register_notification_jobs():
     )
     
     logger.info("Notification jobs registered")
+    
+    # System maintenance jobs
+    from .system_jobs import snapshot_user_wealth
+    
+    # Wealth snapshot - daily at 11:59 PM UTC
+    scheduler.add_job(
+        snapshot_user_wealth,
+        'cron',
+        hour=23,
+        minute=59,
+        id='wealth_snapshot',
+        name='Daily Wealth Snapshot',
+        replace_existing=True
+    )
+    
+    logger.info("System jobs registered")
 
 
 

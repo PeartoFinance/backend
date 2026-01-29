@@ -317,3 +317,20 @@ def cron_update_forex():
         return jsonify({'ok': True, **result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/wealth-snapshot', methods=['GET', 'POST'])
+def cron_wealth_snapshot():
+    """
+    Manually trigger a wealth snapshot for all users.
+    cURL: curl -X POST https://api.pearto.com/api/cron/wealth-snapshot?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.system_jobs import snapshot_user_wealth
+        result = snapshot_user_wealth()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -13,10 +13,77 @@ from models import (
     Watchlist, WatchlistItem, UserWatchlist, UserAlert, 
     UserNotificationPref, UserDashboardConfig, UserDevice,
     UserActivity, UserDocument, UserSession, PasswordResetToken,
-    LoginEvent, AdminUser
+    LoginEvent, AdminUser, WealthState
 )
 
 logger = logging.getLogger(__name__)
+
+def snapshot_user_wealth():
+    """
+    Daily snapshot of user wealth (portfolio value + cash).
+    Used for net worth history charts.
+    """
+    try:
+        from app import app
+        with app.app_context():
+            # 1. Get all active users
+            users = User.query.filter_by(account_status='active').all()
+            today = datetime.now(timezone.utc).date()
+            
+            snapshots_created = 0
+            
+            for user in users:
+                # 2. Calculate total portfolio value for this user
+                # Sum of all holdings across all portfolios
+                holdings = PortfolioHolding.query.join(UserPortfolio).filter(
+                    UserPortfolio.user_id == user.id
+                ).all()
+                
+                total_portfolio_value = sum(float(h.current_value or 0) for h in holdings)
+                
+                # 3. Check if snapshot for today already exists (to avoid duplicates)
+                existing = WealthState.query.filter_by(
+                    user_id=user.id,
+                    date=today
+                ).first()
+                
+                if existing:
+                    # Update existing snapshot
+                    existing.total_portfolio_value = total_portfolio_value
+                    # Calculate daily change if previous day exists
+                    yesterday = today - timedelta(days=1)
+                    prev = WealthState.query.filter_by(user_id=user.id, date=yesterday).first()
+                    if prev:
+                        existing.daily_change = total_portfolio_value - float(prev.total_portfolio_value or 0)
+                else:
+                    # Create new snapshot
+                    daily_change = 0
+                    yesterday = today - timedelta(days=1)
+                    prev = WealthState.query.filter_by(user_id=user.id, date=yesterday).first()
+                    if prev:
+                        daily_change = total_portfolio_value - float(prev.total_portfolio_value or 0)
+                        
+                    snapshot = WealthState(
+                        user_id=user.id,
+                        date=today,
+                        total_portfolio_value=total_portfolio_value,
+                        total_cash=0, # Placeholder for future cash tracking
+                        total_investments=total_portfolio_value,
+                        daily_change=daily_change
+                    )
+                    db.session.add(snapshot)
+                
+                snapshots_created += 1
+                
+            db.session.commit()
+            logger.info(f"Wealth snapshot complete: {snapshots_created} users processed.")
+            return {'status': 'ok', 'processed': snapshots_created}
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error during wealth snapshot: {str(e)}")
+        return {'status': 'error', 'error': str(e)}
+
 
 def cleanup_deleted_accounts():
     """
