@@ -164,7 +164,7 @@ def cron_all_market():
 
 @cron_bp.route('/business-profiles', methods=['GET', 'POST'])
 def cron_update_business_profiles():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/business-profiles?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://192.168.1.71:5000/api/cron/business-profiles?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -180,7 +180,7 @@ def cron_update_business_profiles():
 def cron_cleanup_accounts():
     """
     Permanently delete accounts marked for deletion > 30 days ago.
-    cURL: curl -X POST https://api.pearto.com/api/cron/cleanup-accounts?token=YOUR_TOKEN
+    cURL: curl -X POST http://192.168.1.71:5000/api/cron/cleanup-accounts?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -197,7 +197,7 @@ def cron_cleanup_accounts():
 def cron_update_financials():
     """
     Sync financial statements for all listed stocks.
-    cURL: curl -X POST https://api.pearto.com/api/cron/financials?token=YOUR_TOKEN
+    cURL: curl -X POST http://192.168.1.71:5000/api/cron/financials?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -292,7 +292,7 @@ def cron_import_biz_profiles():
 def cron_news_notifications():
     """
     Fetch recent news and send notifications to users based on preferences.
-    cURL: curl -X POST https://api.pearto.com/api/cron/news-notifications?token=YOUR_TOKEN
+    cURL: curl -X POST http://192.168.1.71:5000/api/cron/news-notifications?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -307,7 +307,7 @@ def cron_news_notifications():
 
 @cron_bp.route('/forex', methods=['GET', 'POST'])
 def cron_update_forex():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/forex?token=YOUR_TOKEN"""
+    """cURL: curl -X POST http://192.168.1.71:5000/api/cron/forex?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     

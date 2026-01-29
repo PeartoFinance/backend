@@ -134,3 +134,49 @@ def import_forex_to_db(currencies: List[str] = None) -> Dict[str, int]:
         return {'updated': 0, 'errors': len(target_list)}
         
     return {'updated': updated, 'errors': errors}
+
+
+def get_forex_history(
+    symbol: str, 
+    period: str = '1mo', 
+    interval: str = '1d'
+) -> List[Dict[str, Any]]:
+    """
+    Get historical OHLCV data for a forex pair.
+    
+    Args:
+        symbol: Forex pair symbol (e.g., 'EURUSD')
+        period: Valid periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+        interval: Valid intervals: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+    
+    Returns:
+        List of OHLCV dictionaries
+    """
+    try:
+        # Standardize symbol for Yahoo Finance (e.g. EURUSD -> EURUSD=X)
+        # Note: Frontend usually sends 'EURUSD' or 'USDJPY' without =X
+        yf_symbol = symbol.upper()
+        if not yf_symbol.endswith('=X'):
+             yf_symbol = f"{yf_symbol}=X"
+
+        ticker = yf.Ticker(yf_symbol)
+        hist = ticker.history(period=period, interval=interval)
+        
+        if hist.empty:
+            return []
+        
+        results = []
+        for date, row in hist.iterrows():
+            formatted_date = date.isoformat() if hasattr(date, 'isoformat') else str(date)
+            results.append({
+                'date': formatted_date,
+                'open': float(row['Open']) if row['Open'] else None,
+                'high': float(row['High']) if row['High'] else None,
+                'low': float(row['Low']) if row['Low'] else None,
+                'close': float(row['Close']) if row['Close'] else None,
+                'volume': int(row['Volume']) if row['Volume'] else 0,
+            })
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching forex history for {symbol}: {e}")
+        return []

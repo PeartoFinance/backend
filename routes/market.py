@@ -9,8 +9,17 @@ from models import (
     Dividend, BulkTransaction
 )
 from handlers.market_data.calendar_handler import get_economic_events
+from handlers.market_data.forex_handler import get_forex_history
 
 market_bp = Blueprint('market', __name__)
+
+
+@market_bp.route('/forex/history/<symbol>', methods=['GET'])
+def get_forex_pair_history(symbol):
+    """Get historical data for a forex pair"""
+    period = request.args.get('period', '1mo')
+    interval = request.args.get('interval', '1d')
+    return jsonify(get_forex_history(symbol, period, interval))
 
 
 @market_bp.route('/calendar', methods=['GET'])

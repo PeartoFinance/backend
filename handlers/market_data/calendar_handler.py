@@ -205,16 +205,45 @@ def get_economic_events(
         
         results = []
         for idx, row in events_df.iterrows():
+            # yfinance returns: Region, Event Time, For, Actual, Expected, Last, Revised
+            # The event name is in the index
+            event_name = str(idx) if isinstance(idx, str) else row.name if hasattr(row, 'name') else 'Unknown'
+            
+            # Parse event time - may contain date and time info
+            event_time = row.get('Event Time')
+            event_date = None
+            if event_time is not None:
+                try:
+                    # Event Time might be a timestamp or string
+                    if hasattr(event_time, 'isoformat'):
+                        event_date = event_time.isoformat()
+                    else:
+                        event_date = str(event_time)
+                except:
+                    event_date = None
+            
+            # Helper to safely convert values (handles NaN)
+            def safe_value(v):
+                if v is None:
+                    return None
+                import math
+                try:
+                    if math.isnan(float(v)):
+                        return None
+                except (ValueError, TypeError):
+                    pass
+                return str(v) if v is not None else None
+            
             results.append({
                 'id': str(uuid.uuid4()),
-                'title': row.get('eventname') or row.get('event'),
-                'country': row.get('country'),
-                'eventDate': row.get('startdatetime'),
-                'importance': _map_importance(row.get('importance')),
-                'forecast': row.get('forecast'),
-                'previous': row.get('previous'),
-                'actual': row.get('actual'),
-                'currency': row.get('currency'),
+                'title': event_name.strip() if event_name else 'Unknown Event',
+                'country': row.get('Region', ''),
+                'eventDate': event_date,
+                'importance': _map_importance(row.get('importance', 2)),  # Default medium
+                'forecast': safe_value(row.get('Expected')),
+                'previous': safe_value(row.get('Last')),
+                'actual': safe_value(row.get('Actual')),
+                'period': row.get('For', ''),
                 'source': 'Yahoo Finance',
             })
         
