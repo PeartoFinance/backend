@@ -268,20 +268,28 @@ def google_signin():
     referral_code_input = data.get('referralCode', '').strip()
 
     if not id_token_str:
-        return jsonify({'error': 'Google ID Token required'}), 400
+        return jsonify({'error': 'Firebase ID Token required'}), 400
 
     try:
-        # Verify Google Token to prevent account spoofing
-        client_id = os.getenv('GOOGLE_CLIENT_ID')
-        idinfo = id_token.verify_oauth2_token(id_token_str, requests.Request(), client_id)
+         # Verify Firebase ID Token to prevent account spoofing
+        # Firebase tokens use a different certificate URL than standard Google tokens
+        firebase_project_id = os.getenv('FIREBASE_PROJECT_ID')
+        certs_url = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+        
+        idinfo = id_token.verify_token(
+            id_token_str, 
+            requests.Request(), 
+            audience=firebase_project_id,
+            certs_url=certs_url
+        )
         
         email = idinfo['email'].lower()
         name = idinfo.get('name')
         avatar_url = idinfo.get('picture')
         firebase_uid = idinfo.get('sub')
     except Exception as e:
-        print(f'[Auth] Google token verification failed: {e}')
-        return jsonify({'error': 'Invalid Google Token'}), 401
+        print(f'[Auth] Firebase token verification failed: {e}')
+        return jsonify({'error': 'Invalid Firebase Token'}), 401
 
     # Check if user exists
     user = User.query.filter_by(email=email).first()
