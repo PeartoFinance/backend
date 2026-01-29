@@ -13,6 +13,10 @@ from models import db, User, PasswordResetToken, UserProfile
 from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email, track_login, track_signup
 from models.user import UserSession
 from .decorators import auth_required
+import os
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -259,15 +263,26 @@ def google_signin():
     from handlers import send_google_login_email
     
     data = request.get_json()
-    firebase_uid = data.get('firebase_uid', '')
-    email = data.get('email', '').strip().lower()
-    name = data.get('name', '').strip()
-    avatar_url = data.get('avatarUrl', '')
+    id_token_str = data.get('idToken') # Secure: Receive token from frontend
+
     referral_code_input = data.get('referralCode', '').strip()
-    
-    if not email:
-        return jsonify({'error': 'Email required'}), 400
-    
+
+    if not id_token_str:
+        return jsonify({'error': 'Google ID Token required'}), 400
+
+    try:
+        # Verify Google Token to prevent account spoofing
+        client_id = os.getenv('GOOGLE_CLIENT_ID')
+        idinfo = id_token.verify_oauth2_token(id_token_str, requests.Request(), client_id)
+        
+        email = idinfo['email'].lower()
+        name = idinfo.get('name')
+        avatar_url = idinfo.get('picture')
+        firebase_uid = idinfo.get('sub')
+    except Exception as e:
+        print(f'[Auth] Google token verification failed: {e}')
+        return jsonify({'error': 'Invalid Google Token'}), 401
+
     # Check if user exists
     user = User.query.filter_by(email=email).first()
     
@@ -291,7 +306,6 @@ def google_signin():
         user.last_login_at = datetime.now(timezone.utc)
         db.session.commit()
         
-        print(f'[Auth] Google login: {email}')
     else:
         # Check referral code if provided
         referred_by_id = None
@@ -331,9 +345,9 @@ def google_signin():
         )
         db.session.add(profile)
         db.session.commit()
+
         
-        print(f'[Auth] New Google signup: {email}')
-        
+                
         # Send welcome email for new users
         try:
             send_welcome_email(user.email, user.name)
