@@ -58,6 +58,10 @@ class MarketData(db.Model):
     
     __table_args__ = (
         db.UniqueConstraint('symbol', 'country_code', 'asset_type', name='uq_market_data_symbol_country_asset'),
+        # Performance indexes for sorting and filtering
+        db.Index('idx_market_movers', 'asset_type', 'is_listed', 'change_percent'),
+        db.Index('idx_market_volume', 'asset_type', 'is_listed', 'volume'),
+        db.Index('idx_market_country', 'country_code', 'asset_type'),
     )
     
     def to_dict(self):

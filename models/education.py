@@ -66,6 +66,11 @@ class Course(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    __table_args__ = (
+        db.Index('idx_course_filter', 'is_published', 'country_code'),
+        db.Index('idx_course_category', 'is_published', 'category'),
+    )
+
     def to_dict(self):
         return {
             'id': self.id,

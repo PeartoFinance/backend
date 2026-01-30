@@ -10,6 +10,7 @@ from models import (
 )
 from handlers.market_data.calendar_handler import get_economic_events
 from handlers.market_data.forex_handler import get_forex_history
+from extensions import cache
 
 market_bp = Blueprint('market', __name__)
 
@@ -34,8 +35,9 @@ def get_calendar():
 
 
 @market_bp.route('/overview', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_market_overview():
-    """Get comprehensive market overview data"""
+    """Get comprehensive market overview data - cached for 30s"""
     header_country = request.headers.get('X-User-Country')
     if header_country:
         hc = header_country.strip().upper()
@@ -73,12 +75,25 @@ def get_market_overview():
         md_filter
     ).order_by(desc(MarketData.volume)).limit(5).all()
     
-    # Calculate market stats
-    all_stocks = MarketData.query.filter(MarketData.asset_type == 'stock').all()
-    advancers = sum(1 for s in all_stocks if s.change_percent and s.change_percent > 0)
-    decliners = sum(1 for s in all_stocks if s.change_percent and s.change_percent < 0)
-    unchanged = len(all_stocks) - advancers - decliners
-    total_volume = sum(s.volume or 0 for s in all_stocks)
+    # Calculate market stats using efficient SQL COUNT (instead of loading all rows)
+    advancers = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock',
+        MarketData.change_percent > 0
+    ).scalar() or 0
+    
+    decliners = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock',
+        MarketData.change_percent < 0
+    ).scalar() or 0
+    
+    total_count = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock'
+    ).scalar() or 0
+    unchanged = total_count - advancers - decliners
+    
+    total_volume = db.session.query(db.func.sum(MarketData.volume)).filter(
+        MarketData.asset_type == 'stock'
+    ).scalar() or 0
     
     return jsonify({
         'indices': [idx.to_dict() for idx in indices],

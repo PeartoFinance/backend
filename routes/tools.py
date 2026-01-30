@@ -5,6 +5,7 @@ Handles tool settings and calculator management
 from flask import Blueprint, request, jsonify
 from models.settings import ToolSettings
 from models.base import db
+from extensions import cache
 
 tools_bp = Blueprint('tools', __name__, url_prefix='/api/tools')
 
@@ -66,6 +67,7 @@ def get_country_from_header():
 
 
 @tools_bp.route('/settings', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_tools_settings():
     """List all tool settings (admin view, country-filtered)"""
     country = get_country_from_header()
@@ -82,6 +84,7 @@ def get_tools_settings():
 
 
 @tools_bp.route('/settings/enabled', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_enabled_tools():
     """List only enabled tools (public, country-filtered)"""
     country = get_country_from_header()

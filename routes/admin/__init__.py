@@ -22,6 +22,14 @@ from .roles import roles_bp
 from .uploads import uploads_bp
 from .email_templates import email_templates_bp
 from .navigation import navigation_bp
+from .financial import financial_bp
+from .products import products_bp
+from .orders import orders_bp
+from .pricing import pricing_bp
+from .sellers import sellers_bp
+from .help import help_bp
+from .ai import ai_bp
+from .bookings import bookings_bp
 
 # Main admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -46,5 +54,13 @@ admin_bp.register_blueprint(roles_bp)
 admin_bp.register_blueprint(uploads_bp)
 admin_bp.register_blueprint(email_templates_bp)
 admin_bp.register_blueprint(navigation_bp)
+admin_bp.register_blueprint(financial_bp)
+admin_bp.register_blueprint(products_bp)
+admin_bp.register_blueprint(orders_bp)
+admin_bp.register_blueprint(pricing_bp)
+admin_bp.register_blueprint(sellers_bp)
+admin_bp.register_blueprint(help_bp)
+admin_bp.register_blueprint(ai_bp)
+admin_bp.register_blueprint(bookings_bp)
 
 __all__ = ['admin_bp']

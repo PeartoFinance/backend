@@ -8,6 +8,7 @@ from models.base import db
 from models.media import TVChannel, RadioStation, TrendingTopic, ForexRate
 from models.article import NewsItem
 from models.misc import Testimonial, FAQ
+from extensions import cache
 
 content_bp = Blueprint('content', __name__)
 
@@ -50,6 +51,7 @@ def get_featured_news():
 
 
 @content_bp.route('/tv', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_tv_channels():
     """Get TV channels"""
     limit = min(int(request.args.get('limit', 20)), 50)
@@ -71,6 +73,7 @@ def get_tv_channels():
 
 
 @content_bp.route('/radio', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_radio_stations():
     """Get radio stations"""
     limit = min(int(request.args.get('limit', 20)), 50)
@@ -97,6 +100,7 @@ def get_radio_stations():
 
 
 @content_bp.route('/trending', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_trending_topics():
     """Get trending topics"""
     limit = min(int(request.args.get('limit', 10)), 20)
@@ -151,6 +155,7 @@ def get_forex_rates():
 
 
 @content_bp.route('/testimonials', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_testimonials():
     """Get active testimonials"""
     limit = min(int(request.args.get('limit', 10)), 50)
@@ -186,6 +191,7 @@ def get_testimonials():
     } for t in testimonials])
 
 @content_bp.route('/faq', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_faqs():
     """Get active FAQs"""
     # limit = min(int(request.args.get('limit', 50)), 100) # Typically show all or many

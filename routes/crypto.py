@@ -5,11 +5,13 @@ Crypto API Routes with SQLAlchemy
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 from models import db, MarketData as MarketPrice, CryptoMarketData
+from extensions import cache
 
 crypto_bp = Blueprint('crypto', __name__)
 
 
 @crypto_bp.route('/markets', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_markets():
     """Get cryptocurrency market listings"""
     limit = min(int(request.args.get('limit', 100)), 250)
@@ -43,6 +45,7 @@ def get_markets():
 
 
 @crypto_bp.route('/global', methods=['GET'])
+@cache.cached(timeout=60)
 def get_global():
     """Get global cryptocurrency market metrics"""
     data = CryptoMarketData.query.order_by(
@@ -63,6 +66,7 @@ def get_global():
 
 
 @crypto_bp.route('/coin/<symbol>', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_coin(symbol):
     """Get single cryptocurrency details"""
     from handlers.market_data.crypto_handler import import_crypto_to_db
@@ -149,6 +153,7 @@ def get_coins():
 
 
 @crypto_bp.route('/gainers', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_gainers():
     """Get top gaining cryptocurrencies"""
     limit = min(int(request.args.get('limit', 10)), 50)
@@ -170,6 +175,7 @@ def get_gainers():
 
 
 @crypto_bp.route('/losers', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_losers():
     """Get top losing cryptocurrencies"""
     limit = min(int(request.args.get('limit', 10)), 50)

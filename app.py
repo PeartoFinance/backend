@@ -14,6 +14,7 @@ from flask_cors import CORS
 from config import config
 from models.base import db
 from flask_migrate import Migrate
+from extensions import cache, compress
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -23,8 +24,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config.SQLALCHEMY_ENGINE_OPTIONS
 
-# Initialize SQLAlchemy
+# Cache configuration - simple in-memory cache for performance
+app.config['CACHE_TYPE'] = 'simple'
+app.config['CACHE_DEFAULT_TIMEOUT'] = 30
+
+# Initialize extensions
 db.init_app(app)
+cache.init_app(app)
+compress.init_app(app)  # Auto-compress responses > 500 bytes
 
 # For migration
 migrate = Migrate(app, db)

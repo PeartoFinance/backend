@@ -8,6 +8,7 @@ from models.base import db
 from models.market import MarketData, CompanyFinancials, MarketIssue, Dividend, AnalystRecommendation, StockPriceHistory
 from models.article import NewsItem
 from datetime import datetime, timedelta
+from extensions import cache
 
 stocks_bp = Blueprint('stocks', __name__)
 
@@ -267,6 +268,7 @@ def get_business_directory():
 
 
 @stocks_bp.route('/movers', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_movers():
     """Get top gainers and losers"""
     mover_type = request.args.get('type', 'both')
@@ -303,6 +305,7 @@ def get_movers():
 
 
 @stocks_bp.route('/most-active', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_most_active():
     """Get most actively traded stocks"""
     limit = min(int(request.args.get('limit', 10)), 50)

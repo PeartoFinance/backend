@@ -34,6 +34,7 @@ from flask import Blueprint, jsonify, request, g
 from models import Course, Instructor, CourseModule, UserEnrollment
 from models.base import db
 from routes.decorators import auth_required
+from extensions import cache
 
 education_bp = Blueprint("education", __name__)
 
@@ -45,6 +46,7 @@ def is_course_visible_to_user(course, user_country):
 
 
 @education_bp.route("/courses", methods=["GET"])
+@cache.cached(timeout=120, query_string=True)
 def get_courses():
     """Get all published courses with optional filtering"""
     try:
@@ -187,6 +189,7 @@ def get_course(slug):
 
 
 @education_bp.route("/instructors", methods=["GET"])
+@cache.cached(timeout=300, query_string=True)
 def get_instructors():
     """Get all active instructors"""
     try:
@@ -227,6 +230,7 @@ def get_instructors():
 
 
 @education_bp.route("/categories", methods=["GET"])
+@cache.cached(timeout=300, query_string=True)
 def get_categories():
     """Get unique course categories"""
     try:

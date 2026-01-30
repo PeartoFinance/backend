@@ -119,6 +119,12 @@ class NewsItem(db.Model):
     
     # Business Profile Link (Added to filter news by specific company)
     related_symbol = db.Column(db.String(20), index=True, nullable=True)
+
+    __table_args__ = (
+        db.Index('idx_news_feed', 'status', 'published_at'),
+        db.Index('idx_news_category', 'status', 'category', 'published_at'),
+        db.Index('idx_news_source', 'source_type', 'status'),
+    )
     
     def to_dict(self):
         return {
