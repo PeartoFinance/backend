@@ -6,7 +6,8 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 import uuid
 from routes.decorators import auth_required
-from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, UserInvestmentGoal
+from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, UserInvestmentGoal, FinancialGoal
+
 from services.portfolio_service import calculate_portfolio_health
 
 portfolio_bp = Blueprint('portfolio', __name__)
@@ -733,3 +734,114 @@ def get_portfolio_analytics(portfolio_id):
         'topPerformers': sorted_by_gain[:5],
         'worstPerformers': sorted_by_gain[-5:][::-1] if len(sorted_by_gain) >= 5 else sorted_by_gain[::-1]
     })
+
+
+# Users financial goals tracker
+
+@portfolio_bp.route('/financial-goals', methods=['GET'])
+@auth_required
+def get_financial_goals():
+    """
+    Fetch all financial goals for the current user.
+    Supports both global tracking (whole wealth) and specific portfolio tracking.
+    """
+    goals = FinancialGoal.query.filter_by(user_id=request.user.id).all()
+    
+    # Pre-calculate values to avoid N+1 queries
+    # Get all holdings for this user
+    all_holdings = PortfolioHolding.query.join(UserPortfolio).filter(UserPortfolio.user_id == request.user.id).all()
+    
+    # Organize holdings by portfolio_id and calculate total
+    portfolio_totals = {}
+    global_total = 0
+    
+    for h in all_holdings:
+        val = float(h.current_value or 0)
+        global_total += val
+        if h.portfolio_id not in portfolio_totals:
+            portfolio_totals[h.portfolio_id] = 0
+        portfolio_totals[h.portfolio_id] += val
+    
+    result = []
+    for g in goals:
+        target = float(g.target_amount)
+        start = float(g.start_amount)
+        
+        # Decide which value to use: Specific Portfolio or Global Wealth
+        if g.portfolio_id:
+            current_value = portfolio_totals.get(g.portfolio_id, 0)
+        else:
+            current_value = global_total
+            
+        # Calculate progress percent (0 to 100)
+        progress = 0
+        if target > start:
+            progress = min(100, max(0, (current_value - start) / (target - start) * 100))
+        elif current_value >= target:
+            progress = 100
+            
+        result.append({
+            'id': g.id,
+            'portfolio_id': g.portfolio_id,
+            'target_amount': target,
+            'start_amount': start,
+            'current_amount': round(current_value, 2),
+            'progress_percent': round(progress, 2),
+            'target_date': g.target_date.isoformat() if g.target_date else None,
+            'status': g.status,
+            'notify_on_reach': g.notify_on_reach,
+            'created_at': g.created_at.isoformat() if g.created_at else None
+        })
+        
+    return jsonify(result)
+
+
+@portfolio_bp.route('/financial-goals', methods=['POST'])
+@auth_required
+def create_financial_goal():
+    """
+    Create a new financial milestone for the user.
+    If 'start_amount' isn't provided, it defaults to the user's current portfolio value.
+    """
+    data = request.get_json()
+    
+    # Validation
+    if not data.get('target_amount') or not data.get('target_date'):
+        return jsonify({'error': 'Target amount and date are required'}), 400
+
+    # Get current value as baseline if start_amount is missing
+    holdings = PortfolioHolding.query.join(UserPortfolio).filter(UserPortfolio.user_id == request.user.id).all()
+    current_value = float(sum(h.current_value or 0 for h in holdings))
+    
+    new_goal = FinancialGoal(
+        user_id=request.user.id,
+        portfolio_id=data.get('portfolio_id'),
+        target_amount=data.get('target_amount'),
+        start_amount=data.get('start_amount', current_value),
+        target_date=data.get('target_date'),
+        notify_on_reach=data.get('notify_on_reach', True)
+    )
+    
+    db.session.add(new_goal)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Financial goal created successfully',
+        'id': new_goal.id
+    }), 201
+
+
+@portfolio_bp.route('/financial-goals/<int:goal_id>', methods=['DELETE'])
+@auth_required
+def delete_financial_goal(goal_id):
+    """
+    Allow users to remove a goal milestone.
+    """
+    goal = FinancialGoal.query.filter_by(id=goal_id, user_id=request.user.id).first()
+    if not goal:
+        return jsonify({'error': 'Financial goal not found'}), 404
+        
+    db.session.delete(goal)
+    db.session.commit()
+    
+    return jsonify({'message': 'Goal deleted successfully'})

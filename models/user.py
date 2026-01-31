@@ -143,10 +143,9 @@ class UserAlert(db.Model):
 class UserNotificationPref(db.Model):
     """User notification preferences - granular control over all notification types"""
     __tablename__ = 'user_notification_prefs'
-    
+     
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
     # Legacy fields (kept for backward compatibility)
     email_marketing = db.Column(db.Boolean, default=False)
     email_alerts = db.Column(db.Boolean, default=True)
@@ -162,6 +161,7 @@ class UserNotificationPref(db.Model):
     # Trading & Market notifications
     email_price_alerts = db.Column(db.Boolean, default=True)   # Price target hits
     email_daily_digest = db.Column(db.Boolean, default=True)   # Daily market summary
+    email_portfolio_summary = db.Column(db.Boolean, default=True) # Daily P&L summary
     email_earnings = db.Column(db.Boolean, default=True)       # Earnings reminders
     email_newsletter = db.Column(db.Boolean, default=True)     # Weekly newsletter
     
@@ -192,6 +192,7 @@ class UserNotificationPref(db.Model):
             'emailAccount': self.email_account if self.email_account is not None else True,
             'emailPriceAlerts': self.email_price_alerts if self.email_price_alerts is not None else self.email_alerts,
             'emailDailyDigest': self.email_daily_digest if self.email_daily_digest is not None else True,
+            'emailPortfolioSummary': self.email_portfolio_summary if self.email_portfolio_summary is not None else True,
             'emailEarnings': self.email_earnings if self.email_earnings is not None else True,
             'emailNews': self.email_news if self.email_news is not None else True,
             'emailMarketing': self.email_marketing if self.email_marketing is not None else False,
@@ -242,6 +243,57 @@ class NewsNotification(db.Model):
 
 
 # ===================
+
+#  User financial goals models
+class FinancialGoalNotification(db.Model):
+    """
+    Tracks sent notifications for financial goal achievements
+    (cron-safe, idempotent)
+    """
+    __tablename__ = 'financial_goal_notifications'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id'),
+        nullable=False
+    )
+
+    goal_id = db.Column(
+        db.Integer,
+        db.ForeignKey('financial_goals.id'),
+        nullable=False
+    )
+
+    sent_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id',
+            'goal_id',
+            name='ux_user_financial_goal_notification'
+        ),
+    )
+
+#  =====================
+class DailySummaryNotification(db.Model):
+    """
+    Tracks sent daily P&L summaries to prevent duplicate emails per day.
+    """
+    __tablename__ = 'daily_summary_notifications'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False) # The date this summary covers
+    sent_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'date', name='ux_user_daily_summary_date'),
+    )
 
 
 class UserDashboardConfig(db.Model):

@@ -2,7 +2,7 @@
 Portfolio & Trading Models
 PeartoFinance Backend
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from .base import db
 
 
@@ -22,6 +22,9 @@ class UserPortfolio(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
+    holdings = db.relationship('PortfolioHolding', backref='portfolio', cascade='all, delete-orphan')
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -277,3 +280,56 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, default=1)
     unit_price = db.Column(db.Numeric(18, 2))
     total_price = db.Column(db.Numeric(18, 2))
+
+
+# Financial Goals Model
+
+class FinancialGoal(db.Model):
+    """
+    User financial goals (portfolio target-based)
+    """
+    __tablename__ = 'financial_goals'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('users.id'),
+        nullable=False,
+        index=True
+    )
+
+    # Optional: support multi-portfolio in future
+    portfolio_id = db.Column(
+        db.String(255),
+        db.ForeignKey('user_portfolios.id'),
+        nullable=True
+    )
+
+    # Goal definition
+    target_amount = db.Column(db.Numeric(18, 2), nullable=False)
+    start_amount = db.Column(db.Numeric(18, 2), nullable=False)
+    target_date = db.Column(db.Date, nullable=False)
+
+    # Goal state
+    status = db.Column(
+        db.Enum('active', 'achieved', 'expired'),
+        default='active',
+        index=True
+    )
+
+    # User preference
+    notify_on_reach = db.Column(db.Boolean, default=True)
+
+    # Cron visibility / debugging
+    last_checked_at = db.Column(db.DateTime)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
