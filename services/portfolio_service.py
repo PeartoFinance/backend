@@ -41,7 +41,14 @@ def calculate_portfolio_health(user_id):
     total_value = sum(Decimal(str(h.current_value or 0)) for h in holdings)
     
     if total_value == 0:
-        return {"score": 0, "message": "Portfolio has no current value."}
+        return {
+            "score": 0, 
+            "status": "No Value", 
+            "message": "Portfolio has no current value.",
+            "recommendations": [],
+            "allocation_health": {},
+            "needs_holdings": True  # Treat as empty for setup purposes
+        }
 
     # 4. Calculate Actual Allocation by Asset Type
     # We group holdings into categories like 'stock', 'crypto', etc.
