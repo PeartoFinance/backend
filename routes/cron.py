@@ -116,6 +116,39 @@ def cron_check_watchlist():
         return jsonify({'error': str(e)}), 500
 
 
+@cron_bp.route('/earnings-alerts', methods=['GET', 'POST'])
+def cron_check_earnings():
+    """
+    cPanel Cron: URL-accessible endpoint for earnings alerts.
+    Checks both user watchlists and their actual portfolio holdings.
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import check_earnings_alerts
+        result = check_earnings_alerts()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@cron_bp.route('/portfolio-summary', methods=['GET', 'POST'])
+def cron_daily_pl_summary():
+    """
+    cPanel Cron: URL-accessible endpoint for daily P&L summaries.
+    Compares latest WealthState snapshots to determine gain/loss.
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import send_daily_pl_summaries
+        result = send_daily_pl_summaries()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @cron_bp.route('/daily-digest', methods=['GET', 'POST'])
 def cron_daily_digest():
     """cURL: curl -X POST https://api.pearto.com/api/cron/daily-digest?token=YOUR_TOKEN"""
@@ -331,6 +364,23 @@ def cron_wealth_snapshot():
     try:
         from jobs.system_jobs import snapshot_user_wealth
         result = snapshot_user_wealth()
+        return jsonify({'ok': True, **result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/check-goals', methods=['GET', 'POST'])
+def cron_check_goals():
+    """
+    cPanel Cron: URL-accessible endpoint to check user financial goals.
+    cURL example: curl -X POST https://api.pearto.com/api/cron/check-goals?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import check_financial_goals
+        result = check_financial_goals()
         return jsonify({'ok': True, **result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

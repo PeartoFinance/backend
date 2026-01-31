@@ -173,52 +173,64 @@ def send_daily_digest() -> Dict[str, Any]:
 
 def check_earnings_alerts() -> Dict[str, Any]:
     """
-    Check for upcoming earnings announcements for watchlist stocks.
+    Check for upcoming earnings announcements for both watchlist stocks AND portfolio holdings.
     Send reminders to users before earnings release.
     """
-    logger.info("Checking earnings alerts")
+    logger.info("Checking earnings alerts for holdings and watchlists")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, UserWatchlist, EarningsCalendar
+            from models import db, UserWatchlist, PortfolioHolding, UserPortfolio, EarningsCalendar
             from notifications import send_earnings_reminder
             from datetime import timedelta
             
             alerts_sent = 0
             tomorrow = datetime.utcnow().date() + timedelta(days=1)
             
-            # Get earnings happening tomorrow
+            # 1. Get symbols reporting earnings tomorrow
             earnings = EarningsCalendar.query.filter(
                 EarningsCalendar.earnings_date == tomorrow
             ).all()
             
             if not earnings:
-                return {'status': 'ok', 'alerts_sent': 0}
+                return {'status': 'ok', 'alerts_sent': 0, 'message': 'No earnings tomorrow'}
             
-            earning_symbols = [e.symbol for e in earnings]
+            report_symbols = [e.symbol for e in earnings]
             
-            # Find users watching these stocks
+            # Dictionary to store unique symbols per user {user_id: set(symbols)}
+            user_symbols_map = {}
+
+            # 2. Check Watchlists
             watchlist_items = UserWatchlist.query.filter(
-                UserWatchlist.symbol.in_(earning_symbols)
+                UserWatchlist.symbol.in_(report_symbols)
             ).all()
-            
-            # Group by user
-            user_earnings = {}
             for item in watchlist_items:
-                if item.user_id not in user_earnings:
-                    user_earnings[item.user_id] = []
-                user_earnings[item.user_id].append(item.symbol)
+                if item.user_id not in user_symbols_map:
+                    user_symbols_map[item.user_id] = set()
+                user_symbols_map[item.user_id].add(item.symbol)
+
+            # 3. Check Portfolio Holdings (NEW)
+            # Find users who actually OWN these stocks
+            holdings = PortfolioHolding.query.join(UserPortfolio).filter(
+                PortfolioHolding.symbol.in_(report_symbols)
+            ).all()
+            for h in holdings:
+                user_id = h.portfolio.user_id # Access via relationship
+                if user_id not in user_symbols_map:
+                    user_symbols_map[user_id] = set()
+                user_symbols_map[user_id].add(h.symbol)
             
-            # Send reminders
-            for user_id, symbols in user_earnings.items():
+            # 4. Send uniquely grouped reminders
+            for user_id, symbols_set in user_symbols_map.items():
                 try:
-                    send_earnings_reminder(user_id, symbols)
+                    symbols_list = list(symbols_set)
+                    send_earnings_reminder(user_id, symbols_list)
                     alerts_sent += 1
                 except Exception as e:
                     logger.warning(f"Failed to send earnings reminder to user {user_id}: {e}")
             
-            logger.info(f"Sent {alerts_sent} earnings reminders")
+            logger.info(f"Sent {alerts_sent} earnings reminders (Holdings + Watchlist)")
             return {'status': 'ok', 'alerts_sent': alerts_sent}
     except Exception as e:
         logger.error(f"Earnings alerts check failed: {e}")
@@ -257,3 +269,183 @@ def process_news_notifications() -> Dict[str, Any]:
             'error': str(e),
             'elapsed_seconds': (datetime.utcnow() - start_time).total_seconds()
         }
+
+
+def check_financial_goals() -> Dict[str, Any]:
+    """
+    Background job to track user financial goals against their current portfolio value.
+    Sends notifications and marks goals as achieved when targets are hit.
+    """
+    logger.info("Running financial goals check")
+    
+    try:
+        app = get_app()
+        with app.app_context():
+            from models import db, FinancialGoal, FinancialGoalNotification, UserPortfolio, PortfolioHolding
+            from notifications import send_goal_reached_notification
+            from datetime import datetime
+            
+            goals_achieved = 0
+            
+            # Fetch all active goals
+            active_goals = FinancialGoal.query.filter_by(status='active').all()
+            
+            for goal in active_goals:
+                # 1. Determine the relevant current value
+                if goal.portfolio_id:
+                    # Track ONLY specified portfolio
+                    holdings = PortfolioHolding.query.filter_by(portfolio_id=goal.portfolio_id).all()
+                else:
+                    # Track WHOLE wealth (Global)
+                    holdings = PortfolioHolding.query.join(UserPortfolio).filter(
+                        UserPortfolio.user_id == goal.user_id
+                    ).all()
+                
+                current_value = float(sum(h.current_value or 0 for h in holdings))
+                
+                # Update last checked timestamp for debugging/audit
+                goal.last_checked_at = datetime.utcnow()
+                
+                # 2. Check if the target amount has been crossed
+                if current_value >= float(goal.target_amount):
+                    try:
+                        # 3. Idempotency Check (Don't spam if portfolio fluctuates)
+                        # Check if a notification was already sent for this specific goal
+                        sent_already = FinancialGoalNotification.query.filter_by(
+                            user_id=goal.user_id,
+                            goal_id=goal.id
+                        ).first()
+                        
+                        if not sent_already:
+                            # Send email and push notification if requested
+                            if goal.notify_on_reach:
+                                send_goal_reached_notification(goal.user_id, float(goal.target_amount))
+                            
+                            # Mark as sent in our tracking table
+                            notif = FinancialGoalNotification(
+                                user_id=goal.user_id,
+                                goal_id=goal.id
+                            )
+                            db.session.add(notif)
+                            
+                            # Milestone reached! 🥳
+                            goal.status = 'achieved'
+                            goals_achieved += 1
+                            logger.info(f"Goal Reached: User {goal.user_id} hit ${goal.target_amount}")
+                    except Exception as e:
+                        logger.warning(f"Goal Processing Error for {goal.id}: {e}")
+            
+            db.session.commit()
+            
+            return {
+                'status': 'ok', 
+                'goals_achieved': goals_achieved, 
+                'total_checked': len(active_goals)
+            }
+            
+    except Exception as e:
+        logger.error(f"Financial goals check failed: {e}")
+        return {'status': 'error', 'error': str(e)}
+
+
+def send_daily_pl_summaries() -> Dict[str, Any]:
+    """
+    Background job to send Daily P&L Summaries.
+    Compares the most recent WealthState with the previous one to determine daily gain/loss.
+    """
+    logger.info("Starting Daily P&L Summary job")
+    
+    try:
+        app = get_app()
+        with app.app_context():
+            from models import db, User, WealthState, DailySummaryNotification
+            from notifications import send_daily_summary
+            from services.preference_checker import should_send_notification
+            from datetime import timedelta
+            
+            # We typically run this in the morning (e.g. 7 AM) to show yesterday's P&L
+            # Or at night (e.g. 10 PM) to show 'Today's P&L'.
+            # Based on cron setup, let's assume this runs AFTER the late-night snapshot.
+            
+            emails_sent = 0
+            todays_date = datetime.utcnow().date()
+            
+            # 1. Get all active users
+            users = User.query.filter_by(account_status='active').all()
+            
+            for user in users:
+                try:
+                    # 2. Check Preferences
+                    if not should_send_notification(user.id, 'daily_summary', 'email'): 
+                        # NB: 'daily_summary' isn't in pref checker yet, might fallback to 'daily_digest' or need update
+                        # For now we'll assume the pref checker defaults to True or we check raw DB col if needed
+                        # But let's rely on the notification handler to double check or the new col.
+                        # Actually preference_checker needs update or we check manually here:
+                        pass
+                    
+                    # Manual check of the new preference column if checker not updated
+                    # (assuming user object has relationship to prefs, or we query prefs)
+                    if user.notification_preferences and \
+                       getattr(user.notification_preferences, 'email_portfolio_summary', True) is False:
+                        continue
+                    
+                    # 3. Get Wealth Data
+                    # Fetch latest 2 snapshots
+                    snapshots = WealthState.query.filter_by(user_id=user.id)\
+                        .order_by(WealthState.date.desc())\
+                        .limit(2).all()
+                    
+                    if not snapshots:
+                        continue
+                        
+                    latest = snapshots[0]
+                    
+                    # Logic: If we only have 1 snapshot, we can't show P&L (unless it's 0)
+                    if len(snapshots) < 2:
+                        continue
+                        
+                    prev = snapshots[1]
+                    
+                    daily_change = float(latest.total_portfolio_value or 0) - float(prev.total_portfolio_value or 0)
+                    percent_change = 0
+                    if float(prev.total_portfolio_value or 0) > 0:
+                        percent_change = (daily_change / float(prev.total_portfolio_value)) * 100
+                        
+                    # 4. Idempotency Check
+                    # Don't send if we already sent an email for THIS snapshot date
+                    already_sent = DailySummaryNotification.query.filter_by(
+                        user_id=user.id,
+                        date=latest.date
+                    ).first()
+                    
+                    if already_sent:
+                        continue
+                        
+                    # 5. Send Notification
+                    # Only send if there is significant value (user has money)
+                    if float(latest.total_portfolio_value or 0) > 0:
+                        send_daily_summary(
+                            user_id=user.id,
+                            portfolio_val=float(latest.total_portfolio_value),
+                            daily_change=daily_change,
+                            change_pct=percent_change
+                        )
+                        
+                        # 6. Mark as sent
+                        notif = DailySummaryNotification(
+                            user_id=user.id,
+                            date=latest.date
+                        )
+                        db.session.add(notif)
+                        emails_sent += 1
+                        
+                except Exception as u_err:
+                    logger.warning(f"Failed to process P&L summary for user {user.id}: {u_err}")
+            
+            db.session.commit()
+            logger.info(f"Daily P&L summaries sent: {emails_sent}")
+            return {'status': 'ok', 'sent': emails_sent}
+            
+    except Exception as e:
+        logger.error(f"Daily P&L job failed: {e}")
+        return {'status': 'error', 'error': str(e)}

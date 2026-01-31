@@ -162,6 +162,8 @@ def _register_notification_jobs():
     from .notification_jobs import (
         check_watchlist_alerts,
         send_daily_digest,
+        check_earnings_alerts,
+        send_daily_pl_summaries,
     )
     
     # Watchlist price alerts - every 60 seconds
@@ -173,6 +175,16 @@ def _register_notification_jobs():
         name='Check Watchlist Alerts',
         replace_existing=True
     )
+
+    # Earnings alerts - daily at 7 AM UTC
+    scheduler.add_job(
+        check_earnings_alerts,
+        'cron',
+        hour=7,
+        id='earnings_alerts',
+        name='Check Earnings Alerts (Holdings + Watchlist)',
+        replace_existing=True
+    )
     
     # Daily digest - 9 AM UTC
     scheduler.add_job(
@@ -181,6 +193,16 @@ def _register_notification_jobs():
         hour=9,
         id='daily_digest',
         name='Send Daily Digest',
+        replace_existing=True
+    )
+    
+    # Daily P&L Summary - 8 AM UTC (Yesterday's Performance)
+    scheduler.add_job(
+        send_daily_pl_summaries,
+        'cron',
+        hour=8,
+        id='daily_pl_summary',
+        name='Send Daily P&L Summary',
         replace_existing=True
     )
     

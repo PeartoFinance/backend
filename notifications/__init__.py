@@ -8,6 +8,8 @@ from .notification_handler import (
     send_price_alert,
     send_digest_email,
     send_earnings_reminder,
+    send_goal_reached_notification,
+    send_daily_summary,
 )
 from .push_service import (
     send_push_notification,
@@ -27,6 +29,8 @@ __all__ = [
     'send_price_alert',
     'send_digest_email',
     'send_earnings_reminder',
+    'send_goal_reached_notification',
+    'send_daily_summary',
     'send_push_notification',
     'send_bulk_push',
     'register_device',

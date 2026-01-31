@@ -263,3 +263,46 @@ def send_security_alert(
         message=message,
         channels=['email', 'push']  # Always send to both channels for security
     )
+
+
+def send_goal_reached_notification(user_id: int, target_amount: float):
+    """
+    Send celebration notification when a financial goal is reached.
+    """
+    title = "Financial Goal Reached! 🎉"
+    message = f"Incredible news! Your portfolio has hit your target of ${target_amount:,.2f}. You've successfully reached a major financial milestone!"
+    
+    # We use 'price_alerts' category for user preferences check (logic in should_send_notification)
+    return send_notification(
+        user_id=user_id,
+        notification_type='price_alerts', 
+        title=title,
+        message=message,
+        channels=['email', 'push']
+    )
+
+
+def send_daily_summary(user_id: int, portfolio_val: float, daily_change: float, change_pct: float):
+    """
+    Send daily P&L summary email/notification.
+    """
+    direction = "up" if daily_change >= 0 else "down"
+    icon = "📈" if daily_change >= 0 else "📉"
+    
+    title = f"{icon} Daily Portfolio Summary: {direction.title()} ${abs(daily_change):.2f}"
+    message = f"Your portfolio ended the day at ${portfolio_val:,.2f}, {direction} ${abs(daily_change):.2f} ({change_pct:+.2f}%)."
+    
+    # Use 'daily_digest' logic for now or mapped category
+    return send_notification(
+        user_id=user_id,
+        notification_type='daily_digest',
+        title=title,
+        message=message,
+        data={
+            'portfolio_val': portfolio_val,
+            'daily_change': daily_change,
+            'change_pct': change_pct,
+            'is_summary': True
+        },
+        channels=['email', 'push']
+    )
