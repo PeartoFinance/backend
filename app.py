@@ -150,6 +150,10 @@ app.register_blueprint(news_prefs_bp, url_prefix='/api/user/news-preferences')
 from routes.public_vendors import public_vendors_bp
 app.register_blueprint(public_vendors_bp)
 
+# Chart routes (drawings, templates, indicators, analysis)
+from routes.chart import chart_bp
+app.register_blueprint(chart_bp, url_prefix='/api/chart')
+
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
 app.register_blueprint(cron_bp, url_prefix='/api/cron')

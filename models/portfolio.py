@@ -306,7 +306,9 @@ class FinancialGoal(db.Model):
         nullable=True
     )
 
+
     # Goal definition
+    name = db.Column(db.String(255), nullable=True)  # Optional goal name
     target_amount = db.Column(db.Numeric(18, 2), nullable=False)
     start_amount = db.Column(db.Numeric(18, 2), nullable=False)
     target_date = db.Column(db.Date, nullable=False)
