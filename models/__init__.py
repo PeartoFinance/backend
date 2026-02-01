@@ -97,6 +97,14 @@ from .portfolio import (
     FinancialGoal,
 )
 
+# Chart models
+from .chart import (
+    ChartDrawing,
+    ChartTemplate,
+    ChartIndicatorSettings,
+    DetectedPattern,
+)
+
 # Settings/Config models
 from .settings import (
     Settings,
@@ -203,6 +211,8 @@ __all__ = [
     'UserPortfolio', 'PortfolioHolding', 'PortfolioTransaction', 'Watchlist',
     'WatchlistItem', 'UserWatchlist', 'PaperTradingAccount', 'PaperHolding',
     'PaperTransaction', 'WealthState', 'Transaction', 'Deposit', 'Withdrawal', 'Order', 'OrderItem','UserInvestmentGoal','FinancialGoal',
+    # Chart
+    'ChartDrawing', 'ChartTemplate', 'ChartIndicatorSettings', 'DetectedPattern',
     # Settings
     'Settings', 'Appearance', 'Country', 'APIRegistry', 'ToolSettings',
     'NavigationItem', 'Page', 'EmailTemplate', 'Pricing', 'Service', 'ServiceFeature', 'Product', 'MarketHours',

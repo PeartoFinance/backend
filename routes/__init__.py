@@ -22,6 +22,7 @@ from .education import education_bp
 from .navigation import navigation_bp
 from .news_preferences import news_prefs_bp
 from .public_vendors import public_vendors_bp
+from .chart import chart_bp
 
 __all__ = [
     'auth_bp',
@@ -45,4 +46,5 @@ __all__ = [
     'navigation_bp',
     'news_prefs_bp',
     'public_vendors_bp',
+    'chart_bp',
 ]

@@ -234,29 +234,36 @@ def get_portfolios():
         # Get holdings for this portfolio
         holdings = PortfolioHolding.query.filter_by(portfolio_id=p.id).all()
         
-        # Calculate totals from holdings
-        total_value = sum(float(h.current_value or 0) for h in holdings)
-        total_gain = sum(float(h.gain_loss or 0) for h in holdings)
-        total_cost = sum(float(h.shares or 0) * float(h.avg_buy_price or 0) for h in holdings)
+        # Convert holdings with live prices
+        holdings_data = [_holding_to_dict(h) for h in holdings]
+        
+        # Calculate totals from holdings with live prices
+        total_value = sum(h['totalValue'] for h in holdings_data)
+        total_cost = sum(h['shares'] * h['avgCost'] for h in holdings_data)
+        total_gain = sum(h['gain'] for h in holdings_data)
         total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
         
         result.append({
             'id': p.id,
             'name': p.name,
-            'totalValue': total_value,
-            'totalGain': total_gain,
+            'totalValue': round(total_value, 2),
+            'totalGain': round(total_gain, 2),
             'totalGainPercent': round(total_gain_percent, 2),
-            'holdings': [_holding_to_dict(h) for h in holdings]
+            'holdings': holdings_data
         })
     
     return jsonify(result)
 
 
 def _holding_to_dict(h):
-    """Convert holding to frontend-compatible dict"""
+    """Convert holding to frontend-compatible dict with live prices"""
     shares = float(h.shares or 0)
     avg_cost = float(h.avg_buy_price or 0)
-    current_price = float(h.current_price or 0)
+    
+    # Fetch live price from MarketData
+    market = MarketData.query.filter_by(symbol=h.symbol).first()
+    current_price = float(market.price if market and market.price else h.current_price or 0)
+    
     total_value = shares * current_price
     total_cost = shares * avg_cost
     gain = total_value - total_cost
@@ -265,7 +272,7 @@ def _holding_to_dict(h):
     return {
         'id': h.id,
         'symbol': h.symbol,
-        'name': h.symbol,  # Will be enriched from MarketData if needed
+        'name': market.name if market else h.symbol,  # Use name from MarketData
         'shares': shares,
         'avgCost': avg_cost,
         'currentPrice': current_price,
@@ -751,12 +758,18 @@ def get_financial_goals():
     # Get all holdings for this user
     all_holdings = PortfolioHolding.query.join(UserPortfolio).filter(UserPortfolio.user_id == request.user.id).all()
     
-    # Organize holdings by portfolio_id and calculate total
+    # Get all unique symbols and fetch their current prices from MarketData
+    symbols = list(set(h.symbol for h in all_holdings))
+    market_data = {m.symbol: float(m.price or 0) for m in MarketData.query.filter(MarketData.symbol.in_(symbols)).all()}
+    
+    # Organize holdings by portfolio_id and calculate total with live prices
     portfolio_totals = {}
     global_total = 0
     
     for h in all_holdings:
-        val = float(h.current_value or 0)
+        # Use live price from MarketData, fallback to stored current_price
+        current_price = market_data.get(h.symbol, float(h.current_price or 0))
+        val = float(h.shares or 0) * current_price
         global_total += val
         if h.portfolio_id not in portfolio_totals:
             portfolio_totals[h.portfolio_id] = 0
@@ -782,6 +795,7 @@ def get_financial_goals():
             
         result.append({
             'id': g.id,
+            'name': g.name,  # Include goal name
             'portfolio_id': g.portfolio_id,
             'target_amount': target,
             'start_amount': start,
@@ -815,6 +829,7 @@ def create_financial_goal():
     
     new_goal = FinancialGoal(
         user_id=request.user.id,
+        name=data.get('name'),  # Goal name
         portfolio_id=data.get('portfolio_id'),
         target_amount=data.get('target_amount'),
         start_amount=data.get('start_amount', current_value),
