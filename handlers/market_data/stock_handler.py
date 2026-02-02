@@ -331,12 +331,20 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     change = latest_price - prev_close
                     change_pct = (change / prev_close * 100) if prev_close != 0 else 0
                     
+                    # Handle volume safely (convert to 0 if NaN)
+                    vol_val = ticker_df['Volume'].iloc[-1]
+                    import pandas as pd
+                    if pd.isna(vol_val):
+                        volume = 0
+                    else:
+                        volume = int(vol_val)
+
                     quote = {
                         'symbol': symbol,
                         'price': latest_price,
                         'change': change,
                         'changePercent': change_pct,
-                        'volume': int(ticker_df['Volume'].iloc[-1]),
+                        'volume': volume,
                         'open': float(ticker_df['Open'].iloc[-1]),
                         'dayHigh': float(ticker_df['High'].max()),
                         'dayLow': float(ticker_df['Low'].min()),

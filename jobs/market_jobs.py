@@ -81,7 +81,7 @@ def update_all_crypto() -> Dict[str, Any]:
         app = get_app()
         with app.app_context():
             # Crypto is always GLOBAL
-            result = import_cryptos_to_db(TOP_CRYPTOS, country_code='GLOBAL')
+            result = import_cryptos_to_db(TOP_CRYPTOS)
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Crypto update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")

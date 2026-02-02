@@ -42,6 +42,9 @@ class User(db.Model):
     tax_residency = db.Column(db.String(100))
     language_pref = db.Column(db.String(10), default='en')
     country_code = db.Column(db.String(2), default='US')
+
+    # Relationships
+    notification_preferences = db.relationship('UserNotificationPref', backref='user', uselist=False, cascade='all, delete-orphan')
     
     def to_dict(self):
         return {
