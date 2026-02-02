@@ -226,21 +226,44 @@ def get_watchlists():
 @portfolio_bp.route('/list', methods=['GET'])
 @auth_required
 def get_portfolios():
-    """Get user's portfolios with holdings"""
+    """
+    Get user's portfolios with holdings.
+    Returns LIVE calculated P&L for accurate dashboard view.
+    """
     portfolios = UserPortfolio.query.filter_by(user_id=request.user.id).all()
+    
+    # 1. Gather all symbols across all portfolios to batch fetch
+    all_holdings = PortfolioHolding.query.join(UserPortfolio).filter(UserPortfolio.user_id == request.user.id).all()
+    symbols = set(h.symbol for h in all_holdings)
+    market_map = {}
+    
+    if symbols:
+        market_data = MarketData.query.filter(MarketData.symbol.in_(symbols)).all()
+        for md in market_data:
+            market_map[md.symbol] = {
+                'price': float(md.price) if md.price is not None else None,
+                'name': md.name
+            }
     
     result = []
     for p in portfolios:
         # Get holdings for this portfolio
-        holdings = PortfolioHolding.query.filter_by(portfolio_id=p.id).all()
+        p_holdings = [h for h in all_holdings if h.portfolio_id == p.id]
         
-        # Convert holdings with live prices
-        holdings_data = [_holding_to_dict(h) for h in holdings]
+        # Calculate totals using LIVE prices
+        total_value = 0
+        total_cost = 0
+        formatted_holdings = []
         
-        # Calculate totals from holdings with live prices
-        total_value = sum(h['totalValue'] for h in holdings_data)
-        total_cost = sum(h['shares'] * h['avgCost'] for h in holdings_data)
-        total_gain = sum(h['gain'] for h in holdings_data)
+        for h in p_holdings:
+            live_data = market_map.get(h.symbol)
+            h_dict = _holding_to_dict(h, live_data)
+            formatted_holdings.append(h_dict)
+            
+            total_value += h_dict['totalValue']
+            total_cost += (float(h.shares or 0) * float(h.avg_buy_price or 0))
+
+        total_gain = total_value - total_cost
         total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
         
         result.append({
@@ -249,20 +272,30 @@ def get_portfolios():
             'totalValue': round(total_value, 2),
             'totalGain': round(total_gain, 2),
             'totalGainPercent': round(total_gain_percent, 2),
-            'holdings': holdings_data
+            'holdings': formatted_holdings
         })
     
     return jsonify(result)
 
 
-def _holding_to_dict(h):
-    """Convert holding to frontend-compatible dict with live prices"""
+def _holding_to_dict(h, live_data=None):
+    """
+    Convert holding to frontend-compatible dict.
+    live_data: optional dict containing 'price' and 'name' for real-time updates.
+    """
     shares = float(h.shares or 0)
     avg_cost = float(h.avg_buy_price or 0)
     
-    # Fetch live price from MarketData
-    market = MarketData.query.filter_by(symbol=h.symbol).first()
-    current_price = float(market.price if market and market.price else h.current_price or 0)
+    # Default to stored values
+    current_price = float(h.current_price or 0)
+    name = h.symbol
+
+    # Override with live data if available
+    if live_data:
+        if live_data.get('price') is not None:
+            current_price = float(live_data['price'])
+        if live_data.get('name'):
+            name = live_data['name']
     
     total_value = shares * current_price
     total_cost = shares * avg_cost
@@ -272,7 +305,7 @@ def _holding_to_dict(h):
     return {
         'id': h.id,
         'symbol': h.symbol,
-        'name': market.name if market else h.symbol,  # Use name from MarketData
+        'name': name,
         'shares': shares,
         'avgCost': avg_cost,
         'currentPrice': current_price,
@@ -285,7 +318,10 @@ def _holding_to_dict(h):
 @portfolio_bp.route('/<portfolio_id>', methods=['GET'])
 @auth_required
 def get_portfolio(portfolio_id):
-    """Get portfolio by ID with holdings"""
+    """
+    Get portfolio by ID with holdings.
+    Calculates P&L using REAL-TIME data from MarketData table.
+    """
     portfolio = UserPortfolio.query.filter_by(id=portfolio_id, user_id=request.user.id).first()
     if not portfolio:
         return jsonify({'error': 'Portfolio not found'}), 404
@@ -293,19 +329,45 @@ def get_portfolio(portfolio_id):
     # Get holdings
     holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id).all()
     
-    # Calculate totals
-    total_value = sum(float(h.current_value or 0) for h in holdings)
-    total_gain = sum(float(h.gain_loss or 0) for h in holdings)
-    total_cost = sum(float(h.shares or 0) * float(h.avg_buy_price or 0) for h in holdings)
+    # 1. Fetch latest prices for all symbols in this portfolio
+    symbols = [h.symbol for h in holdings]
+    market_map = {}
+    
+    if symbols:
+        market_data = MarketData.query.filter(MarketData.symbol.in_(symbols)).all()
+        for md in market_data:
+            market_map[md.symbol] = {
+                'price': float(md.price) if md.price is not None else None,
+                'name': md.name
+            }
+
+    # 2. Calculate totals using LIVE prices
+    total_value = 0
+    total_cost = 0
+    formatted_holdings = []
+    
+    for h in holdings:
+        # Get live data or fallback to valid stored defaults
+        live_data = market_map.get(h.symbol)
+        
+        # Calculate individual holding stats
+        h_dict = _holding_to_dict(h, live_data)
+        formatted_holdings.append(h_dict)
+        
+        # Accumulate portfolio totals
+        total_value += h_dict['totalValue']
+        total_cost += (float(h.shares or 0) * float(h.avg_buy_price or 0))
+
+    total_gain = total_value - total_cost
     total_gain_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
     
     return jsonify({
         'id': portfolio.id,
         'name': portfolio.name,
-        'totalValue': total_value,
-        'totalGain': total_gain,
+        'totalValue': round(total_value, 2),
+        'totalGain': round(total_gain, 2),
         'totalGainPercent': round(total_gain_percent, 2),
-        'holdings': [_holding_to_dict(h) for h in holdings]
+        'holdings': formatted_holdings
     })
 
 
