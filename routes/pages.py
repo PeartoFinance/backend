@@ -17,9 +17,11 @@ def get_pages():
     Optional query params:
       - country: filter by country_code
       - status: default 'published'
+      - placement: filter by placement (header, sidebar, footer, resources)
     """
     country = request.args.get('country')
     status = request.args.get('status', 'published')
+    placement = request.args.get('placement')
 
     # header-driven country scoping: header overrides query param
     header_country = request.headers.get('X-User-Country')
@@ -30,15 +32,20 @@ def get_pages():
         # if explicit query param provided use it
         country_filter = Page.country_code.in_([country.strip().upper(), 'GLOBAL'])
     else:
-        # no header or query param -> default to GLOBAL only
-        country_filter = (Page.country_code == 'GLOBAL')
+        # no header or query param -> include all pages (for API flexibility)
+        country_filter = True
 
     query = Page.query
     if status:
         query = query.filter(Page.status == status)
-    query = query.filter(country_filter)
+    if country_filter is not True:
+        query = query.filter(country_filter)
+    
+    # Filter by placement if specified
+    if placement:
+        query = query.filter(Page.placement.contains(placement))
 
-    pages = query.order_by(Page.created_at.desc()).all()
+    pages = query.order_by(Page.sort_order.asc(), Page.created_at.desc()).all()
 
     return jsonify({
         'pages': [{
@@ -52,8 +59,37 @@ def get_pages():
             'status': p.status,
             'isHomepage': p.is_homepage,
             'countryCode': p.country_code,
+            'placement': p.placement,
+            'featuredImage': p.featured_image,
+            'sortOrder': p.sort_order,
             'createdAt': p.created_at.isoformat() if p.created_at else None,
         } for p in pages]
     })
 
+
+@pages_bp.route('/pages/<slug>', methods=['GET'])
+def get_page_by_slug(slug):
+    """Get a single page by slug"""
+    page = Page.query.filter_by(slug=slug, status='published').first()
+    
+    if not page:
+        return jsonify({'error': 'Page not found'}), 404
+    
+    return jsonify({
+        'page': {
+            'id': page.id,
+            'title': page.title,
+            'slug': page.slug,
+            'content': page.content,
+            'metaTitle': page.meta_title,
+            'metaDescription': page.meta_description,
+            'template': page.template,
+            'status': page.status,
+            'isHomepage': page.is_homepage,
+            'countryCode': page.country_code,
+            'placement': page.placement,
+            'featuredImage': page.featured_image,
+            'createdAt': page.created_at.isoformat() if page.created_at else None,
+        }
+    })
 

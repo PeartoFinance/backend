@@ -163,6 +163,10 @@ from routes.market_status import market_status_bp
 
 app.register_blueprint(market_status_bp, url_prefix='/api/market')
 
+# Live data routes (real-time quotes and intraday data)
+from routes.live import live_bp
+app.register_blueprint(live_bp, url_prefix='/api/live')
+
 # Admin Vendors
 from routes.admin.vendors import vendors_bp
 app.register_blueprint(vendors_bp, url_prefix='/api/admin')

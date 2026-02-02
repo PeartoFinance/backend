@@ -178,6 +178,12 @@ class Page(db.Model):
     status = db.Column(db.Enum('draft', 'published'), default='draft')
     is_homepage = db.Column(db.Boolean, default=False)
     country_code = db.Column(db.String(10))
+    # NEW: Placement options - where to display the page link
+    # Values: header, sidebar, footer, resources, none (multiple comma-separated)
+    placement = db.Column(db.String(100), default='none')
+    featured_image = db.Column(db.String(500))
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    sort_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

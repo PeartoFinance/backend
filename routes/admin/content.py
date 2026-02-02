@@ -4,6 +4,7 @@ CRUD for pages, posts, categories
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
+import uuid
 from ..decorators import admin_required
 from models import db, Page, Post, PostCategory
 
@@ -20,15 +21,23 @@ def get_pages():
         country = getattr(request, 'user_country', 'US')
         pages = Page.query.filter(
             (Page.country_code == country) | 
-            (Page.country_code == 'GLOBAL')
-        ).order_by(Page.created_at.desc()).all()
+            (Page.country_code == 'GLOBAL') |
+            (Page.country_code == None)
+        ).order_by(Page.sort_order.asc(), Page.created_at.desc()).all()
         return jsonify({
             'pages': [{
                 'id': p.id,
                 'title': p.title,
                 'slug': p.slug,
                 'content': p.content,
-                'is_published': p.is_published,
+                'meta_title': p.meta_title,
+                'meta_description': p.meta_description,
+                'template': p.template,
+                'status': p.status,
+                'placement': p.placement,
+                'featured_image': p.featured_image,
+                'sort_order': p.sort_order,
+                'country_code': p.country_code,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
             } for p in pages]
         })
@@ -43,12 +52,19 @@ def create_page():
     try:
         data = request.get_json()
         page = Page(
+            id=str(uuid.uuid4()),
             title=data.get('title'),
             slug=data.get('slug'),
             content=data.get('content'),
-            is_published=data.get('is_published', False),
+            meta_title=data.get('meta_title'),
+            meta_description=data.get('meta_description'),
+            template=data.get('template', 'default'),
+            status=data.get('status', 'draft'),
+            placement=data.get('placement', 'none'),
+            featured_image=data.get('featured_image'),
+            sort_order=data.get('sort_order', 0),
             created_at=datetime.utcnow(),
-            country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
+            country_code=data.get('country_code', getattr(request, 'user_country', 'GLOBAL'))
         )
         db.session.add(page)
         db.session.commit()
@@ -58,7 +74,34 @@ def create_page():
         return jsonify({'error': str(e)}), 500
 
 
-@content_bp.route('/pages/<int:page_id>', methods=['PUT'])
+@content_bp.route('/pages/<page_id>', methods=['GET'])
+@admin_required
+def get_page(page_id):
+    """Get single page"""
+    try:
+        page = Page.query.get_or_404(page_id)
+        return jsonify({
+            'page': {
+                'id': page.id,
+                'title': page.title,
+                'slug': page.slug,
+                'content': page.content,
+                'meta_title': page.meta_title,
+                'meta_description': page.meta_description,
+                'template': page.template,
+                'status': page.status,
+                'placement': page.placement,
+                'featured_image': page.featured_image,
+                'sort_order': page.sort_order,
+                'country_code': page.country_code,
+                'created_at': page.created_at.isoformat() if page.created_at else None,
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@content_bp.route('/pages/<page_id>', methods=['PUT'])
 @admin_required
 def update_page(page_id):
     """Update page"""
@@ -66,16 +109,11 @@ def update_page(page_id):
         page = Page.query.get_or_404(page_id)
         data = request.get_json()
         
-        if 'title' in data:
-            page.title = data['title']
-        if 'slug' in data:
-            page.slug = data['slug']
-        if 'content' in data:
-            page.content = data['content']
-        if 'is_published' in data:
-            page.is_published = data['is_published']
-        if 'country_code' in data:
-            page.country_code = data['country_code']
+        for field in ['title', 'slug', 'content', 'meta_title', 'meta_description', 
+                      'template', 'status', 'placement', 'featured_image', 
+                      'sort_order', 'country_code']:
+            if field in data:
+                setattr(page, field, data[field])
         
         page.updated_at = datetime.utcnow()
         db.session.commit()
@@ -85,7 +123,7 @@ def update_page(page_id):
         return jsonify({'error': str(e)}), 500
 
 
-@content_bp.route('/pages/<int:page_id>', methods=['DELETE'])
+@content_bp.route('/pages/<page_id>', methods=['DELETE'])
 @admin_required
 def delete_page(page_id):
     """Delete page"""
