@@ -194,7 +194,8 @@ def get_all_stocks():
     limit = min(int(request.args.get('limit', 50)), 100)
     header_country = request.headers.get('X-User-Country')
     if header_country is None:
-        md_filter = (MarketData.country_code == 'US')
+        # Default to GLOBAL/All similar to crypto if no country specified
+        md_filter = (MarketData.country_code == 'GLOBAL')
     else:
         hc = header_country.strip().upper()
         md_filter = (MarketData.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketData.country_code == hc)
@@ -306,3 +307,99 @@ def get_bulk_transactions():
     transactions = query.order_by(desc(BulkTransaction.transaction_date)).limit(limit).all()
     return jsonify([t.to_dict() for t in transactions])
 
+
+@market_bp.route('/sector-analysis', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
+def get_sector_analysis():
+    """
+    Get comprehensive sector analysis for market visualization.
+    Returns sector breakdown by turnover, volume, and transaction count.
+    """
+    from sqlalchemy import func
+    
+    header_country = request.headers.get('X-User-Country')
+    if header_country:
+        hc = header_country.strip().upper()
+        md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
+    else:
+        md_filter = (MarketData.country_code == 'GLOBAL')
+
+    # Get all stocks grouped by sector
+    stocks = MarketData.query.filter(
+        MarketData.asset_type == 'stock',
+        MarketData.sector.isnot(None),
+        MarketData.sector != '',
+        md_filter
+    ).all()
+
+    # Aggregate by sector
+    sector_data = {}
+    for stock in stocks:
+        sector = stock.sector or 'Others'
+        if sector not in sector_data:
+            sector_data[sector] = {
+                'sector': sector,
+                'turnover': 0,
+                'volume': 0,
+                'transactions': 0,  # count of stocks as proxy
+                'totalChange': 0,
+                'changeCount': 0,
+                'advancers': 0,
+                'decliners': 0,
+                'unchanged': 0
+            }
+        
+        # Calculate turnover (volume * price)
+        turnover = (stock.volume or 0) * (stock.price or 0)
+        sector_data[sector]['turnover'] += turnover
+        sector_data[sector]['volume'] += stock.volume or 0
+        sector_data[sector]['transactions'] += 1
+        
+        if stock.change_percent:
+            sector_data[sector]['totalChange'] += stock.change_percent
+            sector_data[sector]['changeCount'] += 1
+            
+            if stock.change_percent > 0:
+                sector_data[sector]['advancers'] += 1
+            elif stock.change_percent < 0:
+                sector_data[sector]['decliners'] += 1
+            else:
+                sector_data[sector]['unchanged'] += 1
+        else:
+            sector_data[sector]['unchanged'] += 1
+
+    # Calculate totals for percentages
+    total_turnover = sum(s['turnover'] for s in sector_data.values())
+    total_volume = sum(s['volume'] for s in sector_data.values())
+    total_transactions = sum(s['transactions'] for s in sector_data.values())
+
+    # Build response with percentages
+    sectors = []
+    for sector, data in sector_data.items():
+        avg_change = float(data['totalChange']) / float(data['changeCount']) if data['changeCount'] > 0 else 0.0
+        sectors.append({
+            'sector': sector,
+            'turnover': float(round(data['turnover'], 2)),
+            'turnoverPercent': float(round((data['turnover'] / total_turnover * 100) if total_turnover > 0 else 0, 2)),
+            'volume': int(data['volume']),
+            'volumePercent': float(round((data['volume'] / total_volume * 100) if total_volume > 0 else 0, 2)),
+            'transactions': int(data['transactions']),
+            'transactionsPercent': float(round((data['transactions'] / total_transactions * 100) if total_transactions > 0 else 0, 2)),
+            'avgChangePercent': float(round(avg_change, 2)),
+            'advancers': int(data['advancers']),
+            'decliners': int(data['decliners']),
+            'unchanged': int(data['unchanged'])
+        })
+
+    # Sort by turnover descending
+    sectors.sort(key=lambda x: x['turnover'], reverse=True)
+
+    return jsonify({
+        'sectors': sectors,
+        'totals': {
+            'turnover': round(total_turnover, 2),
+            'volume': total_volume,
+            'transactions': total_transactions,
+            'sectorCount': len(sectors)
+        }
+    })
