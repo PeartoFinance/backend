@@ -141,5 +141,6 @@ class SubscriptionManager:
             )
             db.session.add(sub)
             
-        db.session.commit()
+        # NOTE: We do NOT commit here anymore. 
+        # The caller (Route) must commit to ensure both Subscription + PaymentLog succeed together.
         return sub
