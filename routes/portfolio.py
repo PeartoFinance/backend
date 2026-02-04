@@ -10,6 +10,7 @@ from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding
 
 from services.portfolio_service import calculate_portfolio_health
 
+
 portfolio_bp = Blueprint('portfolio', __name__)
 
 

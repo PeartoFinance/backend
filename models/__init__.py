@@ -187,6 +187,14 @@ from .social import (
     CopyTradeExecution,
 )
 
+# Subscription models
+from .subscription import (
+    SubscriptionPlan,
+    SubscriptionCoupon,
+    UserSubscription,
+    PaymentTransaction,
+)
+
 # All models list for migrations
 __all__ = [
     'db',
@@ -230,5 +238,7 @@ __all__ = [
     'UserProfile', 'UserFollow', 'Conversation', 'ConversationParticipant', 'Message',
     'TradingIdea', 'IdeaLike', 'IdeaComment', 'DiscussionGroup', 'GroupMember', 'GroupPost',
     'Badge', 'UserBadge', 'CopyTradingLink', 'CopyTradeExecution',
+    # Subscription
+    'SubscriptionPlan', 'SubscriptionCoupon', 'UserSubscription', 'PaymentTransaction',
 ]
 
