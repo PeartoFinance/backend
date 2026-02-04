@@ -1,18 +1,23 @@
 """
 Background Job Scheduler
-Uses APScheduler for periodic background tasks
+Uses APScheduler for periodic background tasks.
+Supports standard parallel execution or sequential database-backed execution.
 """
 import os
 import logging
+import json
+import time
+from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
-from datetime import datetime
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
 scheduler = None
+_app = None
 
 # Job configuration from environment
 JOB_CONFIG = {
@@ -24,24 +29,34 @@ JOB_CONFIG = {
     'calendar_hour': int(os.getenv('JOB_CALENDAR_HOUR', 6)),  # 6 AM
 }
 
+# Cron mode: 'parallel' (standard) or 'sequential' (queue-based)
+CRON_MODE = os.getenv('CRON_MODE', 'parallel').lower()
+
 
 def init_scheduler(app=None):
     """
     Initialize the APScheduler with Flask app context.
     Call this after Flask app is created.
     """
-    global scheduler
+    global scheduler, _app
     
     if scheduler is not None:
         logger.warning("Scheduler already initialized")
         return scheduler
+        
+    if app:
+        _app = app
     
     jobstores = {
         'default': MemoryJobStore()
     }
     
+    # In sequential mode, we only need a few threads for the queue processor
+    # In parallel mode, we need more threads for concurrent jobs
+    pool_size = 5 if CRON_MODE == 'sequential' else 20
+    
     executors = {
-        'default': ThreadPoolExecutor(10),
+        'default': ThreadPoolExecutor(pool_size),
     }
     
     job_defaults = {
@@ -61,28 +76,216 @@ def init_scheduler(app=None):
     _register_market_jobs()
     _register_notification_jobs()
     
+    # Register queue processor if in sequential mode
+    if CRON_MODE == 'sequential':
+        _register_queue_processor(app)
+        logger.info("Scheduler initialized in SEQUENTIAL mode (database queue)")
+    else:
+        logger.info("Scheduler initialized in PARALLEL mode (standard)")
+    
     # Start scheduler
     scheduler.start()
-    logger.info("Background scheduler started")
     
     return scheduler
 
 
+def queue_job(func, job_name, *args, **kwargs):
+    """
+    Wrapper to either run job immediately or queue it based on CRON_MODE.
+    Usage: scheduler.add_job(lambda: queue_job(actual_func, 'job_name'), ...)
+    """
+    if CRON_MODE == 'sequential':
+        # Define inner logic to run within context
+        def _enqueue():
+            try:
+                from models.cron_job import CronJob, JobStatus
+                from models.base import db
+                
+                # Check if job is already pending to avoid duplicates
+                existing = CronJob.query.filter_by(
+                    job_name=job_name, 
+                    status=JobStatus.PENDING
+                ).first()
+                
+                if existing:
+                    logger.info(f"Job {job_name} already pending, skipping enqueue")
+                    return
+                    
+                job = CronJob(
+                    job_name=job_name,
+                    params=json.dumps({'args': args, 'kwargs': kwargs}) if args or kwargs else None,
+                    status=JobStatus.PENDING
+                )
+                db.session.add(job)
+                db.session.commit()
+                logger.info(f"Enqueued job: {job_name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to enqueue job {job_name}: {e}")
+        
+        # Check for application context
+        try:
+            # If we are in a request or app context, this works
+            if current_app:
+                _enqueue()
+        except RuntimeError:
+            # No application context (background thread), use stored app
+            if _app:
+                with _app.app_context():
+                    _enqueue()
+            else:
+                logger.error("Cannot enqueue job: No application context available and _app not set")
+
+    else:
+        # Run immediately (standard behavior)
+        logger.info(f"Running job immediately: {job_name}")
+        func(*args, **kwargs)
+
+
+def _register_queue_processor(app):
+    """Register the job that processes the queue sequentially"""
+    scheduler.add_job(
+        lambda: process_job_queue(app),
+        'interval',
+        seconds=30,  # Check queue every 30 seconds
+        id='process_job_queue',
+        name='Process Job Queue',
+        replace_existing=True
+    )
+
+
+def process_job_queue(app):
+    """
+    Worker function to process pending jobs one by one.
+    This runs in its own thread/process but executes jobs sequentially.
+    """
+    with app.app_context():
+        from models.cron_job import CronJob, JobStatus
+        from models.base import db
+        
+        # Get pending jobs ordered by creation time
+        # processing one at a time to ensure sequential execution
+        # We fetch one, execute, then fetch next to handle long-running jobs correctly
+        # But since valid execution context is needed, we do a loop here
+        
+        # Limit to processing for a max duration to avoid holding the thread too long
+        # or just process one batch. 
+        # Let's process until queue is empty or hitting a limit
+        
+        processed_count = 0
+        max_jobs_per_run = 5 
+        
+        while processed_count < max_jobs_per_run:
+            try:
+                # Lock the next job
+                job = CronJob.query.filter_by(status=JobStatus.PENDING)\
+                    .order_by(CronJob.created_at.asc())\
+                    .with_for_update()\
+                    .first()
+                
+                if not job:
+                    break
+                    
+                # Mark as processing
+                job.status = JobStatus.PROCESSING
+                job.started_at = datetime.utcnow()
+                db.session.commit()
+                
+                logger.info(f"Processing queued job: {job.job_name} (ID: {job.id})")
+                
+                # Execute the job
+                try:
+                     _execute_job_by_name(job.job_name, job.params)
+                     job.status = JobStatus.COMPLETED
+                     job.result = "Success"
+                except Exception as e:
+                    logger.error(f"Job {job.job_name} failed: {e}")
+                    job.status = JobStatus.FAILED
+                    job.error = str(e)
+                
+                job.completed_at = datetime.utcnow()
+                db.session.commit()
+                processed_count += 1
+                
+            except Exception as e:
+                logger.error(f"Error in queue processor: {e}")
+                db.session.rollback()
+                time.sleep(1) # Backoff
+                break
+
+
+def _execute_job_by_name(job_name, params_json):
+    """Resolves job string name to function and calls it"""
+    # Import all job modules
+    # Import all job modules
+    from .market_jobs import (
+        update_all_stocks, update_all_crypto, update_all_indices,
+        update_all_commodities, update_earnings_calendar, update_dividends,
+        update_business_profiles, update_financials, update_all_forex,
+        update_all_forecasts
+    )
+    from .notification_jobs import (
+        check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
+        send_daily_pl_summaries, check_financial_goals, process_news_notifications
+    )
+    from .system_jobs import snapshot_user_wealth, cleanup_deleted_accounts
+    from .news_jobs import import_all_news
+    from handlers.market_data.forecast_handler import sync_forecast_data
+    
+    # Map names to functions
+    # Using a mapping ensures safe execution of only allowed functions
+    job_map = {
+        'update_all_stocks': update_all_stocks,
+        'update_all_crypto': update_all_crypto,
+        'update_all_indices': update_all_indices,
+        'update_all_commodities': update_all_commodities,
+        'update_earnings_calendar': update_earnings_calendar,
+        'update_dividends': update_dividends,
+        'update_business_profiles': update_business_profiles,
+        'update_financials': update_financials,
+        'update_all_forex': update_all_forex,
+        'update_all_forecasts': update_all_forecasts,
+        
+        'check_watchlist_alerts': check_watchlist_alerts,
+        'send_daily_digest': send_daily_digest,
+        'check_earnings_alerts': check_earnings_alerts,
+        'send_daily_pl_summaries': send_daily_pl_summaries,
+        'check_financial_goals': check_financial_goals,
+        'process_news_notifications': process_news_notifications,
+        
+        'snapshot_user_wealth': snapshot_user_wealth,
+        'cleanup_deleted_accounts': cleanup_deleted_accounts,
+        'import_all_news': import_all_news,
+        'sync_forecast_data': sync_forecast_data
+    }
+    
+    func = job_map.get(job_name)
+    if not func:
+        raise ValueError(f"Unknown job function: {job_name}")
+        
+    args = []
+    kwargs = {}
+    if params_json:
+        params = json.loads(params_json)
+        args = params.get('args', [])
+        kwargs = params.get('kwargs', {})
+        
+    func(*args, **kwargs)
+
+
 def _register_market_jobs():
     """Register all market data update jobs"""
+    # We use lambda to defer execution to queue_job wrapper
+    
     from .market_jobs import (
-        update_all_stocks,
-        update_all_crypto,
-        update_all_indices,
-        update_all_commodities,
-        update_earnings_calendar,
-        update_dividends,
-        update_business_profiles,
+        update_all_stocks, update_all_crypto, update_all_indices,
+        update_all_commodities, update_earnings_calendar, update_dividends,
+        update_business_profiles
     )
     
-    # Stock updates - every 15 min (configurable)
+    # Stock updates
     scheduler.add_job(
-        update_all_stocks,
+        lambda: queue_job(update_all_stocks, 'update_all_stocks'),
         'interval',
         minutes=JOB_CONFIG['stocks_interval_minutes'],
         id='update_stocks',
@@ -90,9 +293,9 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Crypto updates - every 5 min (24/7)
+    # Crypto updates
     scheduler.add_job(
-        update_all_crypto,
+        lambda: queue_job(update_all_crypto, 'update_all_crypto'),
         'interval',
         minutes=JOB_CONFIG['crypto_interval_minutes'],
         id='update_crypto',
@@ -100,9 +303,9 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Index updates - every 5 min
+    # Index updates
     scheduler.add_job(
-        update_all_indices,
+        lambda: queue_job(update_all_indices, 'update_all_indices'),
         'interval',
         minutes=JOB_CONFIG['indices_interval_minutes'],
         id='update_indices',
@@ -110,9 +313,9 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Commodity updates - every 15 min
+    # Commodity updates
     scheduler.add_job(
-        update_all_commodities,
+        lambda: queue_job(update_all_commodities, 'update_all_commodities'),
         'interval',
         minutes=JOB_CONFIG['commodities_interval_minutes'],
         id='update_commodities',
@@ -120,9 +323,9 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Earnings calendar - daily at 6 AM UTC
+    # Earnings calendar
     scheduler.add_job(
-        update_earnings_calendar,
+        lambda: queue_job(update_earnings_calendar, 'update_earnings_calendar'),
         'cron',
         hour=JOB_CONFIG['calendar_hour'],
         id='update_earnings',
@@ -130,9 +333,9 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Dividends - daily at 6 AM UTC
+    # Dividends
     scheduler.add_job(
-        update_dividends,
+        lambda: queue_job(update_dividends, 'update_dividends'),
         'cron',
         hour=JOB_CONFIG['calendar_hour'],
         minute=30,
@@ -141,18 +344,16 @@ def _register_market_jobs():
         replace_existing=True
     )
     
-    # Business Profiles (Financials + Forecasts) - weekly on Sunday at 2 AM UTC
+    # Business Profiles
     scheduler.add_job(
-        update_business_profiles,
+        lambda: queue_job(update_business_profiles, 'update_business_profiles'),
         'cron',
         day_of_week='sun',
         hour=2,
         id='update_business_profiles',
-        name='Sync Business Profiles (Financials/Forecasts)',
+        name='Sync Business Profiles',
         replace_existing=True
     )
-    
-
     
     logger.info("Market jobs registered")
 
@@ -160,15 +361,14 @@ def _register_market_jobs():
 def _register_notification_jobs():
     """Register notification and alert jobs"""
     from .notification_jobs import (
-        check_watchlist_alerts,
-        send_daily_digest,
-        check_earnings_alerts,
-        send_daily_pl_summaries,
+        check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
+        send_daily_pl_summaries, process_news_notifications
     )
+    from .news_jobs import import_all_news
     
-    # Watchlist price alerts - every 60 seconds
+    # Watchlist price alerts
     scheduler.add_job(
-        check_watchlist_alerts,
+        lambda: queue_job(check_watchlist_alerts, 'check_watchlist_alerts'),
         'interval',
         seconds=JOB_CONFIG['watchlist_interval_seconds'],
         id='check_watchlist',
@@ -176,19 +376,19 @@ def _register_notification_jobs():
         replace_existing=True
     )
 
-    # Earnings alerts - daily at 7 AM UTC
+    # Earnings alerts
     scheduler.add_job(
-        check_earnings_alerts,
+        lambda: queue_job(check_earnings_alerts, 'check_earnings_alerts'),
         'cron',
         hour=7,
         id='earnings_alerts',
-        name='Check Earnings Alerts (Holdings + Watchlist)',
+        name='Check Earnings Alerts',
         replace_existing=True
     )
     
-    # Daily digest - 9 AM UTC
+    # Daily digest
     scheduler.add_job(
-        send_daily_digest,
+        lambda: queue_job(send_daily_digest, 'send_daily_digest'),
         'cron',
         hour=9,
         id='daily_digest',
@@ -196,9 +396,9 @@ def _register_notification_jobs():
         replace_existing=True
     )
     
-    # Daily P&L Summary - 8 AM UTC (Yesterday's Performance)
+    # Daily P&L Summary
     scheduler.add_job(
-        send_daily_pl_summaries,
+        lambda: queue_job(send_daily_pl_summaries, 'send_daily_pl_summaries'),
         'cron',
         hour=8,
         id='daily_pl_summary',
@@ -211,9 +411,9 @@ def _register_notification_jobs():
     # System maintenance jobs
     from .system_jobs import snapshot_user_wealth
     
-    # Wealth snapshot - daily at 11:59 PM UTC
+    # Wealth snapshot
     scheduler.add_job(
-        snapshot_user_wealth,
+        lambda: queue_job(snapshot_user_wealth, 'snapshot_user_wealth'),
         'cron',
         hour=23,
         minute=59,
@@ -222,8 +422,27 @@ def _register_notification_jobs():
         replace_existing=True
     )
     
+    # News import
+    scheduler.add_job(
+        lambda: queue_job(import_all_news, 'import_all_news'),
+        'interval',
+        minutes=30,
+        id='import_news',
+        name='Import News',
+        replace_existing=True
+    )
+    
+    # News notifications
+    scheduler.add_job(
+        lambda: queue_job(process_news_notifications, 'process_news_notifications'),
+        'interval',
+        minutes=60,
+        id='news_notifications',
+        name='News Notifications',
+        replace_existing=True
+    )
+    
     logger.info("System jobs registered")
-
 
 
 def get_job_status():
@@ -232,6 +451,7 @@ def get_job_status():
         return {'status': 'not_initialized', 'jobs': []}
     
     jobs = []
+    # Regular scheduled jobs
     for job in scheduler.get_jobs():
         jobs.append({
             'id': job.id,
@@ -241,9 +461,28 @@ def get_job_status():
             'pending': job.pending,
         })
     
+    # If in sequential mode, also fetch pending queue stats
+    queue_stats = {}
+    if CRON_MODE == 'sequential':
+        try:
+            from models.cron_job import CronJob, JobStatus
+            pending_count = CronJob.query.filter_by(status=JobStatus.PENDING).count()
+            processing_count = CronJob.query.filter_by(status=JobStatus.PROCESSING).count()
+            failed_count = CronJob.query.filter_by(status=JobStatus.FAILED).count()
+            
+            queue_stats = {
+                'pending_jobs': pending_count,
+                'processing_jobs': processing_count,
+                'failed_jobs_total': failed_count
+            }
+        except:
+            pass
+    
     return {
         'status': 'running' if scheduler.running else 'stopped',
+        'mode': CRON_MODE,
         'jobs': jobs,
+        'queue_stats': queue_stats,
         'timestamp': datetime.utcnow().isoformat()
     }
 
@@ -265,10 +504,13 @@ def resume_job(job_id: str):
 
 
 def run_job_now(job_id: str):
-    """Manually trigger a job to run immediately"""
+    """Manually trigger a job to run (or enqueue) immediately"""
     if scheduler:
         job = scheduler.get_job(job_id)
         if job:
+            # We EXECUTE the function directly here
+            # because the function itself (as registered) 
+            # already contains the queue_job wrapper logic if applicable
             job.func()
             return True
     return False

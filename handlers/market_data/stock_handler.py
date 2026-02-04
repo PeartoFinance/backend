@@ -334,6 +334,13 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     # Handle volume safely (convert to 0 if NaN)
                     vol_val = ticker_df['Volume'].iloc[-1]
                     import pandas as pd
+                    import numpy as np
+                    
+                    def sanitize_float(val, default=0.0):
+                        if pd.isna(val) or np.isnan(val):
+                            return default
+                        return float(val)
+
                     if pd.isna(vol_val):
                         volume = 0
                     else:
@@ -341,13 +348,13 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
 
                     quote = {
                         'symbol': symbol,
-                        'price': latest_price,
-                        'change': change,
-                        'changePercent': change_pct,
+                        'price': sanitize_float(latest_price),
+                        'change': sanitize_float(change),
+                        'changePercent': sanitize_float(change_pct),
                         'volume': volume,
-                        'open': float(ticker_df['Open'].iloc[-1]),
-                        'dayHigh': float(ticker_df['High'].max()),
-                        'dayLow': float(ticker_df['Low'].min()),
+                        'open': sanitize_float(ticker_df['Open'].iloc[-1]),
+                        'dayHigh': sanitize_float(ticker_df['High'].max()),
+                        'dayLow': sanitize_float(ticker_df['Low'].min()),
                     }
 
                 if not quote or not quote.get('price'):

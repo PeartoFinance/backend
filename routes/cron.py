@@ -1,10 +1,11 @@
 """
 Cron URL Routes
 External cURL-accessible endpoints for cPanel or external cron services
-These endpoints don't start the scheduler but run jobs directly
+These endpoints don't start the scheduler but run jobs directly or enqueue them
 """
 from flask import Blueprint, jsonify, request
 import os
+from jobs.scheduler import queue_job
 
 cron_bp = Blueprint('cron', __name__)
 
@@ -26,8 +27,8 @@ def cron_update_stocks():
     
     try:
         from jobs.market_jobs import update_all_stocks
-        result = update_all_stocks()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_stocks, 'update_all_stocks')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -40,8 +41,8 @@ def cron_update_crypto():
     
     try:
         from jobs.market_jobs import update_all_crypto
-        result = update_all_crypto()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_crypto, 'update_all_crypto')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -54,8 +55,8 @@ def cron_update_indices():
     
     try:
         from jobs.market_jobs import update_all_indices
-        result = update_all_indices()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_indices, 'update_all_indices')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -68,8 +69,8 @@ def cron_update_commodities():
     
     try:
         from jobs.market_jobs import update_all_commodities
-        result = update_all_commodities()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_commodities, 'update_all_commodities')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -82,8 +83,8 @@ def cron_update_earnings():
     
     try:
         from jobs.market_jobs import update_earnings_calendar
-        result = update_earnings_calendar()
-        return jsonify({'ok': True, **result})
+        queue_job(update_earnings_calendar, 'update_earnings_calendar')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -96,8 +97,8 @@ def cron_update_dividends():
     
     try:
         from jobs.market_jobs import update_dividends
-        result = update_dividends()
-        return jsonify({'ok': True, **result})
+        queue_job(update_dividends, 'update_dividends')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -110,8 +111,8 @@ def cron_check_watchlist():
     
     try:
         from jobs.notification_jobs import check_watchlist_alerts
-        result = check_watchlist_alerts()
-        return jsonify({'ok': True, **result})
+        queue_job(check_watchlist_alerts, 'check_watchlist_alerts')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -127,8 +128,8 @@ def cron_check_earnings():
     
     try:
         from jobs.notification_jobs import check_earnings_alerts
-        result = check_earnings_alerts()
-        return jsonify({'ok': True, **result})
+        queue_job(check_earnings_alerts, 'check_earnings_alerts')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -143,8 +144,8 @@ def cron_daily_pl_summary():
     
     try:
         from jobs.notification_jobs import send_daily_pl_summaries
-        result = send_daily_pl_summaries()
-        return jsonify({'ok': True, **result})
+        queue_job(send_daily_pl_summaries, 'send_daily_pl_summaries')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -157,8 +158,8 @@ def cron_daily_digest():
     
     try:
         from jobs.notification_jobs import send_daily_digest
-        result = send_daily_digest()
-        return jsonify({'ok': True, **result})
+        queue_job(send_daily_digest, 'send_daily_digest')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -182,15 +183,15 @@ def cron_all_market():
             update_all_forex,
         )
         
-        results = {
-            'stocks': update_all_stocks(),
-            'crypto': update_all_crypto(),
-            'indices': update_all_indices(),
-            'commodities': update_all_commodities(),
-            'business_profiles': update_business_profiles(),
-            'forex': update_all_forex(),
-        }
-        return jsonify({'ok': True, 'results': results})
+        # Enqueue individual jobs so they run sequentially in the worker
+        queue_job(update_all_stocks, 'update_all_stocks')
+        queue_job(update_all_crypto, 'update_all_crypto')
+        queue_job(update_all_indices, 'update_all_indices')
+        queue_job(update_all_commodities, 'update_all_commodities')
+        queue_job(update_business_profiles, 'update_business_profiles')
+        queue_job(update_all_forex, 'update_all_forex')
+        
+        return jsonify({'ok': True, 'message': 'All market jobs triggered/queued'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -203,8 +204,8 @@ def cron_update_business_profiles():
     
     try:
         from jobs.market_jobs import update_business_profiles
-        result = update_business_profiles()
-        return jsonify({'ok': True, **result})
+        queue_job(update_business_profiles, 'update_business_profiles')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -220,8 +221,8 @@ def cron_cleanup_accounts():
 
     try:
         from jobs.system_jobs import cleanup_deleted_accounts
-        cleanup_deleted_accounts()
-        return jsonify({'ok': True, 'message': 'Cleanup completed successfully'})
+        queue_job(cleanup_deleted_accounts, 'cleanup_deleted_accounts')
+        return jsonify({'ok': True, 'message': 'Cleanup triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -237,8 +238,8 @@ def cron_update_financials():
 
     try:
         from jobs.market_jobs import update_financials
-        result = update_financials()
-        return jsonify({'ok': True, **result})
+        queue_job(update_financials, 'update_financials')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -246,7 +247,10 @@ def cron_update_financials():
 @cron_bp.route('/forecast', methods=['GET', 'POST'])
 def cron_update_forecast():
     """
-    Sync analyst forecast data (price targets, earnings estimates, recommendation trends).
+    Sync analyst forecast data. This one is tricky because it takes params.
+    TODO: Support params in CronJob model if needed. For now, running directly for parameterized calls?
+    Wait, the user wants ALL jobs wrapped. But parameterized calls are usually one-off.
+    Let's run it directly if it has params, but bulk updates can be queued.
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -257,16 +261,23 @@ def cron_update_forecast():
 
         symbol = request.args.get('symbol')
         if symbol:
-            result = sync_forecast_data(symbol.upper())
-            return jsonify({'ok': True, 'symbol': symbol, 'result': result})
+            # Interactive: Enqueue specific symbol update for faster response (but still async)
+            # OR run effectively immediately if user expects result.
+            # User wants "cron scheduler system", which implies queuing.
+            # But returning result immediately is nice. 
+            # However, to be consistent with "all api cron routes use cron jobs scheduling", 
+            # we should queue it.
+            # But wait, the route returns "result". Queuing returns "queued".
+            # The user provided checking link for "all-market".
+            # Let's queue it to be safe.
+            queue_job(sync_forecast_data, 'sync_forecast_data', symbol.upper())
+            return jsonify({'ok': True, 'symbol': symbol, 'message': 'Job triggered'})
 
-        stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all()
-        results = []
-        for stock in stocks:
-            result = sync_forecast_data(stock.symbol)
-            results.append({'symbol': stock.symbol, 'status': result.get('status')})
+        # Bulk update - Queue it!
+        from jobs.market_jobs import update_all_forecasts
+        queue_job(update_all_forecasts, 'update_all_forecasts')
 
-        return jsonify({'ok': True, 'synced': len(results), 'results': results})
+        return jsonify({'ok': True, 'message': 'Forecast update job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -282,8 +293,8 @@ def cron_import_news():
 
     try:
         from jobs.news_jobs import import_all_news
-        result = import_all_news()
-        return jsonify(result)
+        queue_job(import_all_news, 'import_all_news')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -298,8 +309,8 @@ def cron_import_stock_profiles():
         
     try:
         from jobs.market_jobs import update_all_stocks
-        result = update_all_stocks()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_stocks, 'update_all_stocks')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -314,8 +325,8 @@ def cron_import_biz_profiles():
         
     try:
         from jobs.market_jobs import update_business_profiles
-        result = update_business_profiles()
-        return jsonify({'ok': True, **result})
+        queue_job(update_business_profiles, 'update_business_profiles')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -332,8 +343,8 @@ def cron_news_notifications():
     
     try:
         from jobs.notification_jobs import process_news_notifications
-        result = process_news_notifications()
-        return jsonify({'ok': result['success'], **result}), 200
+        queue_job(process_news_notifications, 'process_news_notifications')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e), 'ok': False}), 500
 
@@ -346,8 +357,8 @@ def cron_update_forex():
     
     try:
         from jobs.market_jobs import update_all_forex
-        result = update_all_forex()
-        return jsonify({'ok': True, **result})
+        queue_job(update_all_forex, 'update_all_forex')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -363,8 +374,8 @@ def cron_wealth_snapshot():
     
     try:
         from jobs.system_jobs import snapshot_user_wealth
-        result = snapshot_user_wealth()
-        return jsonify({'ok': True, **result})
+        queue_job(snapshot_user_wealth, 'snapshot_user_wealth')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -380,7 +391,7 @@ def cron_check_goals():
     
     try:
         from jobs.notification_jobs import check_financial_goals
-        result = check_financial_goals()
-        return jsonify({'ok': True, **result})
+        queue_job(check_financial_goals, 'check_financial_goals')
+        return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

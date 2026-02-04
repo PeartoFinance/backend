@@ -320,3 +320,55 @@ def update_all_forex() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Forex update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+
+
+def update_all_forecasts() -> Dict[str, Any]:
+    """
+    Update analyst forecasts for all listed stocks.
+    """
+    logger.info("Starting forecasts update job")
+    start_time = datetime.utcnow()
+    
+    try:
+        from models import MarketData
+        from handlers.market_data.forecast_handler import sync_forecast_data
+        
+        app = get_app()
+        with app.app_context():
+            # Original route logic limited to 50, keeping that for now or removing limit? 
+            # Route said: stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all()
+            # Let's keep consistency but maybe we should update ALL eventually.
+            listed_stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all() 
+            symbols = [s.symbol for s in listed_stocks]
+            
+            if not symbols:
+                logger.info("No stocks to update forecasts")
+                return {'status': 'ok', 'updated': 0}
+            
+            success_count = 0
+            error_count = 0
+            
+            for symbol in symbols:
+                try:
+                    result = sync_forecast_data(symbol)
+                    if result.get('status') == 'success':
+                        success_count += 1
+                    else:
+                        error_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to sync forecast for {symbol}: {e}")
+                    error_count += 1
+            
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"Forecasts update complete: {success_count} synced, {error_count} errors in {elapsed:.1f}s")
+            
+            return {
+                'status': 'ok',
+                'synced': success_count,
+                'errors': error_count,
+                'elapsed_seconds': elapsed
+            }
+    except Exception as e:
+        logger.error(f"Forecasts update job failed: {e}")
+        return {'status': 'error', 'error': str(e)}
+

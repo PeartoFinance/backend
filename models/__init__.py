@@ -203,10 +203,12 @@ __all__ = [
     'User', 'PasswordResetToken', 'UserSession', 'UserDevice', 'UserActivity',
     'UserAlert', 'UserNotificationPref', 'UserDashboardConfig', 'UserDocument',
     'UserSavedTerm', 'UserEconomicEvent', 'LoginEvent', 'Role', 'AdminUser','NewsPreference', 'NewsNotification','FinancialGoalNotification', 'DailySummaryNotification',
+    # Cron
+    'CronJob',
     # Market
     'MarketData', 'MarketIndices', 'MarketCache', 'MarketSentiment',
     'CryptoMarketData', 'CommodityData', 'EconomicEvent', 'StockOffer',
-    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation', 
+    'StockPriceHistory', 'EarningsCalendar', 'AnalystRecommendation',
     'EarningsEstimate', 'RecommendationHistory', 'StockSplit',
     'Dividend', 'BulkTransaction', 'CompanyFinancials', 'MarketIssue',
     # Article
