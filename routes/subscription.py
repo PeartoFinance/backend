@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from routes.decorators import auth_required, admin_required
-from models.subscription import SubscriptionPlan, SubscriptionCoupon, PaymentTransaction
+from models.subscription import SubscriptionPlan, SubscriptionCoupon, PaymentTransaction, UserSubscription
 from models import db
 from services.subscription.manager import SubscriptionManager
 from services.subscription.gateways import get_payment_gateway
