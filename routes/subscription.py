@@ -110,7 +110,16 @@ def capture():
     if not order_id or not plan_id:
         return jsonify({'error': 'order_id and plan_id are required'}), 400
         
-    # 1. Finalize payment on gateway
+    # 1. IDEMPOTENCY CHECK: Prevent duplicate processing of the same order
+    existing_tx = PaymentTransaction.query.filter_by(gateway_transaction_id=order_id).first()
+    if existing_tx:
+        return jsonify({
+            'success': True, 
+            'message': 'Order already processed.',
+            'plan': existing_tx.subscription.plan.name if existing_tx.subscription else "Active"
+        }), 200
+
+    # 2. Finalize payment on gateway
     try:
         gateway = get_payment_gateway()
     except Exception as e:
@@ -121,35 +130,46 @@ def capture():
     if error:
         return jsonify({'error': 'Capture failed', 'details': error}), 400
         
-    # 2. Activate Subscription in DB
-    gateway_name = getattr(gateway, '__class__', {}).__name__.replace('Gateway', '').lower()
-    sub = SubscriptionManager.activate_subscription(
-        user_id=user.id,
-        plan_id=plan_id,
-        gateway=gateway_name,
-        external_id=capture_result.get('transaction_id')
-    )
-    
-    # 3. Log the Transaction (Audit)
-    transaction = PaymentTransaction(
-        user_id=user.id,
-        subscription_id=sub.id,
-        amount=capture_result['amount'],
-        currency='USD', # Should ideally be dynamic
-        status='succeeded',
-        gateway=gateway_name,
-        gateway_transaction_id=capture_result['transaction_id'],
-        description=f"Initial Purchase: {sub.plan.name}"
-    )
-    db.session.add(transaction)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Subscription activated successfully!',
-        'plan': sub.plan.name,
-        'expiry': sub.current_period_end.isoformat()
-    })
+    # 3. ATOMIC DATABASE TRANSACTION
+    # We wrap both the subscription update and the transaction log in one try/except block
+    try:
+        gateway_name = getattr(gateway, '__class__', {}).__name__.replace('Gateway', '').lower()
+        
+        # This call now only adds to session, it does NOT commit
+        sub = SubscriptionManager.activate_subscription(
+            user_id=user.id,
+            plan_id=plan_id,
+            gateway=gateway_name,
+            external_id=capture_result.get('transaction_id')
+        )
+        
+        # Log the Transaction (Audit)
+        transaction = PaymentTransaction(
+            user_id=user.id,
+            subscription_id=sub.id,
+            amount=capture_result['amount'],
+            currency='USD', 
+            status='succeeded',
+            gateway=gateway_name,
+            gateway_transaction_id=order_id, # Link to the original Order ID for idempotency
+            description=f"Initial Purchase: {sub.plan.name}"
+        )
+        db.session.add(transaction)
+        
+        # ONE SINGLE COMMIT for everything
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Subscription activated successfully!',
+            'plan': sub.plan.name,
+            'expiry': sub.current_period_end.isoformat()
+        })
+
+    except Exception as e:
+        db.session.rollback() # Undo everything if even one part fails
+        print(f"[Subscription ERROR] Atomic capture failed: {e}")
+        return jsonify({'error': 'Internal system error during activation', 'message': str(e)}), 500
 
 # ==========================================================
 # ADMIN SUB-ROUTES (Subscription Management)
