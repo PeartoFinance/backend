@@ -195,6 +195,9 @@ from .subscription import (
     PaymentTransaction,
 )
 
+# Feature Usage tracking
+from .feature_usage import UserFeatureUsage
+
 # All models list for migrations
 __all__ = [
     'db',
@@ -242,5 +245,7 @@ __all__ = [
     'Badge', 'UserBadge', 'CopyTradingLink', 'CopyTradeExecution',
     # Subscription
     'SubscriptionPlan', 'SubscriptionCoupon', 'UserSubscription', 'PaymentTransaction',
+    # Feature Usage
+    'UserFeatureUsage',
 ]
 

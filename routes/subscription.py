@@ -4,7 +4,7 @@ from models.subscription import SubscriptionPlan, SubscriptionCoupon, PaymentTra
 from models import db
 from services.subscription.manager import SubscriptionManager
 from services.subscription.gateways import get_payment_gateway
-from services.subscription.constants import FeatureKeys
+from services.subscription.constants import FeatureKeys, UsageLimits
 
 # ==========================================================
 # SUBSCRIPTION ROUTES
@@ -159,12 +159,13 @@ def capture():
 @admin_required
 def admin_list_features():
     """
-    Returns a list of all feature keys the Admin can use in Plan JSON.
+    Returns a list of all feature keys AND usage limit keys.
     This powers the checklist/dropdown in the Admin Dashboard.
     """
     return jsonify({
         'features': FeatureKeys.get_all(),
-        'description': 'Use these keys in the plan feature JSON to unlock specific routes.'
+        'limits': UsageLimits.get_limit_keys(),
+        'description': 'Use features for toggles and limits for numeric quotas.'
     })
 
 @subscription_bp.route('/admin/plans', methods=['POST'])

@@ -3,7 +3,7 @@ Public Navigation Routes
 Serves navigation menu items to frontend
 """
 from flask import Blueprint, jsonify, request
-from models import NavigationItem
+from models import NavigationItem, Settings
 
 navigation_bp = Blueprint('navigation', __name__)
 
@@ -43,3 +43,36 @@ def get_public_navigation():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@navigation_bp.route('/feature-flags', methods=['GET'])
+def get_public_feature_flags():
+    """
+    Get public feature flags for frontend.
+    Used to control AI widgets visibility, maintenance mode, etc.
+    No authentication required.
+    """
+    try:
+        # Default feature flags
+        flags = {
+            'ai_widgets_enabled': True,      # Show AI widgets on pages
+            'ai_analysis_enabled': True,     # Show AI analysis panels
+            'maintenance_mode': False,       # Site maintenance mode
+        }
+        
+        # Load actual values from settings table
+        settings = Settings.query.filter(
+            Settings.category == 'feature_flags',
+            Settings.is_public == True
+        ).all()
+        
+        for s in settings:
+            if s.type == 'boolean':
+                flags[s.key] = s.value == 'true'
+            else:
+                flags[s.key] = s.value
+        
+        return jsonify(flags)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+

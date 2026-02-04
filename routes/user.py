@@ -405,3 +405,157 @@ def get_net_worth():
         'netWorthChangePercent': round(change_percent, 2),
         'portfolioCount': len(portfolios)
     })
+
+
+# ==========================================================
+# SUBSCRIPTION & FEATURE USAGE ENDPOINTS
+# Purpose: Power the frontend feature gating system
+# ==========================================================
+
+@user_bp.route('/subscription', methods=['GET'])
+def get_user_subscription():
+    """
+    Returns the current user's subscription status and feature usage.
+    This powers the frontend's feature gating system.
+    """
+    from models.subscription import UserSubscription
+    from models.feature_usage import UserFeatureUsage
+    from services.subscription.constants import UsageLimits
+    
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    user_id = user.id
+    
+    # Get user's subscription
+    sub = UserSubscription.query.filter(
+        UserSubscription.user_id == user_id, 
+        UserSubscription.status.in_(['active', 'trialing'])
+    ).first()
+    
+    if not sub or not sub.plan:
+        # No subscription = Free tier defaults
+        return jsonify({
+            'plan_name': 'Free',
+            'status': 'active',
+            'expires_at': None,
+            'features': {
+                'portfolio_tracking': True,
+                'real_time_data': True,
+                'advanced_charts': False,
+                'ai_insights': False,
+                'download_reports': False,
+                'unlimited_alerts': False,
+                'priority_support': False,
+            },
+            'usage': _get_usage_for_plan(user_id, UsageLimits.FREE_DEFAULTS)
+        })
+    
+    plan = sub.plan
+    features = plan.features or {}
+    
+    # Extract boolean features and numeric limits separately
+    boolean_features = {k: v for k, v in features.items() if isinstance(v, bool)}
+    limit_features = {k: v for k, v in features.items() if isinstance(v, (int, float))}
+    
+    return jsonify({
+        'plan_name': plan.name,
+        'status': sub.status,
+        'expires_at': sub.current_period_end.isoformat() if sub.current_period_end else None,
+        'features': boolean_features,
+        'usage': _get_usage_for_plan(user_id, limit_features)
+    })
+
+
+def _get_usage_for_plan(user_id: int, limits: dict) -> dict:
+    """Build usage response with current counts and remaining."""
+    from models.feature_usage import UserFeatureUsage
+    from services.subscription.constants import UsageLimits
+    
+    usage_response = {}
+    
+    for key, limit_value in limits.items():
+        if not key.endswith('_limit'):
+            continue
+        
+        usage = UserFeatureUsage.get_or_create(user_id, key)
+        period = UsageLimits.PERIODS.get(key, 'daily')
+        usage.reset_if_needed(period)
+        
+        if limit_value == -1:
+            remaining = -1
+        else:
+            remaining = max(0, limit_value - usage.usage_count)
+        
+        usage_response[key] = {
+            'limit': limit_value,
+            'used': usage.usage_count,
+            'remaining': remaining,
+            'period': period,
+        }
+    
+    return usage_response
+
+
+@user_bp.route('/usage/<feature_key>', methods=['POST'])
+def track_feature_usage(feature_key: str):
+    """
+    Increment usage for a feature and return updated counts.
+    Called by frontend before performing a limited action.
+    """
+    from models.subscription import UserSubscription
+    from models.feature_usage import UserFeatureUsage
+    from services.subscription.constants import UsageLimits
+    
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    user_id = user.id
+    
+    # Get user's subscription to find their limit
+    sub = UserSubscription.query.filter(
+        UserSubscription.user_id == user_id, 
+        UserSubscription.status.in_(['active', 'trialing'])
+    ).first()
+    
+    if sub and sub.plan and sub.plan.features:
+        limit_value = sub.plan.features.get(feature_key, 0)
+    else:
+        limit_value = UsageLimits.FREE_DEFAULTS.get(feature_key, 0)
+    
+    # -1 means unlimited
+    if limit_value == -1:
+        return jsonify({
+            'allowed': True,
+            'remaining': -1,
+            'message': 'Unlimited access'
+        })
+    
+    usage = UserFeatureUsage.get_or_create(user_id, feature_key)
+    period = UsageLimits.PERIODS.get(feature_key, 'daily')
+    usage.reset_if_needed(period)
+    
+    # Check if limit exceeded
+    if usage.usage_count >= limit_value:
+        return jsonify({
+            'allowed': False,
+            'remaining': 0,
+            'limit': limit_value,
+            'message': f'You have reached your {period} limit. Upgrade to Pro for unlimited access.',
+            'period': period,
+        }), 429
+    
+    # Increment usage
+    new_count = usage.increment()
+    remaining = max(0, limit_value - new_count)
+    
+    return jsonify({
+        'allowed': True,
+        'remaining': remaining,
+        'used': new_count,
+        'limit': limit_value,
+        'period': period,
+    })
+

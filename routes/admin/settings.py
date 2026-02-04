@@ -139,3 +139,68 @@ def update_appearance(appearance_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ============ FEATURE FLAGS (Admin Toggles) ============
+
+@settings_bp.route('/feature-flags', methods=['GET'])
+@admin_required
+def get_feature_flags():
+    """Get all admin-controlled feature flags"""
+    try:
+        # Define known feature flags with defaults
+        flags = {
+            'ai_widgets_enabled': True,
+            'ai_analysis_enabled': True,
+            'maintenance_mode': False,
+        }
+        
+        # Load actual values from settings table
+        settings = Settings.query.filter(
+            Settings.category == 'feature_flags'
+        ).all()
+        
+        for s in settings:
+            if s.type == 'boolean':
+                flags[s.key] = s.value == 'true'
+            else:
+                flags[s.key] = s.value
+        
+        return jsonify({'flags': flags})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/feature-flags/<flag_key>', methods=['PUT'])
+@admin_required
+def update_feature_flag(flag_key):
+    """Update a feature flag (creates if doesn't exist)"""
+    try:
+        import uuid
+        data = request.get_json()
+        value = data.get('value')
+        
+        setting = Settings.query.filter_by(key=flag_key, category='feature_flags').first()
+        
+        if not setting:
+            # Create new setting
+            setting = Settings(
+                id=str(uuid.uuid4()),
+                key=flag_key,
+                value=str(value).lower() if isinstance(value, bool) else str(value),
+                type='boolean' if isinstance(value, bool) else 'string',
+                category='feature_flags',
+                description=f'Feature flag: {flag_key}',
+                is_public=True,
+                country_code='GLOBAL'
+            )
+            db.session.add(setting)
+        else:
+            setting.value = str(value).lower() if isinstance(value, bool) else str(value)
+        
+        db.session.commit()
+        return jsonify({'ok': True, 'key': flag_key, 'value': value})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
