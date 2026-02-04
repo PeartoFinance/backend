@@ -170,6 +170,17 @@ def signup():
     db.session.add(profile)
     db.session.commit()
     
+    # NEW: Automatically grant 'Free' subscription (if plan exists)
+    try:
+        from models.subscription import SubscriptionPlan
+        from services.subscription.manager import SubscriptionManager
+        free_plan = SubscriptionPlan.query.filter_by(name='Free', is_active=True).first()
+        if free_plan:
+            SubscriptionManager.activate_subscription(user.id, free_plan.id, gateway='system')
+            print(f"[Subscription] Free plan auto-assigned to {email}")
+    except Exception as e:
+        print(f"[Subscription] Auto-assignment failed: {e}")
+    
     # Track signup activity and send welcome email
     try:
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
@@ -353,6 +364,17 @@ def google_signin():
         )
         db.session.add(profile)
         db.session.commit()
+        
+        # NEW: Automatically grant 'Free' subscription (if plan exists) for Google Signup
+        try:
+            from models.subscription import SubscriptionPlan
+            from services.subscription.manager import SubscriptionManager
+            free_plan = SubscriptionPlan.query.filter_by(name='Free', is_active=True).first()
+            if free_plan:
+                SubscriptionManager.activate_subscription(user.id, free_plan.id, gateway='system')
+                print(f"[Subscription] Free plan auto-assigned to {email}")
+        except Exception as e:
+            print(f"[Subscription] Auto-assignment failed: {e}")
 
         
                 
