@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, asc
 from models import (
     db, MarketData, MarketIndices, CommodityData, StockOffer,
-    Dividend, BulkTransaction
+    Dividend, BulkTransaction, ForexRate
 )
 from handlers.market_data.calendar_handler import get_economic_events
 from handlers.market_data.forex_handler import get_forex_history
@@ -132,6 +132,14 @@ def get_indices():
 
     indices = query.all()
     return jsonify([idx.to_dict() for idx in indices])
+
+
+@market_bp.route('/forex', methods=['GET'])
+def get_forex_metrics():
+    """Get all forex rates"""
+    rates = ForexRate.query.all()
+    # If no rates found, return empty list instead of 404
+    return jsonify([r.to_dict() for r in rates])
 
 
 @market_bp.route('/commodities', methods=['GET'])
@@ -403,3 +411,32 @@ def get_sector_analysis():
             'sectorCount': len(sectors)
         }
     })
+
+
+
+@market_bp.route('/technical-analysis/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
+def get_technical_analysis_route(symbol):
+    """
+    Get technical analysis summary and indicators for a symbol.
+    """
+    try:
+        from services.technical_analysis import analyze_stock
+        from handlers.market_data.stock_handler import get_stock_history
+        
+        # Fetch 6 months of daily data to ensure enough points for MA200
+        history = get_stock_history(symbol, period='6mo', interval='1d')
+        
+        # get_stock_history returns a list of dicts: {'date': ..., 'close': ...}
+        if not history:
+             return jsonify({
+                'symbol': symbol, 
+                'status': 'error', 
+                'message': 'No historical data available'
+            }), 404
+            
+        analysis = analyze_stock(symbol, history)
+        return jsonify(analysis)
+        
+    except Exception as e:
+         return jsonify({'error': str(e)}), 500
