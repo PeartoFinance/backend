@@ -395,3 +395,20 @@ def cron_check_goals():
         return jsonify({'ok': True, 'message': 'Job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/update-ytd', methods=['GET', 'POST'])
+def cron_update_ytd():
+    """
+    Trigger YTD calculation via cPanel cron URL.
+    cURL: curl -X POST http://localhost:5000/api/cron/update-ytd?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.market_jobs import update_ytd_returns
+        queue_job(update_ytd_returns, 'update_ytd_returns')
+        return jsonify({'ok': True, 'message': 'YTD update job triggered'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

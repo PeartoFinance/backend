@@ -372,3 +372,62 @@ def update_all_forecasts() -> Dict[str, Any]:
         logger.error(f"Forecasts update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
 
+
+def update_ytd_returns() -> Dict[str, Any]:
+    """
+    Calculate and update YTD (Year-to-Date) returns for all stocks.
+    Runs once a day to keep sector analysis accurate.
+    """
+    logger.info("Starting YTD returns update job")
+    start_time = datetime.utcnow()
+    
+    try:
+        from models import db, MarketData
+        import yfinance as yf
+        
+        app = get_app()
+        with app.app_context():
+            stocks = MarketData.query.filter_by(asset_type='stock').all()
+            
+            if not stocks:
+                return {'status': 'ok', 'updated': 0}
+                
+            updated_count = 0
+            error_count = 0
+            
+            for stock in stocks:
+                try:
+                    # Fetch history from start of year
+                    ticker = yf.Ticker(stock.symbol)
+                    hist = ticker.history(period="ytd")
+                    
+                    if not hist.empty and len(hist) > 1:
+                        first_price = float(hist['Close'].iloc[0])
+                        current_price = float(hist['Close'].iloc[-1])
+                        
+                        if first_price > 0:
+                            ytd_perf = ((current_price - first_price) / first_price) * 100
+                            stock.ytd_return = ytd_perf
+                            updated_count += 1
+                            
+                            # Commit in small batches to prevent long locks
+                            if updated_count % 10 == 0:
+                                db.session.commit()
+                except Exception as e:
+                    logger.warning(f"Could not calculate YTD for {stock.symbol}: {e}")
+                    error_count += 1
+            
+            db.session.commit()
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"YTD update complete: {updated_count} updated in {elapsed:.1f}s")
+            
+            return {
+                'status': 'ok',
+                'updated': updated_count,
+                'errors': error_count,
+                'elapsed_seconds': elapsed
+            }
+    except Exception as e:
+        logger.error(f"YTD update job failed: {e}")
+        return {'status': 'error', 'error': str(e)}
+
