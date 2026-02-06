@@ -309,7 +309,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
     try:
         # Bulk fetch all prices in one request (much faster and safer for production)
         import yfinance as yf
-        tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=True, progress=False)
+        tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=False, progress=False)
         
         for symbol in symbols:
             try:

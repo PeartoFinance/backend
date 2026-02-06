@@ -344,6 +344,8 @@ def get_sector_analysis():
                 'transactions': 0,  # count of stocks as proxy
                 'totalChange': 0,
                 'changeCount': 0,
+                'totalYTD': 0,
+                'ytdCount': 0,
                 'advancers': 0,
                 'decliners': 0,
                 'unchanged': 0
@@ -367,6 +369,11 @@ def get_sector_analysis():
                 sector_data[sector]['unchanged'] += 1
         else:
             sector_data[sector]['unchanged'] += 1
+            
+        # PROD ADDITION: Accumulate YTD for average calculation
+        if stock.ytd_return is not None:
+            sector_data[sector]['totalYTD'] += stock.ytd_return
+            sector_data[sector]['ytdCount'] += 1
 
     # Calculate totals for percentages
     total_turnover = sum(s['turnover'] for s in sector_data.values())
@@ -377,15 +384,18 @@ def get_sector_analysis():
     sectors = []
     for sector, data in sector_data.items():
         avg_change = float(data['totalChange']) / float(data['changeCount']) if data['changeCount'] > 0 else 0.0
+        avg_ytd = float(data['totalYTD']) / float(data['ytdCount']) if data['ytdCount'] > 0 else 0.0
+        
         sectors.append({
             'sector': sector,
             'turnover': float(round(data['turnover'], 2)),
             'turnoverPercent': float(round((data['turnover'] / total_turnover * 100) if total_turnover > 0 else 0, 2)),
             'volume': int(data['volume']),
             'volumePercent': float(round((data['volume'] / total_volume * 100) if total_volume > 0 else 0, 2)),
-            'transactions': int(data['transactions']),
-            'transactionsPercent': float(round((data['transactions'] / total_transactions * 100) if total_transactions > 0 else 0, 2)),
+            'stockCount': int(data['transactions']),
+            'weight': float(round((data['transactions'] / total_transactions * 100) if total_transactions > 0 else 0, 2)),
             'avgChangePercent': float(round(avg_change, 2)),
+            'avgYtdReturn': float(round(avg_ytd, 2)),
             'advancers': int(data['advancers']),
             'decliners': int(data['decliners']),
             'unchanged': int(data['unchanged'])

@@ -119,6 +119,7 @@ def queue_job(func, job_name, *args, **kwargs):
                 db.session.add(job)
                 db.session.commit()
                 logger.info(f"Enqueued job: {job_name}")
+                db.session.remove()
                 
             except Exception as e:
                 logger.error(f"Failed to enqueue job {job_name}: {e}")
@@ -207,6 +208,10 @@ def process_job_queue(app):
                 db.session.commit()
                 processed_count += 1
                 
+                # IMPORTANT: Release the connection back to the pool after each heavy job
+                # This prevents "Connection Camping" during background processing
+                db.session.remove()
+                
             except Exception as e:
                 logger.error(f"Error in queue processor: {e}")
                 db.session.rollback()
@@ -222,7 +227,7 @@ def _execute_job_by_name(job_name, params_json):
         update_all_stocks, update_all_crypto, update_all_indices,
         update_all_commodities, update_earnings_calendar, update_dividends,
         update_business_profiles, update_financials, update_all_forex,
-        update_all_forecasts
+        update_all_forecasts, update_ytd_returns
     )
     from .notification_jobs import (
         check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
@@ -245,6 +250,7 @@ def _execute_job_by_name(job_name, params_json):
         'update_financials': update_financials,
         'update_all_forex': update_all_forex,
         'update_all_forecasts': update_all_forecasts,
+        'update_ytd_returns': update_ytd_returns,
         
         'check_watchlist_alerts': check_watchlist_alerts,
         'send_daily_digest': send_daily_digest,
@@ -280,7 +286,17 @@ def _register_market_jobs():
     from .market_jobs import (
         update_all_stocks, update_all_crypto, update_all_indices,
         update_all_commodities, update_earnings_calendar, update_dividends,
-        update_business_profiles
+        update_business_profiles, update_ytd_returns
+    )
+    
+    # YTD Returns update (Daily at 1 AM)
+    scheduler.add_job(
+        lambda: queue_job(update_ytd_returns, 'update_ytd_returns'),
+        'cron',
+        hour=1,
+        id='update_ytd',
+        name='Update YTD Returns',
+        replace_existing=True
     )
     
     # Stock updates

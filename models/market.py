@@ -51,6 +51,7 @@ class MarketData(db.Model):
     logo_url = db.Column(db.String(500))
     website = db.Column(db.String(255))
     description = db.Column(db.Text)
+    ytd_return = db.Column(db.Numeric(10, 4)) # Year-to-Date return percentage
     
     # Business Profile Features (Added for detailed company profiles)
     is_listed = db.Column(db.Boolean, default=False, index=True) # Controls visibility in public directory
@@ -106,6 +107,7 @@ class MarketData(db.Model):
             'description': self.description,
             'isListed': self.is_listed,
             'isFeatured': self.is_featured,
+            'ytdReturn': float(self.ytd_return) if self.ytd_return else None,
         }
 
 
