@@ -9,6 +9,7 @@ from models.market import MarketData, CompanyFinancials, MarketIssue, Dividend, 
 from models.article import NewsItem
 from datetime import datetime, timedelta
 from extensions import cache
+from utils.validators import safe_int
 
 stocks_bp = Blueprint('stocks', __name__)
 
@@ -43,7 +44,8 @@ def get_quotes():
 def search_stocks():
     """Search stocks by name or symbol"""
     query = request.args.get('q', '').strip()
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     if not query:
         return jsonify({'error': 'q parameter required'}), 400
@@ -259,7 +261,8 @@ def get_business_directory():
         
         search = request.args.get('q', '')
         header_country = request.headers.get('X-User-Country', 'US')
-        limit = min(int(request.args.get('limit', 20)), 100)
+        # Safe conversion: Returns 20 if invalid characters sent
+        limit = min(safe_int(request.args.get('limit'), 20), 100)
         
         businesses = get_business_directory(search=search, country=header_country, limit=limit)
         return jsonify(businesses)
@@ -272,7 +275,8 @@ def get_business_directory():
 def get_movers():
     """Get top gainers and losers"""
     mover_type = request.args.get('type', 'both')
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     result = {}
     
@@ -308,7 +312,8 @@ def get_movers():
 @cache.cached(timeout=30, query_string=True)
 def get_most_active():
     """Get most actively traded stocks"""
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     header_country = request.headers.get('X-User-Country')
     if header_country:
@@ -336,8 +341,10 @@ def get_most_active():
 def get_etfs():
     """List all ETFs with optional search and pagination"""
     query = request.args.get('q', '').strip()
-    limit = min(int(request.args.get('limit', 20)), 100)
-    page = max(int(request.args.get('page', 1)), 1)
+    # Safe conversion: Returns 20 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 20), 100)
+    # Safe conversion: Returns page 1 if invalid characters sent
+    page = max(safe_int(request.args.get('page'), 1), 1)
     offset = (page - 1) * limit
 
     header_country = request.headers.get('X-User-Country')
@@ -368,7 +375,8 @@ def get_etfs():
 @stocks_bp.route('/etfs/movers', methods=['GET'])
 def get_etf_movers():
     """Get top ETF gainers and losers"""
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     header_country = request.headers.get('X-User-Country')
     if header_country:

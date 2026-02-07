@@ -195,6 +195,23 @@ def internal_error(error):
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    """
+    Global crash catcher. 
+    In Production: Returns a polite message instead of raw code errors.
+    In Development: Returns the actual error for easy debugging.
+    """
+    # Log the full error to the server logs so developers can fix it
+    app.logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
+    
+    # If we are NOT in debug mode (Production), hide the technical details
+    if not app.debug:
+        return jsonify({
+            'error': 'An unexpected error occurred on our server.',
+            'message': 'Our team has been notified. Please try again later.',
+            'status': 500
+        }), 500
+        
+    # In Debug mode, show the error string for easier development
     return jsonify({'error': str(e)}), 500
 
 

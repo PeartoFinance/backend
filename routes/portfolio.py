@@ -7,6 +7,7 @@ from sqlalchemy import desc
 import uuid
 from routes.decorators import auth_required
 from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, UserInvestmentGoal, FinancialGoal
+from utils.validators import safe_int
 
 from services.portfolio_service import calculate_portfolio_health
 
@@ -520,7 +521,8 @@ def get_transactions(portfolio_id):
     # Get filters
     symbol = request.args.get('symbol')
     tx_type = request.args.get('type')
-    limit = min(int(request.args.get('limit', 50)), 100)
+    # Safe conversion: Returns 50 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 50), 100)
     
     query = PortfolioTransaction.query.filter_by(portfolio_id=portfolio_id)
     
@@ -714,7 +716,8 @@ def get_wealth_history():
     """Get user's wealth history for net worth chart"""
     from models import WealthState
     
-    days = min(int(request.args.get('days', 30)), 365)
+    # Safe conversion: Returns 30 if invalid characters sent
+    days = min(safe_int(request.args.get('days'), 30), 365)
     
     history = WealthState.query.filter_by(user_id=request.user.id)\
         .order_by(desc(WealthState.date))\
