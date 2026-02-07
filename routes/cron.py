@@ -401,7 +401,7 @@ def cron_check_goals():
 def cron_update_ytd():
     """
     Trigger YTD calculation via cPanel cron URL.
-    cURL: curl -X POST http://localhost:5000/api/cron/update-ytd?token=YOUR_TOKEN
+    cURL: curl -X POST https://api.pearto.com/api/cron/update-ytd?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401

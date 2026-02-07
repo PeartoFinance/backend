@@ -20,8 +20,11 @@ def get_live_quote(symbol):
     symbol = symbol.upper()
     
     # Try stock handler first (covers most including ETFs)
-    from handlers.market_data.stock_handler import get_stock_quote
+    from handlers.market_data.stock_handler import get_stock_quote, get_multiple_quotes
     from handlers.market_data.crypto_handler import get_crypto_quote
+    from models.market import MarketData
+
+    # Simple heuristic: if it contains '-', likely crypto (e.g., BTC-USD)
     
     # Simple heuristic: if it contains '-', likely crypto (e.g., BTC-USD)
     data = None
@@ -288,3 +291,403 @@ def get_live_dashboard():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@live_bp.route('/overview', methods=['GET'])
+def get_live_overview():
+    """
+    Get comprehensive live market overview.
+    Aggregates indices, top movers, and active stocks.
+    """
+    from handlers.market_data.index_handler import get_all_major_indices
+    from handlers.market_data.screener_handler import get_day_gainers, get_day_losers, get_most_active
+    
+    try:
+        # 1. Market Indices
+        indices = get_all_major_indices() or []
+        
+        # 2. Top Stocks (Gainers/Losers/Active)
+        gainers = get_day_gainers(limit=5) or []
+        losers = get_day_losers(limit=5) or []
+        most_active = get_most_active(limit=5) or []
+        
+        # Helpers
+        def format_index(item):
+            price = item.get('price')
+            change = item.get('change')
+            change_p = item.get('changePercent')
+            return {
+                'symbol': item.get('symbol'),
+                'name': item.get('displayName') or item.get('name'),
+                'value': float(price) if price else None, # Frontend expects 'value' for indices
+                'change': float(change) if change else None,
+                'changePercent': float(change_p) if change_p else None,
+                'marketStatus': 'REGULAR', # Placeholder
+                'lastUpdated': datetime.utcnow().isoformat()
+            }
+            
+        def format_stock(item):
+            price = item.get('price')
+            change = item.get('change')
+            change_p = item.get('changePercent')
+            vol = item.get('volume')
+            return {
+                'symbol': item.get('symbol'),
+                'name': item.get('name'),
+                'price': float(price) if price else None,
+                'change': float(change) if change else None,
+                'changePercent': float(change_p) if change_p else None,
+                'volume': int(vol) if vol else None,
+                'assetType': 'stock'
+            }
+
+        return jsonify({
+            'indices': [format_index(i) for i in indices[:6]],
+            'topGainers': [format_stock(g) for g in gainers],
+            'topLosers': [format_stock(l) for l in losers],
+            'mostActive': [format_stock(a) for a in most_active],
+            # Breadth stats not available live easily, sending 0s or caching
+            'advancers': 0,
+            'decliners': 0,
+            'unchanged': 0,
+            'totalVolume': sum(s.get('volume', 0) for s in most_active) * 10 # Rough estimate
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@live_bp.route('/stocks', methods=['GET'])
+def get_live_stocks():
+    """
+    Get live data for a list of stocks.
+    Fetches symbols from DB (to know which ones to track) then gets live quotes.
+    """
+    from handlers.market_data.stock_handler import get_multiple_quotes
+    from models.market import MarketData
+    
+    sector = request.args.get('sector')
+    limit = min(int(request.args.get('limit', 50)), 100) # Cap at 100 for live fetch (requested by user)
+    
+    header_country = request.headers.get('X-User-Country')
+    # Use DB to get relevant symbols
+    if header_country:
+        hc = header_country.strip().upper()
+        md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
+    else:
+        md_filter = (MarketData.country_code == 'GLOBAL')
+        
+    query = MarketData.query.with_entities(MarketData.symbol).filter(
+        MarketData.asset_type == 'stock',
+        MarketData.is_listed == True,
+        md_filter
+    )
+    
+    if sector:
+        query = query.filter(MarketData.sector == sector)
+        
+    # Order by market cap to show most relevant
+    # Note in DB market_cap might be missing so use volume or id
+    symbols = [s[0] for s in query.limit(limit).all()]
+    
+    if not symbols:
+        return jsonify([])
+        
+    # Name clash with model if not careful
+    from models.market import MarketData as MarketDataModel
+
+    # Fetch live
+    quotes = get_multiple_quotes(symbols)
+    
+    # Fallback to DB if live fetch failed (empty or significantly fewer than requested)
+    if not quotes or len(quotes) < len(symbols) * 0.5:
+        try:
+            # Re-fetch full objects from DB
+            db_stocks = MarketDataModel.query.filter(MarketDataModel.symbol.in_(symbols)).all()
+            
+            # Create a map of live quotes for quick lookup
+            live_map = {q['symbol']: q for q in quotes}
+            
+            quotes = []
+            for stock in db_stocks:
+                # Use live if available, else DB
+                if stock.symbol in live_map:
+                    quotes.append(live_map[stock.symbol])
+                else:
+                    quotes.append({
+                        'symbol': stock.symbol,
+                        'name': stock.name,
+                        'price': float(stock.price) if stock.price else None,
+                        'change': float(stock.change) if stock.change else None,
+                        'changePercent': float(stock.change_percent) if stock.change_percent else None,
+                        'volume': stock.volume,
+                        'marketCap': stock.market_cap,
+                        'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
+                        'high52w': float(stock._52_week_high) if stock._52_week_high else None,
+                        'low52w': float(stock._52_week_low) if stock._52_week_low else None,
+                        'sector': stock.sector,
+                        'industry': stock.industry,
+                        'exchange': stock.exchange,
+                        'currency': stock.currency,
+                        'quoteType': 'EQUITY' if stock.asset_type == 'stock' else 'ETF',
+                        'assetType': stock.asset_type
+                    })
+        except Exception as e:
+            print(f"DB Fallback for stocks failed: {e}")
+            # If DB fails too, just return what we have (even if empty)
+
+    return jsonify(quotes)
+
+
+@live_bp.route('/crypto', methods=['GET'])
+def get_live_crypto():
+    """Get live crypto data"""
+    from handlers.market_data.crypto_handler import get_multiple_crypto_quotes, TOP_CRYPTOS
+    from models.market import MarketData
+    
+    limit = min(int(request.args.get('limit', 25)), 50)
+    
+    # Prioritize DB symbols if we rely on user-added ones, else use top list + DB
+    # For now, let's use the TOP_CRYPTOS constant + some major ones from DB
+    
+    db_symbols = [s[0] for s in MarketData.query.with_entities(MarketData.symbol).filter(
+        MarketData.asset_type == 'crypto'
+    ).limit(limit).all()]
+    
+    # Merge unique
+    all_symbols = list(set(TOP_CRYPTOS + db_symbols))[:limit]
+    
+    quotes = get_multiple_crypto_quotes(all_symbols)
+    
+    # Fallback to DB
+    if not quotes:
+        try:
+             # Fetch from DB
+            db_crypto = MarketData.query.filter(
+                MarketData.asset_type == 'crypto',
+                MarketData.symbol.in_(all_symbols)
+            ).all()
+            
+            for c in db_crypto:
+                quotes.append({
+                    'symbol': c.symbol,
+                    'name': c.name,
+                    'price': float(c.price) if c.price else None,
+                    'change': float(c.change) if c.change else None,
+                    'changePercent': float(c.change_percent) if c.change_percent else None,
+                    'volume': c.volume,
+                    'marketCap': c.market_cap,
+                    'currency': c.currency,
+                    'quoteType': 'CRYPTOCURRENCY',
+                    'assetType': 'crypto'
+                })
+        except Exception as e:
+            print(f"DB Fallback for crypto failed: {e}")
+            
+    return jsonify(quotes)
+
+
+@live_bp.route('/commodities', methods=['GET'])
+def get_live_commodities():
+    """Get live commodities data with DB fallback"""
+    from handlers.market_data.commodity_handler import get_all_commodities
+    from models.market import CommodityData
+    
+    # Try live fetch
+    commodities = get_all_commodities() or []
+    
+    if not commodities:
+        # Fallback to DB
+        try:
+            db_commodities = CommodityData.query.all()
+            for c in db_commodities:
+                commodities.append({
+                    'symbol': c.symbol,
+                    'name': c.name,
+                    'price': float(c.price) if c.price else None,
+                    'change': float(c.change) if c.change else None,
+                    'changePercent': float(c.change_percent) if c.change_percent else None,
+                    'dayHigh': float(c.day_high) if c.day_high else None,
+                    'dayLow': float(c.day_low) if c.day_low else None,
+                    'unit': c.unit,
+                    'currency': c.currency,
+                    'countryCode': c.country_code
+                })
+        except Exception as e:
+            print(f"DB Fallback for commodities failed: {e}")
+            
+    return jsonify(commodities)
+
+
+@live_bp.route('/forex', methods=['GET'])
+def get_live_forex():
+    """Get live forex rates with DB fallback"""
+    from handlers.market_data.forex_handler import COMMON_CURRENCIES, get_forex_quote
+    from models.market import MarketData
+    
+    # Fetch all common currencies live
+    results = []
+    
+    for currency, symbol in COMMON_CURRENCIES.items():
+        try:
+            quote = get_forex_quote(symbol)
+            if quote:
+                # Format to match expected ForexRate interface
+                results.append({
+                    'pair': f"USD/{currency}",
+                    'rate': quote['price'],
+                    'change': quote['change'],
+                    'changePercent': quote['changePercent'],
+                    'high': quote['high'],
+                    'low': quote['low'],
+                    'baseCurrency': 'USD',
+                    'targetCurrency': currency
+                })
+        except:
+            continue
+            
+    # Fallback to DB if live fetch returned nothing or very few
+    if not results or len(results) < len(COMMON_CURRENCIES) * 0.5:
+        try:
+            # Forex pairs are stored in MarketData with asset_type='forex'
+            # Symbols in DB might be 'EUR=X' etc. matching COMMON_CURRENCIES values
+            target_symbols = list(COMMON_CURRENCIES.values())
+            db_forex = MarketData.query.filter(
+                MarketData.asset_type == 'forex',
+                MarketData.symbol.in_(target_symbols)
+            ).all()
+            
+            # Map DB results to fill gaps
+            existing_pairs = {r['pair'] for r in results}
+            
+            # Reverse map symbol to currency code for constructing pair name
+            symbol_to_currency = {v: k for k, v in COMMON_CURRENCIES.items()}
+            
+            for f in db_forex:
+                currency_code = symbol_to_currency.get(f.symbol)
+                if not currency_code:
+                    continue
+                    
+                pair_name = f"USD/{currency_code}"
+                if pair_name not in existing_pairs:
+                    results.append({
+                        'pair': pair_name,
+                        'rate': float(f.price) if f.price else None,
+                        'change': float(f.change) if f.change else None,
+                        'changePercent': float(f.change_percent) if f.change_percent else None,
+                        'high': float(f.day_high) if f.day_high else None,
+                        'low': float(f.day_low) if f.day_low else None,
+                        'baseCurrency': 'USD',
+                        'targetCurrency': currency_code
+                    })
+        except Exception as e:
+            print(f"DB Fallback for forex failed: {e}")
+            
+    return jsonify(results)
+
+
+@live_bp.route('/indices', methods=['GET'])
+def get_live_indices():
+    """Get live market indices with DB fallback"""
+    from handlers.market_data.index_handler import get_all_major_indices
+    from models.market import MarketIndices
+    
+    # Try live fetch first
+    indices = get_all_major_indices() or []
+    
+    if not indices:
+        # Fallback to DB
+        try:
+            db_indices = MarketIndices.query.all()
+            for idx in db_indices:
+                indices.append({
+                    'symbol': idx.symbol,
+                    'name': idx.name,
+                    'price': idx.price,
+                    'change': idx.change_amount,
+                    'changePercent': idx.change_percent,
+                    'previousClose': idx.previous_close,
+                    'dayHigh': idx.day_high,
+                    'dayLow': idx.day_low,
+                    'yearHigh': idx.year_high,
+                    'yearLow': idx.year_low,
+                    'displayName': idx.name
+                })
+        except Exception as e:
+            print(f"DB Fallback failed: {e}")
+
+    # Format for frontend
+    formatted = []
+    for item in indices:
+        price = item.get('price')
+        change = item.get('change')
+        change_p = item.get('changePercent')
+        formatted.append({
+            'symbol': item.get('symbol'),
+            'name': item.get('displayName') or item.get('name'),
+            'value': float(price) if price else None,
+            'change': float(change) if change else None,
+            'changePercent': float(change_p) if change_p else None,
+            'marketStatus': 'REGULAR',
+            'lastUpdated': datetime.utcnow().isoformat(),
+            'assetType': 'index'
+        })
+        
+    return jsonify(formatted)
+
+
+@live_bp.route('/movers', methods=['GET'])
+def get_live_movers():
+    """Get top gainers and losers live"""
+    from handlers.market_data.screener_handler import get_day_gainers, get_day_losers
+    
+    mover_type = request.args.get('type', 'both')
+    limit = min(int(request.args.get('limit', 10)), 50)
+    
+    result = {}
+    
+    if mover_type in ('gainers', 'both'):
+        gainers = get_day_gainers(limit=limit)
+        # Format consistent with frontend expectation
+        result['gainers'] = [{
+            'symbol': g.get('symbol'),
+            'name': g.get('name'),
+            'price': float(g['price']) if g.get('price') else None,
+            'change': float(g['change']) if g.get('change') else None,
+            'changePercent': float(g['changePercent']) if g.get('changePercent') else None,
+            'volume': g.get('volume'),
+            'assetType': 'stock'
+        } for g in gainers]
+        
+    if mover_type in ('losers', 'both'):
+        losers = get_day_losers(limit=limit)
+        result['losers'] = [{
+            'symbol': l.get('symbol'),
+            'name': l.get('name'),
+            'price': float(l['price']) if l.get('price') else None,
+            'change': float(l['change']) if l.get('change') else None,
+            'changePercent': float(l['changePercent']) if l.get('changePercent') else None,
+            'volume': l.get('volume'),
+            'assetType': 'stock'
+        } for l in losers]
+        
+    return jsonify(result)
+
+
+@live_bp.route('/most-active', methods=['GET'])
+def get_live_most_active():
+    """Get most active stocks live"""
+    from handlers.market_data.screener_handler import get_most_active
+    
+    limit = min(int(request.args.get('limit', 10)), 50)
+    
+    active = get_most_active(limit=limit)
+    
+    return jsonify([{
+        'symbol': a.get('symbol'),
+        'name': a.get('name'),
+        'price': float(a['price']) if a.get('price') else None,
+        'change': float(a['change']) if a.get('change') else None,
+        'changePercent': float(a['changePercent']) if a.get('changePercent') else None,
+        'volume': a.get('volume'),
+        'assetType': 'stock'
+    } for a in active])
