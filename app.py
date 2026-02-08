@@ -14,7 +14,7 @@ from flask_cors import CORS
 from config import config
 from models.base import db
 from flask_migrate import Migrate
-from extensions import cache, compress
+from extensions import cache, compress, limiter
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -32,6 +32,7 @@ app.config['CACHE_DEFAULT_TIMEOUT'] = 30
 db.init_app(app)
 cache.init_app(app)
 compress.init_app(app)  # Auto-compress responses > 500 bytes
+limiter.init_app(app)   # Initialize rate limiting
 
 # For migration
 migrate = Migrate(app, db)
