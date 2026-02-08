@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 from models import db, MarketData as MarketPrice, CryptoMarketData
 from extensions import cache
+from utils.validators import safe_int
 
 crypto_bp = Blueprint('crypto', __name__)
 
@@ -14,8 +15,10 @@ crypto_bp = Blueprint('crypto', __name__)
 @cache.cached(timeout=30, query_string=True)
 def get_markets():
     """Get cryptocurrency market listings"""
-    limit = min(int(request.args.get('limit', 100)), 250)
-    page = max(int(request.args.get('page', 1)), 1)
+    # Safe conversion: Returns 100 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 100), 250)
+    # Safe conversion: Returns page 1 if invalid characters sent
+    page = max(safe_int(request.args.get('page'), 1), 1)
     sort_by = request.args.get('sort', 'market_cap')
     
     offset = (page - 1) * limit
@@ -156,7 +159,8 @@ def get_coins():
 @cache.cached(timeout=30, query_string=True)
 def get_gainers():
     """Get top gaining cryptocurrencies"""
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     header_country = request.headers.get('X-User-Country')
     if header_country:
@@ -178,7 +182,8 @@ def get_gainers():
 @cache.cached(timeout=30, query_string=True)
 def get_losers():
     """Get top losing cryptocurrencies"""
-    limit = min(int(request.args.get('limit', 10)), 50)
+    # Safe conversion: Returns 10 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 10), 50)
     
     header_country = request.headers.get('X-User-Country')
     if header_country:

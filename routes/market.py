@@ -11,6 +11,7 @@ from models import (
 from handlers.market_data.calendar_handler import get_economic_events
 from handlers.market_data.forex_handler import get_forex_history
 from extensions import cache
+from utils.validators import safe_int
 
 market_bp = Blueprint('market', __name__)
 
@@ -28,7 +29,8 @@ def get_calendar():
     """Get economic calendar events"""
     start = request.args.get('start')
     end = request.args.get('end')
-    limit = min(int(request.args.get('limit', 50)), 100)
+    # Safe conversion: Returns 50 if user sends invalid characters
+    limit = min(safe_int(request.args.get('limit'), 50), 100)
     
     events = get_economic_events(start, end, limit)
     return jsonify(events)
@@ -199,7 +201,8 @@ def get_stock_offers():
 def get_all_stocks():
     """Get all stocks with optional filters"""
     sector = request.args.get('sector')
-    limit = min(int(request.args.get('limit', 50)), 100)
+    # Safe conversion: Prevents crash if limit is not a number
+    limit = min(safe_int(request.args.get('limit'), 50), 100)
     header_country = request.headers.get('X-User-Country')
     if header_country is None:
         # Default to GLOBAL/All similar to crypto if no country specified
@@ -223,8 +226,10 @@ def get_all_stocks():
 @market_bp.route('/crypto', methods=['GET'])
 def get_crypto_markets():
     """Alias for crypto markets under /api/market/crypto."""
-    limit = min(int(request.args.get('limit', 100)), 250)
-    page = max(int(request.args.get('page', 1)), 1)
+    # Safe conversion: Returns 100 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 100), 250)
+    # Safe conversion: Returns page 1 if invalid characters sent
+    page = max(safe_int(request.args.get('page'), 1), 1)
     sort_by = request.args.get('sort', 'market_cap')
 
     offset = (page - 1) * limit
@@ -282,7 +287,8 @@ def get_market_stats():
 def get_dividends():
     """Get proposed dividends from database."""
     status = request.args.get('status')  # 'proposed', 'approved', 'paid'
-    limit = min(int(request.args.get('limit', 50)), 100)
+    # Safe conversion: Returns 50 if invalid characters sent
+    limit = min(safe_int(request.args.get('limit'), 50), 100)
     header_country = request.headers.get('X-User-Country')
     query = Dividend.query
     if status:
