@@ -1,7 +1,7 @@
 import requests
 import time
 
-BASE_URL = "http://localhost:5000/api/cron"
+BASE_URL = "https://api.pearto.com/api/cron"
 TOKEN = "123456789"
 HEADERS = {'X-Cron-Token': TOKEN}
 
@@ -16,7 +16,7 @@ endpoints = [
     '/earnings-alerts',
     '/portfolio-summary',
     '/daily-digest',
-#    '/all-market',  # Skipping heavy job for now to avoid timeout
+    '/all-market',
     '/business-profiles',
     '/cleanup-accounts',
     '/financials',
@@ -35,13 +35,12 @@ print(f"Verifying {len(endpoints)} endpoints...")
 results = []
 
 for endpoint in endpoints:
-    url = f"{BASE_URL}{endpoint}"
+    url = f"{BASE_URL}{endpoint}?token={TOKEN}"
     print(f"Testing {endpoint}...", end=" ", flush=True)
     try:
         start_time = time.time()
-        # Some endpoints might support GET, but POST is safer for actions
-        # Increased timeout for heavy batch jobs (business-profiles, financials)
-        response = requests.post(url, headers=HEADERS, timeout=300) 
+        # Using GET as per user request examples
+        response = requests.get(url, timeout=300) 
         duration = time.time() - start_time
         
         status = "OK" if response.status_code == 200 else f"FAIL ({response.status_code})"

@@ -6,6 +6,7 @@ import yfinance as yf
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ def get_commodity_quote(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with commodity quote data or None if error
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info
         
         if not info:
@@ -137,7 +139,8 @@ def get_commodity_history(
         List of OHLCV dictionaries
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:

@@ -9,6 +9,7 @@ bcrypt==4.1.2
 requests==2.31.0
 cryptography==41.0.7
 yfinance>=0.2.36
+curl_cffi>=0.7  # Chrome TLS fingerprint to bypass Yahoo rate limits
 pandas>=2.0.0
 APScheduler>=3.10.0
 google-auth>=2.23.0
@@ -20,3 +21,4 @@ flask-migrate==4.1.0
 Flask-Caching==2.3.1
 Flask-Compress==1.23
 Flask-Limiter==3.5.0
+redis>=3.0  # Required for Flask-Limiter Redis storage

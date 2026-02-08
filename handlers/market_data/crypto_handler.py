@@ -6,6 +6,7 @@ import yfinance as yf
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,8 @@ def get_crypto_quote(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with crypto quote data or None if error/not crypto
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info
         
         # Verify it's a crypto asset
@@ -83,7 +85,8 @@ def get_crypto_history(
         List of OHLCV dictionaries
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
@@ -199,7 +202,8 @@ def get_multiple_crypto_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     results = []
     # yfinance Tickers can handle multiple space-separated symbols
     try:
-        tickers = yf.Tickers(' '.join(symbols))
+        session = get_yfinance_session()
+        tickers = yf.Tickers(' '.join(symbols), session=session)
         for symbol in symbols:
             try:
                 # Accessing the ticker object directly

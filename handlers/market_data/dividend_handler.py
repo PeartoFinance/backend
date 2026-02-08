@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import logging
 import pandas as pd
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ def get_stock_dividends(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with dividend data or None if error
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info
         
         # Get dividend history
@@ -97,7 +99,8 @@ def get_ex_dividend_calendar() -> List[Dict[str, Any]]:
     
     for symbol in dividend_stocks:
         try:
-            ticker = yf.Ticker(symbol)
+            session = get_yfinance_session()
+            ticker = yf.Ticker(symbol, session=session)
             info = ticker.info
             
             ex_div_ts = info.get('exDividendDate')
@@ -141,7 +144,8 @@ def import_dividends_to_db(symbols: List[str]) -> Dict[str, int]:
     
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol.upper())
+            session = get_yfinance_session()
+            ticker = yf.Ticker(symbol.upper(), session=session)
             info = ticker.info
             
             if not info or not info.get('symbol'):

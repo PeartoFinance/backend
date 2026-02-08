@@ -9,6 +9,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from models.base import db
 from models.market import CompanyFinancials
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,8 @@ def sync_financials(symbol: str, period: str = 'annual') -> Dict[str, Any]:
     logger.info(f"Syncing {period} financials for {symbol}")
     
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         
         # Fetch all statements
         if period == 'annual':
@@ -454,7 +456,8 @@ def _format_kpis(records: List[CompanyFinancials]) -> Dict[str, List]:
 def _get_ratios_from_db(symbol: str) -> Dict[str, Any]:
     """Get ratios from yfinance (these are real-time metrics)"""
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info or {}
         
         ratios = {

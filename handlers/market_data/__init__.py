@@ -2,6 +2,56 @@
 Market Data Handlers - YFinance Integration
 Unified interface for fetching market data from Yahoo Finance
 """
+import logging
+
+# Centralized session factory to bypass Yahoo rate limits
+# Uses curl_cffi to impersonate Chrome's TLS fingerprint
+_yfinance_session = None
+
+def get_yfinance_session():
+    """
+    Get a session that impersonates Chrome to bypass Yahoo rate limits.
+    Uses curl_cffi which mimics Chrome's TLS fingerprint.
+    Falls back to standard requests if curl_cffi fails.
+    """
+    global _yfinance_session
+    if _yfinance_session is None:
+        try:
+            from curl_cffi import requests as curl_requests
+            _yfinance_session = curl_requests.Session(impersonate="chrome")
+            _yfinance_session._is_curl_cffi = True  # Mark for fallback detection
+            logging.info("[YFinance] Using curl_cffi Chrome-impersonating session")
+        except ImportError:
+            logging.warning("[YFinance] curl_cffi not installed, using default requests")
+            import requests
+            _yfinance_session = requests.Session()
+            _yfinance_session._is_curl_cffi = False
+    return _yfinance_session
+
+
+def reset_yfinance_session():
+    """
+    Reset the session (call this if you encounter curl_cffi errors).
+    This will force the next get_yfinance_session() to create a new session,
+    and if curl_cffi fails, it will fall back to standard requests.
+    """
+    global _yfinance_session
+    _yfinance_session = None
+    logging.info("[YFinance] Session reset")
+
+
+def get_fallback_session():
+    """
+    Get a standard requests session as fallback when curl_cffi fails.
+    This should be used when curl_cffi throws DNS or threading errors.
+    """
+    import requests
+    session = requests.Session()
+    session._is_curl_cffi = False
+    logging.warning("[YFinance] Using fallback requests session due to curl_cffi error")
+    return session
+
+
 
 from .stock_handler import (
     get_stock_quote,

@@ -6,6 +6,7 @@ import yfinance as yf
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,8 @@ def get_stock_quote(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with stock quote data or None if error
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info
         quote_type = info.get('quoteType') # Returns 'ETF' or 'EQUITY'
         asset_type = 'etf' if quote_type == 'ETF' else 'stock'
@@ -82,7 +84,8 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     """
     results = []
     try:
-        tickers = yf.Tickers(' '.join(symbols))
+        session = get_yfinance_session()
+        tickers = yf.Tickers(' '.join(symbols), session=session)
         for symbol in symbols:
             try:
                 ticker = tickers.tickers.get(symbol.upper())
@@ -139,7 +142,8 @@ def get_stock_history(
         List of OHLCV dictionaries
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:
@@ -223,7 +227,8 @@ def get_recommendations(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with recommendation summary and recent upgrades/downgrades
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         
         result = {
             'symbol': symbol,
@@ -276,7 +281,8 @@ def get_analyst_price_targets(symbol: str) -> Optional[Dict[str, Any]]:
         Dictionary with current, high, low, mean, median price targets
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         targets = ticker.analyst_price_targets
         
         if targets is None:
@@ -308,8 +314,8 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
     
     try:
         # Bulk fetch all prices in one request (much faster and safer for production)
-        import yfinance as yf
-        tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=False, progress=False)
+        yf_session = get_yfinance_session()
+        tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=False, progress=False, session=yf_session)
         
         if tickers_data is None or (hasattr(tickers_data, 'empty') and tickers_data.empty):
             logger.warning(f"Bulk download returned no data for symbols: {symbols}")
@@ -328,31 +334,38 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                 if ticker_df.empty:
                     # Fallback to single quote if bulk failed for this symbol
                     quote = get_stock_quote(symbol)
+                elif 'Close' not in ticker_df.columns or 'Open' not in ticker_df.columns:
+                    # Missing required columns, fallback to single quote
+                    logger.warning(f"Missing price data for {symbol} in bulk download")
+                    quote = get_stock_quote(symbol)
                 else:
                     # Extract basic info from bulk data
-                    latest_price = float(ticker_df['Close'].iloc[-1])
-                    prev_close = float(ticker_df['Open'].iloc[0])
-                    change = latest_price - prev_close
-                    change_pct = (change / prev_close * 100) if prev_close != 0 else 0
-                    
-                    # Handle volume safely (convert to 0 if NaN)
-                    vol_val = ticker_df['Volume'].iloc[-1]
                     import pandas as pd
                     import numpy as np
                     
                     def sanitize_float(val, default=0.0):
-                        if pd.isna(val) or np.isnan(val):
+                        try:
+                            if pd.isna(val) or np.isnan(val):
+                                return default
+                            return float(val)
+                        except:
                             return default
-                        return float(val)
-
-                    if pd.isna(vol_val):
-                        volume = 0
+                    
+                    latest_price = sanitize_float(ticker_df['Close'].iloc[-1])
+                    prev_close = sanitize_float(ticker_df['Open'].iloc[0])
+                    change = latest_price - prev_close
+                    change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+                    
+                    # Handle volume safely
+                    if 'Volume' in ticker_df.columns:
+                        vol_val = ticker_df['Volume'].iloc[-1]
+                        volume = 0 if pd.isna(vol_val) else int(vol_val)
                     else:
-                        volume = int(vol_val)
+                        volume = 0
 
                     quote = {
                         'symbol': symbol,
-                        'price': sanitize_float(latest_price),
+                        'price': latest_price,
                         'change': sanitize_float(change),
                         'changePercent': sanitize_float(change_pct),
                         'volume': volume,
@@ -360,6 +373,7 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                         'dayHigh': sanitize_float(ticker_df['High'].max()),
                         'dayLow': sanitize_float(ticker_df['Low'].min()),
                     }
+
 
                 if not quote or not quote.get('price'):
                     errors += 1
@@ -423,7 +437,8 @@ def sync_stock_news(symbol: str) -> Dict[str, Any]:
     
     symbol = symbol.upper()
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         news = ticker.news
         
         if not news:
@@ -508,7 +523,8 @@ def fetch_stock_news_preview(symbol: str) -> Dict[str, Any]:
     
     symbol = symbol.upper()
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         news = ticker.news
         
         if not news:

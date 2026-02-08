@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
 from models import db, ForexRate
+from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ def get_forex_quote(symbol: str) -> Optional[Dict[str, Any]]:
     Get real-time forex quote for a single pair.
     """
     try:
-        ticker = yf.Ticker(symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(symbol, session=session)
         info = ticker.info
         
         if not info or 'regularMarketPrice' not in info:
@@ -159,7 +161,8 @@ def get_forex_history(
         if not yf_symbol.endswith('=X'):
              yf_symbol = f"{yf_symbol}=X"
 
-        ticker = yf.Ticker(yf_symbol)
+        session = get_yfinance_session()
+        ticker = yf.Ticker(yf_symbol, session=session)
         hist = ticker.history(period=period, interval=interval)
         
         if hist.empty:

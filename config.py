@@ -24,15 +24,15 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        # CRITICAL for Shared Hosting: Keep these numbers low to avoid "Too many connections"
-        'pool_size': 2,            
-        'max_overflow': 0,         # No extra connections beyond pool_size
-        'pool_recycle': 30,        # Kill idle connections every 30s (Prevents "MySQL gone away")
+        # Optimized for stability (Shared Hosting compatible but robust)
+        'pool_size': 5,            # Increased from 2 to allow concurrency
+        'max_overflow': 10,        # Allow burst connections
+        'pool_recycle': 1800,      # Recycle every 30 mins (Standard, 30s was too aggressive)
         'pool_pre_ping': True,     # Check if connection is alive before using
-        'pool_timeout': 10,        # Don't wait too long for a connection
+        'pool_timeout': 30,        # Wait longer for a connection if pool is busy
         'pool_reset_on_return': 'rollback',
         'connect_args': {
-            'connect_timeout': 5   # Quick failure if DB is unreachable
+            'connect_timeout': 10  # More tolerant timeout
         }
     }
     
