@@ -4,17 +4,51 @@ Real-time quotes and intraday data for live chart updates
 """
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
-from extensions import cache
+from extensions import cache, limiter
+from handlers.market_data.screener_handler import get_day_gainers, get_day_losers, get_most_active
 from models.market import MarketData
+from utils.validators import safe_int, safe_float
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 live_bp = Blueprint('live', __name__)
 
-# In-memory cache for live quotes (10 second TTL)
-live_quote_cache = {}
+# Helper for unified market data formatting
+def _format_market_item(item, asset_type='stock'):
+    """Unifies market data formatting for live routes"""
+    if not item: return None
+    
+    price = item.get('price') or item.get('currentPrice') or item.get('regularMarketPrice')
+    change = item.get('change') or item.get('regularMarketChange')
+    change_p = item.get('changePercent') or item.get('regularMarketChangePercent')
+    
+    # Infer asset type if missing
+    calculated_asset_type = item.get('assetType') or asset_type
+    if not item.get('assetType'):
+        if item.get('quoteType') == 'CRYPTOCURRENCY' or item.get('sector') == 'Cryptocurrency':
+            calculated_asset_type = 'crypto'
+        elif item.get('quoteType') in ['ETF', 'EQUITY']:
+            calculated_asset_type = 'stock'
+
+    return {
+        'symbol': item.get('symbol'),
+        'name': item.get('shortName') or item.get('name') or item.get('displayName'),
+        'price': float(price) if price is not None else None,
+        'change': float(change) if change is not None else None,
+        'changePercent': float(change_p) if change_p is not None else None,
+        'volume': item.get('volume') or item.get('regularMarketVolume'),
+        'marketCap': item.get('marketCap'),
+        'assetType': calculated_asset_type,
+        'currency': item.get('currency', 'USD'),
+        'exchange': item.get('exchange'),
+        'lastUpdated': datetime.utcnow().isoformat()
+    }
 
 
 @live_bp.route('/quote/<symbol>', methods=['GET'])
+@limiter.limit("60 per minute")
 def get_live_quote(symbol):
     """Get real-time quote for a single symbol using direct handlers"""
     symbol = symbol.upper()
@@ -35,34 +69,13 @@ def get_live_quote(symbol):
         data = get_stock_quote(symbol)
         
     if not data:
-        # Fallback check if it was crypto but didn't have dash? Unlikely for YF but possible
-        if '-' not in symbol:
-            data = get_crypto_quote(symbol)
-
-    if not data:
         return jsonify({'error': 'Symbol not found'}), 404
     
-    # Ensure assetType is present
-    if not data.get('assetType'):
-        # Infer from data or defaults
-        if data.get('quoteType') == 'CRYPTOCURRENCY' or data.get('sector') == 'Cryptocurrency':
-            data['assetType'] = 'crypto'
-        else:
-            data['assetType'] = 'stock'
-
-    # Ensure numeric fields are floats
-    if data.get('price'): data['price'] = float(data['price'])
-    if data.get('change'): data['change'] = float(data['change'])
-    if data.get('changePercent'): 
-        # YFinance sometimes returns 0.05 for 5%, sometimes 5.0. 
-        # Usually it's raw scalar e.g. 0.015 for 1.5% in some versions, or 1.5. 
-        # Just passing it through, frontend handles it.
-        data['changePercent'] = float(data['changePercent'])
-        
-    return jsonify(data)
+    return jsonify(_format_market_item(data))
 
 
 @live_bp.route('/quotes', methods=['GET'])
+@limiter.limit("30 per minute")
 def get_live_quotes():
     """Get real-time quotes for multiple symbols using direct handlers"""
     symbols_param = request.args.get('symbols', '')
@@ -79,19 +92,11 @@ def get_live_quotes():
     from handlers.market_data.stock_handler import get_multiple_quotes
     
     results = get_multiple_quotes(symbols)
-    
-    # Enrich with assetType
-    for item in results:
-        if not item.get('assetType'):
-             if item.get('quoteType') == 'CRYPTOCURRENCY' or item.get('sector') == 'Cryptocurrency':
-                 item['assetType'] = 'crypto'
-             else:
-                 item['assetType'] = 'stock'
-    
-    return jsonify(results)
+    return jsonify([_format_market_item(r) for r in results if r])
 
 
 @live_bp.route('/intraday/<symbol>', methods=['GET'])
+@limiter.limit("20 per minute")
 def get_live_intraday(symbol):
     """
     Get recent intraday data for live charts.
@@ -120,13 +125,12 @@ def get_live_intraday(symbol):
 
 
 @live_bp.route('/market-pulse', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_market_pulse():
     """
     Get quick market overview for live dashboard via direct handlers.
     Returns major indices and top movers.
     """
-    from handlers.market_data.screener_handler import get_day_gainers, get_day_losers, get_most_active
-    
     try:
         # Fetch directly from external source via handlers
         # Using limit=5 as per UI requirement
@@ -134,30 +138,19 @@ def get_market_pulse():
         losers = get_day_losers(limit=5)
         active = get_most_active(limit=5)
         
-        # Helper to format handler output for frontend
-        def format_item(item):
-            price = item.get('price')
-            change_p = item.get('changePercent')
-            if price: price = float(price)
-            if change_p: change_p = float(change_p)
-            return {
-                'symbol': item.get('symbol'),
-                'name': item.get('name'),
-                'price': price,
-                'changePercent': change_p
-            }
-        
         return jsonify({
-            'gainers': [format_item(g) for g in gainers],
-            'losers': [format_item(l) for l in losers],
-            'mostActive': [format_item(a) for a in active],
+            'gainers': [_format_market_item(g) for g in gainers],
+            'losers': [_format_market_item(l) for l in losers],
+            'mostActive': [_format_market_item(a) for a in active],
             'timestamp': datetime.utcnow().isoformat()
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Market pulse error: {e}")
+        return jsonify({'error': 'Failed to fetch market pulse'}), 500
 
 
 @live_bp.route('/search', methods=['GET'])
+@limiter.limit("30 per minute")
 def search_live_symbols():
     """
     Search symbols with live prices via direct handler.
@@ -196,6 +189,7 @@ def search_live_symbols():
 
 
 @live_bp.route('/dashboard', methods=['GET'])
+@limiter.limit("10 per minute")
 def get_live_dashboard():
     """
     Get comprehensive live dashboard data via direct handlers.
@@ -290,10 +284,12 @@ def get_live_dashboard():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Live dashboard error: {e}")
+        return jsonify({'error': 'Failed to fetch dashboard data'}), 500
 
 
 @live_bp.route('/overview', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_live_overview():
     """
     Get comprehensive live market overview.
@@ -357,16 +353,18 @@ def get_live_overview():
 
 
 @live_bp.route('/stocks', methods=['GET'])
+@cache.cached(timeout=15, query_string=True)
 def get_live_stocks():
     """
-    Get live data for a list of stocks.
-    Fetches symbols from DB (to know which ones to track) then gets live quotes.
+    Get live data for a list of stocks with pagination.
     """
     from handlers.market_data.stock_handler import get_multiple_quotes
     from models.market import MarketData
     
     sector = request.args.get('sector')
-    limit = min(int(request.args.get('limit', 50)), 100) # Cap at 100 for live fetch (requested by user)
+    limit = min(safe_int(request.args.get('limit'), 50), 100)
+    page = max(safe_int(request.args.get('page'), 1), 1)
+    offset = (page - 1) * limit
     
     header_country = request.headers.get('X-User-Country')
     # Use DB to get relevant symbols
@@ -386,8 +384,7 @@ def get_live_stocks():
         query = query.filter(MarketData.sector == sector)
         
     # Order by market cap to show most relevant
-    # Note in DB market_cap might be missing so use volume or id
-    symbols = [s[0] for s in query.limit(limit).all()]
+    symbols = [s[0] for s in query.offset(offset).limit(limit).all()]
     
     if not symbols:
         return jsonify([])
@@ -435,23 +432,26 @@ def get_live_stocks():
             print(f"DB Fallback for stocks failed: {e}")
             # If DB fails too, just return what we have (even if empty)
 
-    return jsonify(quotes)
+    return jsonify([_format_market_item(q, 'stock') for q in quotes if q])
 
 
 @live_bp.route('/crypto', methods=['GET'])
+@cache.cached(timeout=15, query_string=True)
 def get_live_crypto():
-    """Get live crypto data"""
+    """Get live crypto data with pagination"""
     from handlers.market_data.crypto_handler import get_multiple_crypto_quotes, TOP_CRYPTOS
     from models.market import MarketData
     
-    limit = min(int(request.args.get('limit', 25)), 50)
+    limit = min(safe_int(request.args.get('limit', 25)), 50)
+    page = max(safe_int(request.args.get('page'), 1), 1)
+    offset = (page - 1) * limit
     
     # Prioritize DB symbols if we rely on user-added ones, else use top list + DB
     # For now, let's use the TOP_CRYPTOS constant + some major ones from DB
     
     db_symbols = [s[0] for s in MarketData.query.with_entities(MarketData.symbol).filter(
         MarketData.asset_type == 'crypto'
-    ).limit(limit).all()]
+    ).offset(offset).limit(limit).all()]
     
     # Merge unique
     all_symbols = list(set(TOP_CRYPTOS + db_symbols))[:limit]
@@ -483,7 +483,7 @@ def get_live_crypto():
         except Exception as e:
             print(f"DB Fallback for crypto failed: {e}")
             
-    return jsonify(quotes)
+    return jsonify([_format_market_item(q, 'crypto') for q in quotes if q])
 
 
 @live_bp.route('/commodities', methods=['GET'])
@@ -582,7 +582,7 @@ def get_live_forex():
         except Exception as e:
             print(f"DB Fallback for forex failed: {e}")
             
-    return jsonify(results)
+    return jsonify([_format_market_item(r, 'forex') for r in results if r])
 
 
 @live_bp.route('/indices', methods=['GET'])
