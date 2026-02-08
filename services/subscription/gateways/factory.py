@@ -1,27 +1,29 @@
 import os
 from .paypal import PayPalGateway
+from .stripe import StripeGateway
 
 # ==========================================================
 # PAYMENT GATEWAY FACTORY
 # Purpose: This is the 'Switch' that selects the active gateway.
 # 
 # DESIGN CHOICE:
-# Instead of hardcoding 'PayPal' across the app, we ask the 
-# factory for the active gateway. If we switch to 'Stripe' 
-# in the future, we only add it here.
+# Accepts gateway_type as parameter for user-selectable gateways.
+# Falls back to ACTIVE_PAYMENT_GATEWAY env var if not specified.
 # ==========================================================
 
-def get_payment_gateway():
+def get_payment_gateway(gateway_type=None):
     """
-    Returns an instance of the active payment gateway based on .env
+    Returns an instance of the requested payment gateway.
+    
+    Args:
+        gateway_type: 'paypal' or 'stripe'. If None, uses env var.
     """
-    gateway_type = os.getenv('ACTIVE_PAYMENT_GATEWAY', 'paypal').lower()
+    gateway_type = (gateway_type or os.getenv('ACTIVE_PAYMENT_GATEWAY', 'paypal')).lower()
 
     if gateway_type == 'paypal':
         return PayPalGateway()
-    
-    # Placeholder for future gateways
-    # elif gateway_type == 'stripe':
-    #     return StripeGateway()
+    elif gateway_type == 'stripe':
+        return StripeGateway()
 
-    raise ValueError(f"Unsupported or unconfigured payment gateway: {gateway_type}")
+    raise ValueError(f"Unsupported payment gateway: {gateway_type}")
+

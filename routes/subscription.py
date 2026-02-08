@@ -5,6 +5,7 @@ from models import db
 from services.subscription.manager import SubscriptionManager
 from services.subscription.gateways import get_payment_gateway
 from services.subscription.constants import FeatureKeys, UsageLimits
+from datetime import datetime
 
 # ==========================================================
 # SUBSCRIPTION ROUTES
@@ -60,29 +61,50 @@ def checkout():
     user = request.user
     plan_id = data.get('plan_id')
     coupon_code = data.get('coupon_code')
+    is_trial = data.get('trial', False)
+    gateway_type = data.get('gateway', 'stripe')  # Default to Stripe for trial support
     
     if not plan_id:
         return jsonify({'error': 'plan_id is required'}), 400
         
+    plan = SubscriptionPlan.query.get(plan_id)
+    if not plan:
+        return jsonify({'error': 'Invalid plan'}), 400
+
+    # Trial validation
+    if is_trial:
+        if not plan.trial_enabled:
+            return jsonify({'error': 'This plan does not support trial'}), 400
+            
+        # Fraud Prevention: Check if user already used trial
+        if not SubscriptionManager.can_start_trial(user.id):
+            return jsonify({'error': 'You have already used your free trial'}), 400
+            
+        # Note: Both Stripe and PayPal now support subscription trials
+
     # 1. Calculate final price (including discounts)
     calc_result, error = SubscriptionManager.calculate_final_price(plan_id, coupon_code)
     if error:
         return jsonify({'error': error}), 400
         
-    plan = SubscriptionPlan.query.get(plan_id)
     final_price = calc_result['final_price']
     
-    # 2. Get active gateway (PayPal/Stripe)
+    # 2. Get selected gateway (PayPal/Stripe)
     try:
-        gateway = get_payment_gateway()
+        gateway = get_payment_gateway(gateway_type)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
         
     # 3. Create order with provider
+    # Pass trial_days if this is a trial checkout
+    trial_days = plan.trial_days if is_trial and plan.trial_enabled else None
+    
     provider_result, error = gateway.create_order(
         plan_name=plan.name,
         final_price=final_price,
-        currency=plan.currency
+        currency=plan.currency,
+        trial_days=trial_days,
+        plan_id=plan.id  # Pass plan_id so gateway can include it in success URL
     )
     
     if error:
@@ -91,7 +113,9 @@ def checkout():
     return jsonify({
         'order_id': provider_result['order_id'],
         'approval_url': provider_result['approval_url'],
-        'final_price': float(final_price)
+        'final_price': float(final_price),
+        'is_trial': bool(trial_days),
+        'plan_id': plan.id
     })
 
 
@@ -106,9 +130,21 @@ def capture():
     user = request.user
     order_id = data.get('order_id')
     plan_id = data.get('plan_id') # Needed to know what to activate
+    gateway_type = data.get('gateway', 'stripe')  # Default to stripe
     
     if not order_id or not plan_id:
         return jsonify({'error': 'order_id and plan_id are required'}), 400
+    
+    # Convert plan_id to int (may come as string from JSON)
+    try:
+        plan_id = int(plan_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid plan_id format'}), 400
+    
+    # Validate plan exists
+    plan = SubscriptionPlan.query.get(plan_id)
+    if not plan:
+        return jsonify({'error': f'Plan with id {plan_id} not found'}), 400
         
     # 1. IDEMPOTENCY CHECK: Prevent duplicate processing of the same order
     existing_tx = PaymentTransaction.query.filter_by(gateway_transaction_id=order_id).first()
@@ -121,7 +157,7 @@ def capture():
 
     # 2. Finalize payment on gateway
     try:
-        gateway = get_payment_gateway()
+        gateway = get_payment_gateway(gateway_type)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
         
@@ -135,24 +171,32 @@ def capture():
     try:
         gateway_name = getattr(gateway, '__class__', {}).__name__.replace('Gateway', '').lower()
         
+        # Check if this is a trial (Stripe subscription with trial)
+        is_trial = capture_result.get('is_trial', False)
+        
         # This call now only adds to session, it does NOT commit
         sub = SubscriptionManager.activate_subscription(
             user_id=user.id,
             plan_id=plan_id,
             gateway=gateway_name,
-            external_id=capture_result.get('transaction_id')
+            external_id=capture_result.get('transaction_id'),
+            is_trial=is_trial
         )
+        
+        # Validate subscription was created
+        if not sub or sub is False:
+            return jsonify({'error': 'Failed to activate subscription'}), 500
         
         # Log the Transaction (Audit)
         transaction = PaymentTransaction(
             user_id=user.id,
             subscription_id=sub.id,
-            amount=capture_result['amount'],
+            amount=capture_result.get('amount', 0),
             currency='USD', 
             status='succeeded',
             gateway=gateway_name,
             gateway_transaction_id=order_id, # Link to the original Order ID for idempotency
-            description=f"Initial Purchase: {sub.plan.name}"
+            description=f"{'Trial' if is_trial else 'Initial Purchase'}: {sub.plan.name}"
         )
         db.session.add(transaction)
         
@@ -163,13 +207,59 @@ def capture():
             'success': True,
             'message': 'Subscription activated successfully!',
             'plan': sub.plan.name,
-            'expiry': sub.current_period_end.isoformat()
+            'expiry': sub.current_period_end.isoformat(),
+            'is_trial': sub.status == 'trialing'
         })
 
     except Exception as e:
         db.session.rollback() # Undo everything if even one part fails
         print(f"[Subscription ERROR] Atomic capture failed: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Internal system error during activation', 'message': str(e)}), 500
+
+
+@subscription_bp.route('/cancel', methods=['POST'])
+@auth_required
+def cancel_subscription():
+    """
+    Cancels the user's active subscription.
+    Marks status as 'cancelled' but keeps access until period end.
+    """
+    user = request.user
+    
+    # Get user's active subscription
+    sub = UserSubscription.query.filter(
+        UserSubscription.user_id == user.id,
+        UserSubscription.status.in_(['active', 'trialing'])
+    ).first()
+    
+    if not sub:
+        return jsonify({'error': 'No active subscription found'}), 404
+    
+    # Cancel with payment gateway if we have an external subscription
+    if sub.external_subscription_id:
+        try:
+            gateway = get_payment_gateway(sub.payment_gateway or 'stripe')
+            success, message = gateway.cancel_subscription(sub.external_subscription_id)
+            if not success:
+                print(f"[Subscription] Gateway cancel warning: {message}")
+        except Exception as e:
+            print(f"[Subscription] Gateway cancel error: {e}")
+    
+    # Update database
+    sub.status = 'cancelled'
+    if hasattr(sub, 'auto_renew'):
+        sub.auto_renew = False
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Subscription cancelled successfully',
+        'access_until': sub.current_period_end.isoformat() if sub.current_period_end else None
+    })
+
 
 # ==========================================================
 # ADMIN SUB-ROUTES (Subscription Management)
@@ -203,7 +293,9 @@ def admin_create_plan():
             duration_days=data.get('duration_days', 30),
             features=data.get('features', {}),
             max_members=data.get('max_members', 1),
-            is_featured=data.get('is_featured', False)
+            is_featured=data.get('is_featured', False),
+            trial_enabled=data.get('trial_enabled', False),
+            trial_days=data.get('trial_days', 7)
         )
         db.session.add(new_plan)
         db.session.commit()
@@ -219,7 +311,7 @@ def admin_update_plan(plan_id):
     data = request.json
     
     # Update fields if provided
-    for key in ['name', 'description', 'price', 'features', 'is_active', 'is_featured']:
+    for key in ['name', 'description', 'price', 'features', 'is_active', 'is_featured', 'trial_enabled', 'trial_days']:
         if key in data:
             setattr(plan, key, data[key])
             

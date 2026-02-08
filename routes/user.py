@@ -84,13 +84,23 @@ def update_profile():
     if 'avatarUrl' in data:
         user.avatar_url = data['avatarUrl']
     
+    # Profile customization fields
+    if 'specializations' in data:
+        user.specializations = data['specializations']
+    
+    if 'certifications' in data:
+        user.certifications = data['certifications']
+    
+    if 'hourlyRate' in data:
+        user.hourly_rate = data['hourlyRate']
+    
     user.updated_at = datetime.utcnow()
     db.session.commit()
     
     # Track profile update activity
     try:
         from handlers import track_profile_update
-        changed_fields = [k for k in ['name', 'phone', 'avatarUrl'] if k in data]
+        changed_fields = [k for k in ['name', 'phone', 'avatarUrl', 'specializations', 'certifications', 'hourlyRate'] if k in data]
         track_profile_update(user.id, changed_fields)
     except Exception as e:
         print(f'[User] Activity tracking failed: {e}')
@@ -368,33 +378,43 @@ def get_user_watchlist():
 
 @user_bp.route('/net-worth', methods=['GET'])
 def get_net_worth():
-    """Get user's net worth calculated from portfolio holdings"""
+    """Get user's net worth calculated from portfolio holdings using LIVE market data"""
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Authentication required'}), 401
     
-    from models import UserPortfolio, PortfolioHolding
+    from models import UserPortfolio, PortfolioHolding, MarketData
     
     # Get all user portfolios
     portfolios = UserPortfolio.query.filter_by(user_id=user.id).all()
     
+    # Gather all holdings and their symbols
+    all_holdings = PortfolioHolding.query.join(UserPortfolio).filter(UserPortfolio.user_id == user.id).all()
+    symbols = set(h.symbol for h in all_holdings)
+    
+    # Fetch LIVE prices from MarketData (same as /portfolio/list does)
+    market_map = {}
+    if symbols:
+        market_data = MarketData.query.filter(MarketData.symbol.in_(symbols)).all()
+        for md in market_data:
+            market_map[md.symbol] = float(md.price) if md.price is not None else 0
+    
     total_value = 0
     total_cost = 0
-    total_gain = 0
     
-    for portfolio in portfolios:
-        holdings = PortfolioHolding.query.filter_by(portfolio_id=portfolio.id).all()
-        for h in holdings:
-            shares = float(h.shares or 0)
-            avg_price = float(h.avg_buy_price or 0)
-            current_price = float(h.current_price or 0)
-            
-            value = shares * current_price
-            cost = shares * avg_price
-            
-            total_value += value
-            total_cost += cost
-            total_gain += (value - cost)
+    for h in all_holdings:
+        shares = float(h.shares or 0)
+        avg_price = float(h.avg_buy_price or 0)
+        # Use LIVE price from MarketData, fallback to stored current_price
+        current_price = market_map.get(h.symbol, float(h.current_price or 0))
+        
+        value = shares * current_price
+        cost = shares * avg_price
+        
+        total_value += value
+        total_cost += cost
+    
+    total_gain = total_value - total_cost
     
     # Calculate percentage change
     change_percent = (total_gain / total_cost * 100) if total_cost > 0 else 0
@@ -416,7 +436,7 @@ def get_net_worth():
 def get_user_subscription():
     """
     Returns the current user's subscription status and feature usage.
-    This powers the frontend's feature gating system.
+    This powers the frontend's feature gating system AND the billing page.
     """
     from models.subscription import UserSubscription
     from models.feature_usage import UserFeatureUsage
@@ -437,9 +457,12 @@ def get_user_subscription():
     if not sub or not sub.plan:
         # No subscription = Free tier defaults
         return jsonify({
+            'has_subscription': False,
             'plan_name': 'Free',
+            'plan_id': None,
             'status': 'active',
             'expires_at': None,
+            'subscription': None,  # For billing page compatibility
             'features': {
                 'portfolio_tracking': True,
                 'real_time_data': True,
@@ -459,10 +482,29 @@ def get_user_subscription():
     boolean_features = {k: v for k, v in features.items() if isinstance(v, bool)}
     limit_features = {k: v for k, v in features.items() if isinstance(v, (int, float))}
     
+    # Build subscription object for billing page
+    subscription_data = {
+        'id': sub.id,
+        'status': sub.status,
+        'auto_renew': sub.auto_renew if hasattr(sub, 'auto_renew') else True,
+        'start_date': sub.created_at.isoformat() if hasattr(sub, 'created_at') and sub.created_at else None,
+        'current_period_end': sub.current_period_end.isoformat() if sub.current_period_end else None,
+        'plan': {
+            'id': plan.id,
+            'name': plan.name,
+            'price': float(plan.price),
+            'currency': plan.currency or 'USD',
+            'interval': plan.interval if hasattr(plan, 'interval') else 'month',
+        }
+    }
+    
     return jsonify({
+        'has_subscription': True,
         'plan_name': plan.name,
+        'plan_id': plan.id,
         'status': sub.status,
         'expires_at': sub.current_period_end.isoformat() if sub.current_period_end else None,
+        'subscription': subscription_data,  # For billing page
         'features': boolean_features,
         'usage': _get_usage_for_plan(user_id, limit_features)
     })

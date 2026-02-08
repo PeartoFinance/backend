@@ -29,6 +29,17 @@ class SubscriptionManager:
         return sub
 
     @staticmethod
+    def can_start_trial(user_id):
+        """
+        Fraud Prevention: Check if user has already used a trial.
+        Returns False if user has previously had a trial subscription.
+        """
+        existing = UserSubscription.query.filter_by(user_id=user_id).first()
+        if existing and existing.payment_gateway == 'trial':
+            return False
+        return True
+
+    @staticmethod
     def check_access(user_id, feature_key):
         """
         Determines if a user has access to a specific feature.
@@ -110,9 +121,9 @@ class SubscriptionManager:
         }, None
 
     @staticmethod
-    def activate_subscription(user_id, plan_id, gateway, external_id=None):
+    def activate_subscription(user_id, plan_id, gateway, external_id=None, is_trial=False):
         """
-        Called after a successful payment!
+        Called after a successful payment OR to start a trial.
         Creates or updates the UserSubscription record.
         """
         plan = SubscriptionPlan.query.get(plan_id)
@@ -122,11 +133,19 @@ class SubscriptionManager:
         # Check for existing sub to update, or create new
         sub = UserSubscription.query.filter_by(user_id=user_id).first()
         
-        expiry_date = datetime.utcnow() + timedelta(days=plan.duration_days)
+        # Determine duration and status
+        if is_trial and plan.trial_enabled:
+            days = plan.trial_days
+            status = 'trialing'
+        else:
+            days = plan.duration_days
+            status = 'active'
+            
+        expiry_date = datetime.utcnow() + timedelta(days=days)
         
         if sub:
             sub.plan_id = plan.id
-            sub.status = 'active'
+            sub.status = status
             sub.current_period_end = expiry_date
             sub.payment_gateway = gateway
             sub.external_subscription_id = external_id
@@ -134,7 +153,7 @@ class SubscriptionManager:
             sub = UserSubscription(
                 user_id=user_id,
                 plan_id=plan.id,
-                status='active',
+                status=status,
                 current_period_end=expiry_date,
                 payment_gateway=gateway,
                 external_subscription_id=external_id

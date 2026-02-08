@@ -42,6 +42,10 @@ class User(db.Model):
     tax_residency = db.Column(db.String(100))
     language_pref = db.Column(db.String(10), default='en')
     country_code = db.Column(db.String(2), default='US')
+    # Profile customization fields
+    specializations = db.Column(db.JSON)  # [{"id": "1", "name": "Equities", "selected": true}, ...]
+    certifications = db.Column(db.JSON)   # [{"id": "1", "name": "CFA Level I", "level": true}, ...]
+    hourly_rate = db.Column(db.Numeric(10, 2))
 
     # Relationships
     notification_preferences = db.relationship('UserNotificationPref', backref='user', uselist=False, cascade='all, delete-orphan')
@@ -53,6 +57,7 @@ class User(db.Model):
             'email': self.email,
             'role': self.role,
             'avatarUrl': self.avatar_url,
+            'phone': self.phone,
             'countryCode': self.country_code,
             'currency': self.currency,
             'languagePref': self.language_pref,
@@ -66,7 +71,10 @@ class User(db.Model):
             'referredBy': self.referred_by,
             'createdAt': self.created_at.isoformat() if self.created_at else None,
             'lastLoginAt': self.last_login_at.isoformat() if self.last_login_at else None,
-            'hasPassword': bool(self.password)
+            'hasPassword': bool(self.password),
+            'specializations': self.specializations or [],
+            'certifications': self.certifications or [],
+            'hourlyRate': float(self.hourly_rate) if self.hourly_rate else None,
         }
 
 

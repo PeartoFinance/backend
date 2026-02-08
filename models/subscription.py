@@ -39,6 +39,11 @@ class SubscriptionPlan(db.Model):
     is_active = db.Column(db.Boolean, default=True)       # If False, plan is hidden from new users
     is_featured = db.Column(db.Boolean, default=False)    # If True, highlighted as "Best Value" on UI
     
+    # TRIAL MODE CONFIGURATION
+    # Admin can enable trial mode per plan with configurable duration
+    trial_enabled = db.Column(db.Boolean, default=False)  # If True, new users can start a trial
+    trial_days = db.Column(db.Integer, default=7)         # Duration of trial in days
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -53,7 +58,9 @@ class SubscriptionPlan(db.Model):
             'features': self.features,
             'maxMembers': self.max_members,
             'description': self.description,
-            'isFeatured': self.is_featured
+            'isFeatured': self.is_featured,
+            'trialEnabled': self.trial_enabled,
+            'trialDays': self.trial_days
         }
 
 
