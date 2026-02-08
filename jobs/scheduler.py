@@ -7,7 +7,7 @@ import os
 import logging
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -289,6 +289,10 @@ def _register_market_jobs():
         update_business_profiles, update_ytd_returns
     )
     
+    # Calculate a small delay (2 mins) to allow server to settle after push/restart
+    # This prevents immediate heavy API calls to Yahoo right after boot
+    start_date = datetime.utcnow() + timedelta(minutes=2)
+    
     # YTD Returns update (Daily at 1 AM)
     scheduler.add_job(
         lambda: queue_job(update_ytd_returns, 'update_ytd_returns'),
@@ -304,6 +308,7 @@ def _register_market_jobs():
         lambda: queue_job(update_all_stocks, 'update_all_stocks'),
         'interval',
         minutes=JOB_CONFIG['stocks_interval_minutes'],
+        start_date=start_date,
         id='update_stocks',
         name='Update Stock Prices',
         replace_existing=True
@@ -314,6 +319,7 @@ def _register_market_jobs():
         lambda: queue_job(update_all_crypto, 'update_all_crypto'),
         'interval',
         minutes=JOB_CONFIG['crypto_interval_minutes'],
+        start_date=start_date,
         id='update_crypto',
         name='Update Crypto Prices',
         replace_existing=True
@@ -324,6 +330,7 @@ def _register_market_jobs():
         lambda: queue_job(update_all_indices, 'update_all_indices'),
         'interval',
         minutes=JOB_CONFIG['indices_interval_minutes'],
+        start_date=start_date,
         id='update_indices',
         name='Update Market Indices',
         replace_existing=True
@@ -334,6 +341,7 @@ def _register_market_jobs():
         lambda: queue_job(update_all_commodities, 'update_all_commodities'),
         'interval',
         minutes=JOB_CONFIG['commodities_interval_minutes'],
+        start_date=start_date,
         id='update_commodities',
         name='Update Commodities',
         replace_existing=True
@@ -382,11 +390,14 @@ def _register_notification_jobs():
     )
     from .news_jobs import import_all_news
     
+    start_date = datetime.utcnow() + timedelta(minutes=2)
+    
     # Watchlist price alerts
     scheduler.add_job(
         lambda: queue_job(check_watchlist_alerts, 'check_watchlist_alerts'),
         'interval',
         seconds=JOB_CONFIG['watchlist_interval_seconds'],
+        start_date=start_date,
         id='check_watchlist',
         name='Check Watchlist Alerts',
         replace_existing=True
@@ -443,6 +454,7 @@ def _register_notification_jobs():
         lambda: queue_job(import_all_news, 'import_all_news'),
         'interval',
         minutes=30,
+        start_date=start_date,
         id='import_news',
         name='Import News',
         replace_existing=True

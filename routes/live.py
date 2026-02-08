@@ -389,24 +389,49 @@ def get_live_stocks():
     if not symbols:
         return jsonify([])
         
-    # Name clash with model if not careful
+    # fetch full objects to check freshness
     from models.market import MarketData as MarketDataModel
-
-    # Fetch live
-    quotes = get_multiple_quotes(symbols)
+    db_stocks = MarketDataModel.query.filter(
+        MarketDataModel.symbol.in_(symbols)
+    ).all()
     
-    # Fallback to DB if live fetch failed (empty or significantly fewer than requested)
-    if not quotes or len(quotes) < len(symbols) * 0.5:
-        try:
-            # Re-fetch full objects from DB
-            db_stocks = MarketDataModel.query.filter(MarketDataModel.symbol.in_(symbols)).all()
-            
-            # Create a map of live quotes for quick lookup
+    # Check if DB data is fresh (within 15 minutes)
+    fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
+    all_fresh = all(s.last_updated and s.last_updated > fresh_cutoff for s in db_stocks) if db_stocks else False
+    
+    quotes = []
+    if all_fresh and db_stocks:
+        # Use DB data directly
+        for stock in db_stocks:
+            quotes.append({
+                'symbol': stock.symbol,
+                'name': stock.name,
+                'price': float(stock.price) if stock.price else None,
+                'change': float(stock.change) if stock.change else None,
+                'changePercent': float(stock.change_percent) if stock.change_percent else None,
+                'volume': stock.volume,
+                'marketCap': stock.market_cap,
+                'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
+                'high52w': float(stock._52_week_high) if stock._52_week_high else None,
+                'low52w': float(stock._52_week_low) if stock._52_week_low else None,
+                'sector': stock.sector,
+                'industry': stock.industry,
+                'exchange': stock.exchange,
+                'currency': stock.currency,
+                'quoteType': 'EQUITY' if stock.asset_type == 'stock' else 'ETF',
+                'assetType': stock.asset_type
+            })
+    else:
+        # Fetch live if any are stale or it's a fresh restart
+        from handlers.market_data.stock_handler import get_multiple_quotes
+        quotes = get_multiple_quotes(symbols)
+        
+        # Fallback to DB if live fetch failed
+        if not quotes or len(quotes) < len(symbols) * 0.5:
+            # Re-map using what we already fetched from DB
             live_map = {q['symbol']: q for q in quotes}
-            
             quotes = []
             for stock in db_stocks:
-                # Use live if available, else DB
                 if stock.symbol in live_map:
                     quotes.append(live_map[stock.symbol])
                 else:
@@ -428,9 +453,6 @@ def get_live_stocks():
                         'quoteType': 'EQUITY' if stock.asset_type == 'stock' else 'ETF',
                         'assetType': stock.asset_type
                     })
-        except Exception as e:
-            print(f"DB Fallback for stocks failed: {e}")
-            # If DB fails too, just return what we have (even if empty)
 
     return jsonify([_format_market_item(q, 'stock') for q in quotes if q])
 
@@ -456,17 +478,37 @@ def get_live_crypto():
     # Merge unique
     all_symbols = list(set(TOP_CRYPTOS + db_symbols))[:limit]
     
-    quotes = get_multiple_crypto_quotes(all_symbols)
+    # Fetch from DB first to check for freshness
+    db_crypto = MarketData.query.filter(
+        MarketData.asset_type == 'crypto',
+        MarketData.symbol.in_(all_symbols)
+    ).all()
     
-    # Fallback to DB
-    if not quotes:
-        try:
-             # Fetch from DB
-            db_crypto = MarketData.query.filter(
-                MarketData.asset_type == 'crypto',
-                MarketData.symbol.in_(all_symbols)
-            ).all()
-            
+    fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
+    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff for c in db_crypto) if db_crypto else False
+    
+    quotes = []
+    if all_fresh and db_crypto:
+        for c in db_crypto:
+            quotes.append({
+                'symbol': c.symbol,
+                'name': c.name,
+                'price': float(c.price) if c.price else None,
+                'change': float(c.change) if c.change else None,
+                'changePercent': float(c.change_percent) if c.change_percent else None,
+                'volume': c.volume,
+                'marketCap': c.market_cap,
+                'currency': c.currency,
+                'quoteType': 'CRYPTOCURRENCY',
+                'assetType': 'crypto'
+            })
+    else:
+        # Either stale or forced refresh needed
+        from handlers.market_data.crypto_handler import get_multiple_crypto_quotes
+        quotes = get_multiple_crypto_quotes(all_symbols)
+        
+        # Fallback to DB if live fetch failed
+        if not quotes:
             for c in db_crypto:
                 quotes.append({
                     'symbol': c.symbol,
@@ -480,25 +522,41 @@ def get_live_crypto():
                     'quoteType': 'CRYPTOCURRENCY',
                     'assetType': 'crypto'
                 })
-        except Exception as e:
-            print(f"DB Fallback for crypto failed: {e}")
             
     return jsonify([_format_market_item(q, 'crypto') for q in quotes if q])
 
 
 @live_bp.route('/commodities', methods=['GET'])
 def get_live_commodities():
-    """Get live commodities data with DB fallback"""
     from handlers.market_data.commodity_handler import get_all_commodities
     from models.market import CommodityData
     
-    # Try live fetch
-    commodities = get_all_commodities() or []
+    # Check DB first
+    db_commodities = CommodityData.query.all()
+    fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
+    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff for c in db_commodities) if db_commodities else False
     
-    if not commodities:
-        # Fallback to DB
-        try:
-            db_commodities = CommodityData.query.all()
+    commodities = []
+    if all_fresh and db_commodities:
+        for c in db_commodities:
+            commodities.append({
+                'symbol': c.symbol,
+                'name': c.name,
+                'price': float(c.price) if c.price else None,
+                'change': float(c.change) if c.change else None,
+                'changePercent': float(c.change_percent) if c.change_percent else None,
+                'dayHigh': float(c.day_high) if c.day_high else None,
+                'dayLow': float(c.day_low) if c.day_low else None,
+                'unit': c.unit,
+                'currency': c.currency,
+                'countryCode': c.country_code
+            })
+    else:
+        # Try live fetch
+        commodities = get_all_commodities() or []
+        
+        if not commodities and db_commodities:
+            # Fallback
             for c in db_commodities:
                 commodities.append({
                     'symbol': c.symbol,
@@ -512,8 +570,6 @@ def get_live_commodities():
                     'currency': c.currency,
                     'countryCode': c.country_code
                 })
-        except Exception as e:
-            print(f"DB Fallback for commodities failed: {e}")
             
     return jsonify(commodities)
 
@@ -591,13 +647,33 @@ def get_live_indices():
     from handlers.market_data.index_handler import get_all_major_indices
     from models.market import MarketIndices
     
-    # Try live fetch first
-    indices = get_all_major_indices() or []
+    # Check DB first
+    db_indices = MarketIndices.query.all()
+    fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
+    all_fresh = all(idx.last_updated and idx.last_updated > fresh_cutoff for idx in db_indices) if db_indices else False
     
-    if not indices:
-        # Fallback to DB
-        try:
-            db_indices = MarketIndices.query.all()
+    indices = []
+    if all_fresh and db_indices:
+        for idx in db_indices:
+            indices.append({
+                'symbol': idx.symbol,
+                'name': idx.name,
+                'price': idx.price,
+                'change': idx.change_amount,
+                'changePercent': idx.change_percent,
+                'previousClose': idx.previous_close,
+                'dayHigh': idx.day_high,
+                'dayLow': idx.day_low,
+                'yearHigh': idx.year_high,
+                'yearLow': idx.year_low,
+                'displayName': idx.name
+            })
+    else:
+        # Try live fetch first
+        indices = get_all_major_indices() or []
+        
+        if not indices and db_indices:
+            # Fallback
             for idx in db_indices:
                 indices.append({
                     'symbol': idx.symbol,
@@ -612,8 +688,6 @@ def get_live_indices():
                     'yearLow': idx.year_low,
                     'displayName': idx.name
                 })
-        except Exception as e:
-            print(f"DB Fallback failed: {e}")
 
     # Format for frontend
     formatted = []
