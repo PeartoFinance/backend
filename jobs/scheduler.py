@@ -51,9 +51,9 @@ def init_scheduler(app=None):
         'default': MemoryJobStore()
     }
     
-    # In sequential mode, we only need a few threads for the queue processor
-    # In parallel mode, we need more threads for concurrent jobs
-    pool_size = 5 if CRON_MODE == 'sequential' else 20
+    # In shared hosting, we must keep threads Very Low to avoid 'fork() failed'
+    # 5 threads is usually the safe limit for background workers
+    pool_size = 5 
     
     executors = {
         'default': ThreadPoolExecutor(pool_size),

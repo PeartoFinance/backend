@@ -3,6 +3,7 @@ Market Data Update Jobs
 Periodic jobs to refresh market data from yfinance
 """
 import logging
+import time
 from datetime import datetime
 from typing import Dict, Any
 
@@ -53,6 +54,8 @@ def update_all_stocks() -> Dict[str, Any]:
                     result = import_stocks_to_db(batch, country_code=country)
                     total_updated += result.get('updated', 0)
                     total_errors += result.get('errors', 0)
+                    # Add small delay between batches to let the server breathe
+                    time.sleep(1)
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Stock update complete: {total_updated} updated, {total_errors} errors in {elapsed:.1f}s")
@@ -226,6 +229,10 @@ def update_business_profiles() -> Dict[str, Any]:
                     sync_forecast_data(symbol)
                     sync_stock_news(symbol)
                     success_count += 1
+                    
+                    # Throttling to avoid "fork() failed" and DB connection drops
+                    if success_count % 3 == 0:
+                        time.sleep(1)
                 except Exception as e:
                     logger.error(f"Failed to sync profile for {symbol}: {e}")
                     error_count += 1
@@ -277,6 +284,10 @@ def update_financials() -> Dict[str, Any]:
                         success_count += 1
                     else:
                         error_count += 1
+                    
+                    # Throttling
+                    if success_count % 5 == 0:
+                        time.sleep(1)
                 except Exception as e:
                     logger.error(f"Failed to sync financials for {symbol}: {e}")
                     error_count += 1
@@ -389,35 +400,51 @@ def update_ytd_returns() -> Dict[str, Any]:
         with app.app_context():
             stocks = MarketData.query.filter_by(asset_type='stock').all()
             
-            if not stocks:
-                return {'status': 'ok', 'updated': 0}
-                
+            # Batching to avoid memory issues
+            batch_size = 30
+            symbols = [s.symbol for s in stocks]
+            
             updated_count = 0
             error_count = 0
             
-            for stock in stocks:
+            for i in range(0, len(symbols), batch_size):
+                batch = symbols[i:i+batch_size]
                 try:
-                    # Fetch history from start of year
-                    ticker = yf.Ticker(stock.symbol)
-                    hist = ticker.history(period="ytd")
+                    # Multi-symbol download is much faster/safer than single Ticker loop
+                    data = yf.download(batch, period="ytd", interval="1d", group_by='ticker', threads=False, progress=False)
                     
-                    if not hist.empty and len(hist) > 1:
-                        first_price = float(hist['Close'].iloc[0])
-                        current_price = float(hist['Close'].iloc[-1])
-                        
-                        if first_price > 0:
-                            ytd_perf = ((current_price - first_price) / first_price) * 100
-                            stock.ytd_return = ytd_perf
-                            updated_count += 1
+                    for symbol in batch:
+                        try:
+                            # Extract data for this symbol
+                            if len(batch) > 1:
+                                hist = data[symbol]
+                            else:
+                                hist = data
+                                
+                            if not hist.empty and len(hist) > 1:
+                                # Get start price (first row) and end price (last row)
+                                first_price = float(hist['Close'].dropna().iloc[0])
+                                current_price = float(hist['Close'].dropna().iloc[-1])
+                                
+                                if first_price > 0:
+                                    ytd_perf = ((current_price - first_price) / first_price) * 100
+                                    # Update the model
+                                    stock_obj = next((s for s in stocks if s.symbol == symbol), None)
+                                    if stock_obj:
+                                        stock_obj.ytd_return = ytd_perf
+                                        updated_count += 1
+                        except Exception as inner_e:
+                            logger.debug(f"YTD detail error for {symbol}: {inner_e}")
+                            error_count += 1
                             
-                            # Commit in small batches to prevent long locks
-                            if updated_count % 10 == 0:
-                                db.session.commit()
-                except Exception as e:
-                    logger.warning(f"Could not calculate YTD for {stock.symbol}: {e}")
-                    error_count += 1
-            
-            db.session.commit()
+                    db.session.commit()
+                    # Small sleep to let the server breathe
+                    time.sleep(1)
+                    
+                except Exception as batch_e:
+                    logger.warning(f"YTD batch failed: {batch_e}")
+                    error_count += len(batch)
+
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"YTD update complete: {updated_count} updated in {elapsed:.1f}s")
             

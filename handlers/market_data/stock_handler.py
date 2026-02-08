@@ -311,6 +311,10 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
         import yfinance as yf
         tickers_data = yf.download(symbols, period='1d', interval='1m', group_by='ticker', threads=False, progress=False)
         
+        if tickers_data is None or (hasattr(tickers_data, 'empty') and tickers_data.empty):
+            logger.warning(f"Bulk download returned no data for symbols: {symbols}")
+            return {'imported': 0, 'updated': 0, 'errors': len(symbols)}
+
         for symbol in symbols:
             try:
                 symbol = symbol.upper()
