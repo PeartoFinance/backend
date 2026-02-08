@@ -34,8 +34,8 @@ if RATELIMIT_STORAGE_URL == 'memory://':
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=RATELIMIT_STORAGE_URL,
-    # Gracefully handle backend failures - fallback to allowing requests
-    default_limits=["200 per day", "50 per hour"],
+    # Production-friendly rate limits
+    default_limits=["5000 per day", "1000 per hour", "100 per minute"],
     storage_options={"socket_connect_timeout": 5},  # Timeout for Redis connection
     strategy="fixed-window",  # Less memory-intensive than moving-window
 )
