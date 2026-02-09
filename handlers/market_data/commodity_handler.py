@@ -134,20 +134,29 @@ def get_all_commodities() -> List[Dict[str, Any]]:
                 if 'Close' not in symbol_data.columns or symbol_data['Close'].empty:
                     continue
                 
-                latest = symbol_data.iloc[-1]
-                price = float(latest['Close']) if not pd.isna(latest['Close']) else None
+                # Get latest VALID values to handle pre-market NaNs
+                valid_closes = symbol_data['Close'].dropna()
+                if valid_closes.empty:
+                    continue
+                    
+                last_valid_idx = valid_closes.index[-1]
+                price = float(valid_closes.loc[last_valid_idx])
                 
                 # Calculate change
                 change = None
                 change_percent = None
                 previous_close = None
                 
-                if len(symbol_data) >= 2:
-                    prev = symbol_data.iloc[-2]
-                    previous_close = float(prev['Close']) if not pd.isna(prev['Close']) else None
+                # Find previous close
+                if len(valid_closes) >= 2:
+                    prev_valid_idx = valid_closes.index[-2]
+                    previous_close = float(valid_closes.loc[prev_valid_idx])
+                    
                     if previous_close and price:
                         change = price - previous_close
                         change_percent = (change / previous_close) * 100
+                
+                latest = symbol_data.loc[last_valid_idx]
                 
                 results.append({
                     'symbol': symbol,

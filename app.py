@@ -14,7 +14,7 @@ from flask_cors import CORS
 from config import config
 from models.base import db
 from flask_migrate import Migrate
-from extensions import cache, compress, limiter
+from extensions import cache, compress, limiter, CACHE_REDIS_URL
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -24,9 +24,20 @@ app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = config.SQLALCHEMY_ENGINE_OPTIONS
 
-# Cache configuration - simple in-memory cache for performance
-app.config['CACHE_TYPE'] = 'simple'
-app.config['CACHE_DEFAULT_TIMEOUT'] = 30
+# Cache configuration - Redis for shared caching across workers
+# Falls back to simple cache if Redis is unavailable
+try:
+    import redis
+    r = redis.from_url(CACHE_REDIS_URL)
+    r.ping()  # Test connection
+    app.config['CACHE_TYPE'] = 'redis'
+    app.config['CACHE_REDIS_URL'] = CACHE_REDIS_URL
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+    print("[OK] Using Redis cache backend")
+except Exception as e:
+    print(f"[WARNING] Redis cache unavailable, using simple cache: {e}")
+    app.config['CACHE_TYPE'] = 'simple'
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 30
 
 # Initialize extensions
 db.init_app(app)

@@ -26,14 +26,14 @@ DEFAULT_BADGES = [
 ]
 
 
-@badges_bp.route('/social/badges', methods=['GET'])
+@badges_bp.route('/badges', methods=['GET'])
 def list_all_badges():
     """List all available badges"""
     badges = Badge.query.filter_by(is_active=True).order_by(Badge.sort_order).all()
     return jsonify({'badges': [b.to_dict() for b in badges]})
 
 
-@badges_bp.route('/social/badges/my', methods=['GET'])
+@badges_bp.route('/badges/my', methods=['GET'])
 @auth_required
 def get_my_badges():
     """Get current user's earned badges"""
@@ -58,7 +58,7 @@ def get_my_badges():
     })
 
 
-@badges_bp.route('/social/badges/user/<int:user_id>', methods=['GET'])
+@badges_bp.route('/badges/user/<int:user_id>', methods=['GET'])
 def get_user_badges(user_id):
     """Get a user's badges"""
     user = User.query.get(user_id)
@@ -82,7 +82,7 @@ def get_user_badges(user_id):
     return jsonify({'badges': result, 'badgeCount': len(result)})
 
 
-@badges_bp.route('/social/badges/seed', methods=['POST'])
+@badges_bp.route('/badges/seed', methods=['POST'])
 def seed_badges():
     """Seed default badges (admin only)"""
     # Simple check - in production use proper admin auth
@@ -108,7 +108,7 @@ def seed_badges():
     return jsonify({'success': True, 'created': created})
 
 
-@badges_bp.route('/social/badges/award/<badge_id>', methods=['POST'])
+@badges_bp.route('/badges/award/<badge_id>', methods=['POST'])
 @auth_required
 def check_and_award_badge(badge_id):
     """Check if user qualifies for badge and award it"""
@@ -139,7 +139,7 @@ def check_and_award_badge(badge_id):
     })
 
 
-@badges_bp.route('/social/badges/leaderboard', methods=['GET'])
+@badges_bp.route('/badges/leaderboard', methods=['GET'])
 def get_leaderboard():
     """Get badge points leaderboard"""
     limit = min(request.args.get('limit', 10, type=int), 50)

@@ -20,6 +20,11 @@ REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'zboeUzOlC2kcjLXWb7v')
 REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
 REDIS_PORT = os.getenv('REDIS_PORT', '38469')
 REDIS_DB = os.getenv('REDIS_LIMITER_DB', '0')
+REDIS_CACHE_DB = os.getenv('REDIS_CACHE_DB', '1')  # Separate DB for cache
+
+# Build Redis URLs
+REDIS_BASE_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}'
+CACHE_REDIS_URL = os.getenv('CACHE_REDIS_URL', f'{REDIS_BASE_URL}/{REDIS_CACHE_DB}')
 
 # Build Redis URL - use Redis if available, fallback to memory
 RATELIMIT_STORAGE_URL = os.getenv(

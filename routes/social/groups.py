@@ -20,7 +20,7 @@ def slugify(text):
     return text[:100]
 
 
-@groups_bp.route('/social/groups', methods=['GET'])
+@groups_bp.route('/groups', methods=['GET'])
 def list_groups():
     """List public groups"""
     page = request.args.get('page', 1, type=int)
@@ -50,7 +50,7 @@ def list_groups():
     })
 
 
-@groups_bp.route('/social/groups', methods=['POST'])
+@groups_bp.route('/groups', methods=['POST'])
 @auth_required
 def create_group():
     """Create a new group"""
@@ -93,7 +93,7 @@ def create_group():
     return jsonify({'success': True, 'group': group.to_dict()}), 201
 
 
-@groups_bp.route('/social/groups/<group_id>', methods=['GET'])
+@groups_bp.route('/groups/<group_id>', methods=['GET'])
 def get_group(group_id):
     """Get group details"""
     group = DiscussionGroup.query.get(group_id) or \
@@ -112,7 +112,7 @@ def get_group(group_id):
     return jsonify({'group': group_data})
 
 
-@groups_bp.route('/social/groups/<group_id>/join', methods=['POST'])
+@groups_bp.route('/groups/<group_id>/join', methods=['POST'])
 @auth_required
 def join_group(group_id):
     """Join a group"""
@@ -142,7 +142,7 @@ def join_group(group_id):
     return jsonify({'success': True})
 
 
-@groups_bp.route('/social/groups/<group_id>/leave', methods=['POST'])
+@groups_bp.route('/groups/<group_id>/leave', methods=['POST'])
 @auth_required
 def leave_group(group_id):
     """Leave a group"""
@@ -170,7 +170,7 @@ def leave_group(group_id):
     return jsonify({'success': True})
 
 
-@groups_bp.route('/social/groups/<group_id>/posts', methods=['GET'])
+@groups_bp.route('/groups/<group_id>/posts', methods=['GET'])
 def get_group_posts(group_id):
     """Get posts in a group"""
     group = DiscussionGroup.query.get(group_id) or \
@@ -204,7 +204,7 @@ def get_group_posts(group_id):
     })
 
 
-@groups_bp.route('/social/groups/<group_id>/posts', methods=['POST'])
+@groups_bp.route('/groups/<group_id>/posts', methods=['POST'])
 @auth_required
 def create_group_post(group_id):
     """Create a post in a group"""
@@ -249,7 +249,7 @@ def create_group_post(group_id):
     return jsonify({'success': True, 'post': post_data}), 201
 
 
-@groups_bp.route('/social/groups/<group_id>/members', methods=['GET'])
+@groups_bp.route('/groups/<group_id>/members', methods=['GET'])
 def get_group_members(group_id):
     """Get group members"""
     group = DiscussionGroup.query.get(group_id) or \
@@ -274,7 +274,7 @@ def get_group_members(group_id):
     return jsonify({'members': result, 'total': len(result)})
 
 
-@groups_bp.route('/social/groups/my', methods=['GET'])
+@groups_bp.route('/groups/my', methods=['GET'])
 @auth_required
 def get_my_groups():
     """Get groups user is a member of"""

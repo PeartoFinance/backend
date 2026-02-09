@@ -50,11 +50,13 @@ def update_all_stocks() -> Dict[str, Any]:
     Update all stocks in the database with latest prices from yfinance.
     Fetches symbols from MarketData table and refreshes each one.
     """
+    from models import db
+    
     logger.info("Starting stock update job")
     start_time = datetime.utcnow()
     
     try:
-        from models import db, MarketData
+        from models import MarketData
         from handlers.market_data import import_stocks_to_db
         
         app = get_app()
@@ -98,12 +100,19 @@ def update_all_stocks() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Stock update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_all_crypto() -> Dict[str, Any]:
     """
     Update all cryptocurrency prices from yfinance.
     """
+    from models import db
+    
     logger.info("Starting crypto update job")
     start_time = datetime.utcnow()
     
@@ -126,12 +135,19 @@ def update_all_crypto() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Crypto update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_all_indices() -> Dict[str, Any]:
     """
     Update all market indices from yfinance.
     """
+    from models import db
+    
     logger.info("Starting indices update job")
     start_time = datetime.utcnow()
     
@@ -154,12 +170,19 @@ def update_all_indices() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Indices update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_all_commodities() -> Dict[str, Any]:
     """
     Update all commodity prices from yfinance.
     """
+    from models import db
+    
     logger.info("Starting commodities update job")
     start_time = datetime.utcnow()
     
@@ -182,6 +205,11 @@ def update_all_commodities() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Commodities update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_earnings_calendar() -> Dict[str, Any]:
@@ -189,6 +217,8 @@ def update_earnings_calendar() -> Dict[str, Any]:
     Update earnings calendar from yfinance.
     Runs daily to fetch upcoming earnings announcements.
     """
+    from models import db
+    
     logger.info("Starting earnings calendar update job")
     
     try:
@@ -202,6 +232,11 @@ def update_earnings_calendar() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Earnings calendar update failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_dividends() -> Dict[str, Any]:
@@ -209,6 +244,8 @@ def update_dividends() -> Dict[str, Any]:
     Update dividend data from yfinance.
     Runs daily to fetch ex-dividend dates and yields.
     """
+    from models import db
+    
     logger.info("Starting dividends update job")
     
     try:
@@ -222,6 +259,11 @@ def update_dividends() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Dividends update failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_business_profiles() -> Dict[str, Any]:
@@ -229,11 +271,13 @@ def update_business_profiles() -> Dict[str, Any]:
     Update Financials and Forecast data for all 'is_listed' stocks.
     Runs weekly to keep business profiles fresh.
     """
+    from models import db
+    
     logger.info("Starting business profile update job")
     start_time = datetime.utcnow()
     
     try:
-        from models import db, MarketData
+        from models import MarketData
         from handlers.market_data.financial_handler import sync_financials
         from handlers.market_data.forecast_handler import sync_forecast_data
         from handlers.market_data.stock_handler import sync_stock_news
@@ -278,6 +322,11 @@ def update_business_profiles() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Business profile update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_financials() -> Dict[str, Any]:
@@ -286,11 +335,13 @@ def update_financials() -> Dict[str, Any]:
     Syncs both annual and quarterly data.
     Runs weekly (financials don't change frequently).
     """
+    from models import db
+    
     logger.info("Starting financials update job")
     start_time = datetime.utcnow()
     
     try:
-        from models import db, MarketData
+        from models import MarketData
         from handlers.market_data.financial_handler import sync_all_financials
         
         app = get_app()
@@ -333,12 +384,19 @@ def update_financials() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Financials update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_all_forex() -> Dict[str, Any]:
     """
     Update all forex exchange rates from yfinance.
     """
+    from models import db
+    
     logger.info("Starting forex update job")
     start_time = datetime.utcnow()
     
@@ -360,12 +418,19 @@ def update_all_forex() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Forex update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_all_forecasts() -> Dict[str, Any]:
     """
     Update analyst forecasts for all listed stocks.
     """
+    from models import db
+    
     logger.info("Starting forecasts update job")
     start_time = datetime.utcnow()
     
@@ -411,6 +476,11 @@ def update_all_forecasts() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Forecasts update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def update_ytd_returns() -> Dict[str, Any]:
@@ -418,11 +488,13 @@ def update_ytd_returns() -> Dict[str, Any]:
     Calculate and update YTD (Year-to-Date) returns for all stocks.
     Runs once a day to keep sector analysis accurate.
     """
+    from models import db
+    
     logger.info("Starting YTD returns update job")
     start_time = datetime.utcnow()
     
     try:
-        from models import db, MarketData
+        from models import MarketData
         import yfinance as yf
         
         app = get_app()
@@ -486,4 +558,9 @@ def update_ytd_returns() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"YTD update job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 

@@ -11,7 +11,7 @@ from routes.decorators import auth_required
 messages_bp = Blueprint('messages', __name__)
 
 
-@messages_bp.route('/social/messages/conversations', methods=['GET'])
+@messages_bp.route('/messages/conversations', methods=['GET'])
 @auth_required
 def list_conversations():
     """List user's conversations"""
@@ -67,7 +67,7 @@ def list_conversations():
     return jsonify({'conversations': conversations})
 
 
-@messages_bp.route('/social/messages/conversations', methods=['POST'])
+@messages_bp.route('/messages/conversations', methods=['POST'])
 @auth_required
 def start_conversation():
     """Start a new conversation with a user"""
@@ -130,7 +130,7 @@ def start_conversation():
     }), 201
 
 
-@messages_bp.route('/social/messages/conversations/<conv_id>', methods=['GET'])
+@messages_bp.route('/messages/conversations/<conv_id>', methods=['GET'])
 @auth_required
 def get_conversation_messages(conv_id):
     """Get messages in a conversation"""
@@ -175,7 +175,7 @@ def get_conversation_messages(conv_id):
     })
 
 
-@messages_bp.route('/social/messages/conversations/<conv_id>', methods=['POST'])
+@messages_bp.route('/messages/conversations/<conv_id>', methods=['POST'])
 @auth_required
 def send_message(conv_id):
     """Send a message in a conversation"""
@@ -222,7 +222,7 @@ def send_message(conv_id):
     return jsonify({'message': msg_data}), 201
 
 
-@messages_bp.route('/social/messages/conversations/<conv_id>/read', methods=['PUT'])
+@messages_bp.route('/messages/conversations/<conv_id>/read', methods=['PUT'])
 @auth_required
 def mark_as_read(conv_id):
     """Mark conversation as read"""
@@ -241,7 +241,7 @@ def mark_as_read(conv_id):
     return jsonify({'success': True})
 
 
-@messages_bp.route('/social/messages/unread-count', methods=['GET'])
+@messages_bp.route('/messages/unread-count', methods=['GET'])
 @auth_required
 def get_unread_count():
     """Get total unread message count"""

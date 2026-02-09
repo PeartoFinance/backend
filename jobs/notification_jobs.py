@@ -21,12 +21,14 @@ def check_watchlist_alerts() -> Dict[str, Any]:
     Triggers notifications when target prices are hit.
     Checks both WatchlistItem.target_price and UserAlert model.
     """
+    from models import db
+    
     logger.debug("Running watchlist alert check")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, WatchlistItem, Watchlist, MarketData, UserAlert, User
+            from models import WatchlistItem, Watchlist, MarketData, UserAlert, User
             
             alerts_sent = 0
             
@@ -113,6 +115,11 @@ def check_watchlist_alerts() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Watchlist alert check failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def send_daily_digest() -> Dict[str, Any]:
@@ -120,12 +127,14 @@ def send_daily_digest() -> Dict[str, Any]:
     Send daily market digest to subscribed users.
     Includes portfolio summary, watchlist movements, and market highlights.
     """
+    from models import db
+    
     logger.info("Starting daily digest job")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, User, UserWatchlist, MarketData
+            from models import User, UserWatchlist, MarketData
             from notifications import send_digest_email
             from services.preference_checker import should_send_notification
             
@@ -169,6 +178,11 @@ def send_daily_digest() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Daily digest job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def check_earnings_alerts() -> Dict[str, Any]:
@@ -176,12 +190,14 @@ def check_earnings_alerts() -> Dict[str, Any]:
     Check for upcoming earnings announcements for both watchlist stocks AND portfolio holdings.
     Send reminders to users before earnings release.
     """
+    from models import db
+    
     logger.info("Checking earnings alerts for holdings and watchlists")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, UserWatchlist, PortfolioHolding, UserPortfolio, EarningsCalendar
+            from models import UserWatchlist, PortfolioHolding, UserPortfolio, EarningsCalendar
             from notifications import send_earnings_reminder
             from datetime import timedelta
             
@@ -235,6 +251,11 @@ def check_earnings_alerts() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Earnings alerts check failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 # ==================== NEWS NOTIFICATIONS ====================
 def process_news_notifications() -> Dict[str, Any]:
@@ -245,6 +266,8 @@ def process_news_notifications() -> Dict[str, Any]:
     Returns:
         Dictionary with job statistics
     """
+    from models import db
+    
     logger.info("Starting news notification job")
     start_time = datetime.utcnow()
     
@@ -269,6 +292,11 @@ def process_news_notifications() -> Dict[str, Any]:
             'error': str(e),
             'elapsed_seconds': (datetime.utcnow() - start_time).total_seconds()
         }
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def check_financial_goals() -> Dict[str, Any]:
@@ -276,12 +304,14 @@ def check_financial_goals() -> Dict[str, Any]:
     Background job to track user financial goals against their current portfolio value.
     Sends notifications and marks goals as achieved when targets are hit.
     """
+    from models import db
+    
     logger.info("Running financial goals check")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, FinancialGoal, FinancialGoalNotification, UserPortfolio, PortfolioHolding
+            from models import FinancialGoal, FinancialGoalNotification, UserPortfolio, PortfolioHolding
             from notifications import send_goal_reached_notification
             from datetime import datetime
             
@@ -346,6 +376,11 @@ def check_financial_goals() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Financial goals check failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def send_daily_pl_summaries() -> Dict[str, Any]:
@@ -353,12 +388,14 @@ def send_daily_pl_summaries() -> Dict[str, Any]:
     Background job to send Daily P&L Summaries.
     Compares the most recent WealthState with the previous one to determine daily gain/loss.
     """
+    from models import db
+    
     logger.info("Starting Daily P&L Summary job")
     
     try:
         app = get_app()
         with app.app_context():
-            from models import db, User, WealthState, DailySummaryNotification
+            from models import User, WealthState, DailySummaryNotification
             from notifications import send_daily_summary
             from services.preference_checker import should_send_notification
             from datetime import timedelta
@@ -449,3 +486,9 @@ def send_daily_pl_summaries() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Daily P&L job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
+

@@ -83,6 +83,11 @@ def snapshot_user_wealth():
         db.session.rollback()
         logger.error(f"Error during wealth snapshot: {str(e)}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
 
 
 def cleanup_deleted_accounts():
@@ -92,57 +97,67 @@ def cleanup_deleted_accounts():
     and comply with privacy regulations.
     """
     try:
-        # 1. Find users marked as 'deleted' more than 30 days ago
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
-        users_to_delete = User.query.filter(
-            User.account_status == 'deleted',
-            User.deactivated_at <= cutoff_date
-        ).all()
+        from app import app
+        with app.app_context():
+            # 1. Find users marked as 'deleted' more than 30 days ago
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
+            users_to_delete = User.query.filter(
+                User.account_status == 'deleted',
+                User.deactivated_at <= cutoff_date
+            ).all()
 
-        if not users_to_delete:
-            logger.info("No old deleted accounts to clean up.")
-            return
+            if not users_to_delete:
+                logger.info("No old deleted accounts to clean up.")
+                return {'status': 'ok', 'deleted': 0}
 
-        logger.info(f"Found {len(users_to_delete)} accounts to permanently delete.")
+            logger.info(f"Found {len(users_to_delete)} accounts to permanently delete.")
 
-        for user in users_to_delete:
-            user_id = user.id
-            logger.info(f"Hard deleting user ID: {user_id} ({user.email})")
+            for user in users_to_delete:
+                user_id = user.id
+                logger.info(f"Hard deleting user ID: {user_id} ({user.email})")
 
-            # 2. Delete Portfolio Data
-            portfolios = UserPortfolio.query.filter_by(user_id=user_id).all()
-            for p in portfolios:
-                PortfolioTransaction.query.filter_by(portfolio_id=p.id).delete()
-                PortfolioHolding.query.filter_by(portfolio_id=p.id).delete()
-                db.session.delete(p)
+                # 2. Delete Portfolio Data
+                portfolios = UserPortfolio.query.filter_by(user_id=user_id).all()
+                for p in portfolios:
+                    PortfolioTransaction.query.filter_by(portfolio_id=p.id).delete()
+                    PortfolioHolding.query.filter_by(portfolio_id=p.id).delete()
+                    db.session.delete(p)
 
-            # 3. Delete Watchlist Data
-            watchlists = Watchlist.query.filter_by(user_id=user_id).all()
-            for w in watchlists:
-                WatchlistItem.query.filter_by(watchlist_id=w.id).delete()
-                db.session.delete(w)
-            
-            UserWatchlist.query.filter_by(user_id=user_id).delete()
+                # 3. Delete Watchlist Data
+                watchlists = Watchlist.query.filter_by(user_id=user_id).all()
+                for w in watchlists:
+                    WatchlistItem.query.filter_by(watchlist_id=w.id).delete()
+                    db.session.delete(w)
+                
+                UserWatchlist.query.filter_by(user_id=user_id).delete()
 
-            # 4. Delete Other User-Related Data
-            UserAlert.query.filter_by(user_id=user_id).delete()
-            UserNotificationPref.query.filter_by(user_id=user_id).delete()
-            UserDashboardConfig.query.filter_by(user_id=user_id).delete()
-            UserDevice.query.filter_by(user_id=user_id).delete()
-            UserActivity.query.filter_by(user_id=user_id).delete()
-            UserDocument.query.filter_by(user_id=user_id).delete()
-            UserSession.query.filter_by(user_id=user_id).delete()
-            PasswordResetToken.query.filter_by(user_id=user_id).delete()
-            LoginEvent.query.filter_by(user_id=user_id).delete()
-            AdminUser.query.filter_by(user_id=user_id).delete()
+                # 4. Delete Other User-Related Data
+                UserAlert.query.filter_by(user_id=user_id).delete()
+                UserNotificationPref.query.filter_by(user_id=user_id).delete()
+                UserDashboardConfig.query.filter_by(user_id=user_id).delete()
+                UserDevice.query.filter_by(user_id=user_id).delete()
+                UserActivity.query.filter_by(user_id=user_id).delete()
+                UserDocument.query.filter_by(user_id=user_id).delete()
+                UserSession.query.filter_by(user_id=user_id).delete()
+                PasswordResetToken.query.filter_by(user_id=user_id).delete()
+                LoginEvent.query.filter_by(user_id=user_id).delete()
+                AdminUser.query.filter_by(user_id=user_id).delete()
 
-            # 5. Finally, delete the User record
-            db.session.delete(user)
+                # 5. Finally, delete the User record
+                db.session.delete(user)
 
-        # Commit all deletions
-        db.session.commit()
-        logger.info(f"Successfully cleaned up {len(users_to_delete)} accounts.")
+            # Commit all deletions
+            db.session.commit()
+            logger.info(f"Successfully cleaned up {len(users_to_delete)} accounts.")
+            return {'status': 'ok', 'deleted': len(users_to_delete)}
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error during deleted accounts cleanup: {str(e)}")
+        return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
+

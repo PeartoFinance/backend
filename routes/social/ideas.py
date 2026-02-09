@@ -5,13 +5,14 @@ PeartoFinance Backend
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
 import uuid
+from sqlalchemy.orm import joinedload
 from models import db, User, UserProfile, TradingIdea, IdeaLike, IdeaComment
 from routes.decorators import auth_required
 
 ideas_bp = Blueprint('ideas', __name__)
 
 
-@ideas_bp.route('/social/ideas', methods=['GET'])
+@ideas_bp.route('/ideas', methods=['GET'])
 def list_ideas():
     """List public trading ideas"""
     page = request.args.get('page', 1, type=int)
@@ -21,7 +22,10 @@ def list_ideas():
     status = request.args.get('status', 'active')
     sort_by = request.args.get('sort_by', 'newest')  # newest, popular, comments
     
-    query = TradingIdea.query.filter(TradingIdea.is_public == True)
+    # Eager load user and profile to avoid N+1 queries
+    query = TradingIdea.query.options(
+        joinedload(TradingIdea.user).joinedload(User.profile)
+    ).filter(TradingIdea.is_public == True)
     
     if symbol:
         query = query.filter(TradingIdea.symbol == symbol.upper())
@@ -46,7 +50,7 @@ def list_ideas():
     for idea in pagination.items:
         idea_data = idea.to_dict()
         user = idea.user
-        profile = UserProfile.query.filter_by(user_id=user.id).first()
+        profile = user.profile  # Already loaded via joinedload
         idea_data['author'] = {
             'id': user.id,
             'name': user.name,
@@ -64,7 +68,7 @@ def list_ideas():
     })
 
 
-@ideas_bp.route('/social/ideas', methods=['POST'])
+@ideas_bp.route('/ideas', methods=['POST'])
 @auth_required
 def create_idea():
     """Create a new trading idea"""
@@ -104,7 +108,7 @@ def create_idea():
     return jsonify({'success': True, 'idea': idea.to_dict()}), 201
 
 
-@ideas_bp.route('/social/ideas/<idea_id>', methods=['GET'])
+@ideas_bp.route('/ideas/<idea_id>', methods=['GET'])
 def get_idea(idea_id):
     """Get a single trading idea"""
     idea = TradingIdea.query.get(idea_id)
@@ -134,7 +138,7 @@ def get_idea(idea_id):
     return jsonify({'idea': idea_data})
 
 
-@ideas_bp.route('/social/ideas/<idea_id>', methods=['PUT'])
+@ideas_bp.route('/ideas/<idea_id>', methods=['PUT'])
 @auth_required
 def update_idea(idea_id):
     """Update a trading idea"""
@@ -167,7 +171,7 @@ def update_idea(idea_id):
     return jsonify({'success': True, 'idea': idea.to_dict()})
 
 
-@ideas_bp.route('/social/ideas/<idea_id>', methods=['DELETE'])
+@ideas_bp.route('/ideas/<idea_id>', methods=['DELETE'])
 @auth_required
 def delete_idea(idea_id):
     """Delete a trading idea"""
@@ -196,7 +200,7 @@ def delete_idea(idea_id):
     return jsonify({'success': True})
 
 
-@ideas_bp.route('/social/ideas/<idea_id>/like', methods=['POST'])
+@ideas_bp.route('/ideas/<idea_id>/like', methods=['POST'])
 @auth_required
 def like_idea(idea_id):
     """Like a trading idea"""
@@ -235,7 +239,7 @@ def like_idea(idea_id):
         return jsonify({'success': True, 'liked': True, 'likesCount': idea.likes_count})
 
 
-@ideas_bp.route('/social/ideas/<idea_id>/comments', methods=['GET'])
+@ideas_bp.route('/ideas/<idea_id>/comments', methods=['GET'])
 def get_idea_comments(idea_id):
     """Get comments on an idea"""
     idea = TradingIdea.query.get(idea_id)
@@ -260,7 +264,7 @@ def get_idea_comments(idea_id):
     return jsonify({'comments': result})
 
 
-@ideas_bp.route('/social/ideas/<idea_id>/comments', methods=['POST'])
+@ideas_bp.route('/ideas/<idea_id>/comments', methods=['POST'])
 @auth_required
 def add_comment(idea_id):
     """Add a comment to an idea"""
@@ -298,7 +302,7 @@ def add_comment(idea_id):
     return jsonify({'success': True, 'comment': comment_data}), 201
 
 
-@ideas_bp.route('/social/ideas/my', methods=['GET'])
+@ideas_bp.route('/ideas/my', methods=['GET'])
 @auth_required
 def get_my_ideas():
     """Get current user's ideas"""

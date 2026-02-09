@@ -115,7 +115,10 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
         )
         
         if data.empty:
-            logger.warning("[Index Handler] Bulk download returned empty data")
+            logger.warning(f"[Index Handler] Bulk download returned empty data. Symbols: {len(symbols)}")
+            # Log session headers to debug potential blocking
+            if hasattr(session, 'headers'):
+                logger.debug(f"[Index Handler] Session headers: {session.headers}")
             report_yfinance_error(is_rate_limit=False)
             return results
         
@@ -130,23 +133,30 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
                 symbol_data = data[symbol]
                 
                 # Get latest values
-                if 'Close' not in symbol_data.columns or symbol_data['Close'].empty:
+                # Get latest VALID values
+                # yfinance often returns a row for "today" with NaNs before market open
+                valid_closes = symbol_data['Close'].dropna()
+                if valid_closes.empty:
                     continue
                 
-                latest = symbol_data.iloc[-1]
-                price = float(latest['Close']) if not pd.isna(latest['Close']) else None
+                last_valid_idx = valid_closes.index[-1]
+                price = float(valid_closes.loc[last_valid_idx])
                 
                 # Calculate change from previous close
                 change = None
                 change_percent = None
                 previous_close = None
                 
-                if len(symbol_data) >= 2:
-                    prev = symbol_data.iloc[-2]
-                    previous_close = float(prev['Close']) if not pd.isna(prev['Close']) else None
+                # Find previous close (the close before the last valid one)
+                if len(valid_closes) >= 2:
+                    prev_valid_idx = valid_closes.index[-2]
+                    previous_close = float(valid_closes.loc[prev_valid_idx])
+                    
                     if previous_close and price:
                         change = price - previous_close
                         change_percent = (change / previous_close) * 100
+                    
+                latest = symbol_data.loc[last_valid_idx]
                 
                 results.append({
                     'symbol': symbol,

@@ -18,6 +18,8 @@ def import_all_news() -> Dict[str, Any]:
     Fetch news from all configured RSS/External sources.
     Suitable for running every 30-60 minutes via cron.
     """
+    from models import db
+    
     logger.info("Starting news import job")
     start_time = datetime.utcnow()
     
@@ -42,3 +44,9 @@ def import_all_news() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"News import job failed: {e}")
         return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
+

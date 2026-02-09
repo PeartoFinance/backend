@@ -4,13 +4,14 @@ PeartoFinance Backend
 """
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+from sqlalchemy.orm import joinedload
 from models import db, User, UserProfile, UserFollow
 from routes.decorators import auth_required
 
 follows_bp = Blueprint('follows', __name__)
 
 
-@follows_bp.route('/social/follow/<int:user_id>', methods=['POST'])
+@follows_bp.route('/follow/<int:user_id>', methods=['POST'])
 @auth_required
 def follow_user(user_id):
     """Follow a user"""
@@ -54,7 +55,7 @@ def follow_user(user_id):
     return jsonify({'success': True, 'message': 'Now following user'})
 
 
-@follows_bp.route('/social/follow/<int:user_id>', methods=['DELETE'])
+@follows_bp.route('/follow/<int:user_id>', methods=['DELETE'])
 @auth_required
 def unfollow_user(user_id):
     """Unfollow a user"""
@@ -84,7 +85,7 @@ def unfollow_user(user_id):
     return jsonify({'success': True, 'message': 'Unfollowed user'})
 
 
-@follows_bp.route('/social/follow/check/<int:user_id>', methods=['GET'])
+@follows_bp.route('/follow/check/<int:user_id>', methods=['GET'])
 @auth_required
 def check_following(user_id):
     """Check if current user follows target user"""
@@ -98,7 +99,7 @@ def check_following(user_id):
     return jsonify({'isFollowing': follow is not None})
 
 
-@follows_bp.route('/social/follow/followers', methods=['GET'])
+@follows_bp.route('/follow/followers', methods=['GET'])
 @auth_required
 def get_my_followers():
     """Get current user's followers"""
@@ -106,14 +107,17 @@ def get_my_followers():
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 50)
     
-    follows = UserFollow.query.filter_by(following_id=current_user.id)\
+    # Eager load follower user and their profile to avoid N+1
+    follows = UserFollow.query.options(
+        joinedload(UserFollow.follower).joinedload(User.profile)
+    ).filter_by(following_id=current_user.id)\
         .order_by(UserFollow.created_at.desc())\
         .paginate(page=page, per_page=per_page, error_out=False)
     
     followers = []
     for f in follows.items:
         user = f.follower
-        profile = UserProfile.query.filter_by(user_id=user.id).first()
+        profile = user.profile  # Already loaded via joinedload
         followers.append({
             'id': user.id,
             'name': user.name,
@@ -131,7 +135,7 @@ def get_my_followers():
     })
 
 
-@follows_bp.route('/social/follow/following', methods=['GET'])
+@follows_bp.route('/follow/following', methods=['GET'])
 @auth_required
 def get_my_following():
     """Get users current user is following"""
@@ -139,14 +143,17 @@ def get_my_following():
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 20, type=int), 50)
     
-    follows = UserFollow.query.filter_by(follower_id=current_user.id)\
+    # Eager load following user and their profile to avoid N+1
+    follows = UserFollow.query.options(
+        joinedload(UserFollow.following).joinedload(User.profile)
+    ).filter_by(follower_id=current_user.id)\
         .order_by(UserFollow.created_at.desc())\
         .paginate(page=page, per_page=per_page, error_out=False)
     
     following = []
     for f in follows.items:
         user = f.following
-        profile = UserProfile.query.filter_by(user_id=user.id).first()
+        profile = user.profile  # Already loaded via joinedload
         following.append({
             'id': user.id,
             'name': user.name,
@@ -164,7 +171,7 @@ def get_my_following():
     })
 
 
-@follows_bp.route('/social/follow/user/<int:user_id>/followers', methods=['GET'])
+@follows_bp.route('/follow/user/<int:user_id>/followers', methods=['GET'])
 def get_user_followers(user_id):
     """Get a user's followers (public)"""
     page = request.args.get('page', 1, type=int)
@@ -175,14 +182,17 @@ def get_user_followers(user_id):
     if profile and profile.profile_visibility == 'private':
         return jsonify({'error': 'This profile is private'}), 403
     
-    follows = UserFollow.query.filter_by(following_id=user_id)\
+    # Eager load follower and profile to avoid N+1
+    follows = UserFollow.query.options(
+        joinedload(UserFollow.follower).joinedload(User.profile)
+    ).filter_by(following_id=user_id)\
         .order_by(UserFollow.created_at.desc())\
         .paginate(page=page, per_page=per_page, error_out=False)
     
     followers = []
     for f in follows.items:
         user = f.follower
-        user_profile = UserProfile.query.filter_by(user_id=user.id).first()
+        user_profile = user.profile  # Already loaded via joinedload
         # Only show public profiles
         if user_profile and user_profile.profile_visibility == 'private':
             continue

@@ -5,13 +5,14 @@ PeartoFinance Backend
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
 import uuid
+from sqlalchemy.orm import joinedload
 from models import db, User, UserProfile
 from routes.decorators import auth_required
 
 profiles_bp = Blueprint('profiles', __name__)
 
 
-@profiles_bp.route('/social/profiles', methods=['GET'])
+@profiles_bp.route('/profiles', methods=['GET'])
 def list_public_profiles():
     """List public investor profiles"""
     page = request.args.get('page', 1, type=int)
@@ -19,7 +20,10 @@ def list_public_profiles():
     trading_style = request.args.get('trading_style')
     sort_by = request.args.get('sort_by', 'followers')  # followers, ideas, likes
     
-    query = UserProfile.query.filter(UserProfile.profile_visibility == 'public')
+    # Eager load user relationship to avoid N+1 queries
+    query = UserProfile.query.options(
+        joinedload(UserProfile.user)
+    ).filter(UserProfile.profile_visibility == 'public')
     
     if trading_style:
         query = query.filter(UserProfile.trading_style == trading_style)
@@ -38,7 +42,7 @@ def list_public_profiles():
     
     profiles = []
     for profile in pagination.items:
-        user = profile.user
+        user = profile.user  # Already loaded via joinedload
         profile_data = profile.to_dict()
         profile_data['user'] = {
             'name': user.name if profile.profile_visibility == 'public' else 'Anonymous',
@@ -55,7 +59,7 @@ def list_public_profiles():
     })
 
 
-@profiles_bp.route('/social/profiles/<identifier>', methods=['GET'])
+@profiles_bp.route('/profiles/<identifier>', methods=['GET'])
 def get_public_profile(identifier):
     """Get a public profile by username or user ID"""
     # Try to find by public_username first
@@ -97,7 +101,7 @@ def get_public_profile(identifier):
     return jsonify({'profile': profile_data})
 
 
-@profiles_bp.route('/social/profiles/me', methods=['GET'])
+@profiles_bp.route('/profiles/me', methods=['GET'])
 @auth_required
 def get_my_profile():
     """Get current user's profile"""
@@ -117,7 +121,7 @@ def get_my_profile():
     })
 
 
-@profiles_bp.route('/social/profiles/me', methods=['PUT'])
+@profiles_bp.route('/profiles/me', methods=['PUT'])
 @auth_required
 def update_my_profile():
     """Update current user's profile"""
@@ -178,7 +182,7 @@ def update_my_profile():
     })
 
 
-@profiles_bp.route('/social/profiles/check-username/<username>', methods=['GET'])
+@profiles_bp.route('/profiles/check-username/<username>', methods=['GET'])
 def check_username_availability(username):
     """Check if username is available"""
     if len(username) < 3 or len(username) > 50:
