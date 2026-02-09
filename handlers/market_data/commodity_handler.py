@@ -83,22 +83,101 @@ def get_commodity_quote(symbol: str) -> Optional[Dict[str, Any]]:
 
 def get_all_commodities() -> List[Dict[str, Any]]:
     """
-    Get quotes for all tracked commodities.
+    Get quotes for all tracked commodities using BULK FETCH.
+    Uses yf.download() to fetch all commodities in a single API call.
     
     Returns:
         List of commodity quote dictionaries
     """
+    import pandas as pd
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
+    symbols = list(COMMODITIES.keys())
     results = []
     
-    for symbol, commodity_info in COMMODITIES.items():
-        try:
-            quote = get_commodity_quote(symbol)
-            if quote:
-                results.append(quote)
-        except Exception as e:
-            logger.warning(f"Error fetching commodity {symbol}: {e}")
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning("[Commodity Handler] Rate limited, returning empty list")
+        return results
+    
+    try:
+        session = get_yfinance_session()
+        
+        # BULK DOWNLOAD - One API call for all commodities!
+        data = yf.download(
+            symbols,
+            period='2d',
+            interval='1d',
+            group_by='ticker',
+            progress=False,
+            session=session,
+            threads=False
+        )
+        
+        if data.empty:
+            logger.warning("[Commodity Handler] Bulk download returned empty data")
+            report_yfinance_error(is_rate_limit=False)
+            return results
+        
+        report_yfinance_success()
+        
+        # Process each symbol from the bulk data
+        for symbol in symbols:
+            try:
+                commodity_info = COMMODITIES.get(symbol, {})
+                
+                if symbol not in data.columns.get_level_values(0):
+                    continue
+                
+                symbol_data = data[symbol]
+                
+                if 'Close' not in symbol_data.columns or symbol_data['Close'].empty:
+                    continue
+                
+                latest = symbol_data.iloc[-1]
+                price = float(latest['Close']) if not pd.isna(latest['Close']) else None
+                
+                # Calculate change
+                change = None
+                change_percent = None
+                previous_close = None
+                
+                if len(symbol_data) >= 2:
+                    prev = symbol_data.iloc[-2]
+                    previous_close = float(prev['Close']) if not pd.isna(prev['Close']) else None
+                    if previous_close and price:
+                        change = price - previous_close
+                        change_percent = (change / previous_close) * 100
+                
+                results.append({
+                    'symbol': symbol,
+                    'name': commodity_info.get('name', symbol),
+                    'price': price,
+                    'change': round(change, 4) if change else None,
+                    'changePercent': round(change_percent, 2) if change_percent else None,
+                    'previousClose': previous_close,
+                    'dayHigh': float(latest['High']) if not pd.isna(latest.get('High')) else None,
+                    'dayLow': float(latest['Low']) if not pd.isna(latest.get('Low')) else None,
+                    'unit': commodity_info.get('unit'),
+                    'category': commodity_info.get('category'),
+                    'currency': 'USD',
+                })
+            except Exception as e:
+                logger.warning(f"Error processing commodity {symbol} from bulk data: {e}")
+                continue
+        
+        logger.info(f"[Commodity Handler] Bulk fetched {len(results)}/{len(symbols)} commodities")
+        
+    except Exception as e:
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
+        logger.error(f"Error in bulk commodity fetch: {e}")
     
     return results
+
 
 
 def get_commodities_by_category(category: str) -> List[Dict[str, Any]]:

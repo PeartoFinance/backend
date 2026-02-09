@@ -42,8 +42,15 @@ def run_predefined_screen(
     Returns:
         List of stock dictionaries matching the screen
     """
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
     if screener_name not in PREDEFINED_SCREENERS:
         logger.warning(f"Unknown screener: {screener_name}")
+        return []
+    
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning(f"[Screener Handler] Rate limited, skipping {screener_name}")
         return []
     
     try:
@@ -72,8 +79,17 @@ def run_predefined_screen(
                 'industry': quote.get('industry'),
             })
         
+        if results:
+            report_yfinance_success()
+            logger.info(f"[Screener Handler] {screener_name} returned {len(results)} results")
+        
         return results
     except Exception as e:
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
         logger.error(f"Error running screener {screener_name}: {e}")
         return []
 

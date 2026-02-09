@@ -33,6 +33,13 @@ def get_forex_quote(symbol: str) -> Optional[Dict[str, Any]]:
     """
     Get real-time forex quote for a single pair.
     """
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning(f"[Forex Handler] Rate limited, skipping {symbol}")
+        return None
+    
     try:
         session = get_yfinance_session()
         ticker = yf.Ticker(symbol, session=session)
@@ -42,16 +49,18 @@ def get_forex_quote(symbol: str) -> Optional[Dict[str, Any]]:
             # Fallback for some forex symbols where info might be sparse
             fast_info = ticker.fast_info
             if fast_info and 'last_price' in fast_info:
+                report_yfinance_success()
                 return {
                     'symbol': symbol,
                     'price': fast_info['last_price'],
-                    'change': 0, # fast_info doesn't easily provide change
+                    'change': 0,
                     'changePercent': 0,
                     'high': fast_info.get('day_high'),
                     'low': fast_info.get('day_low'),
                 }
             return None
         
+        report_yfinance_success()
         return {
             'symbol': symbol,
             'price': info.get('regularMarketPrice') or info.get('currentPrice'),
@@ -61,8 +70,14 @@ def get_forex_quote(symbol: str) -> Optional[Dict[str, Any]]:
             'low': info.get('dayLow'),
         }
     except Exception as e:
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
         logger.error(f"Error fetching forex quote for {symbol}: {e}")
         return None
+
 
 def import_forex_to_db(currencies: List[str] = None) -> Dict[str, int]:
     """

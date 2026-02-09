@@ -1,6 +1,7 @@
 """
 Market Data Update Jobs
 Periodic jobs to refresh market data from yfinance
+With rate limiting to avoid 429 errors
 """
 import logging
 import time
@@ -8,6 +9,34 @@ from datetime import datetime
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
+
+# Rate limiter integration for cron jobs
+def check_yf_rate_limit():
+    """Check if we can make yfinance requests - used by batch jobs"""
+    try:
+        from handlers.market_data.rate_limiter import check_rate_limit, is_in_cooldown
+        if is_in_cooldown():
+            logger.warning("[Market Jobs] YFinance is in cooldown mode, skipping...")
+            return False
+        return check_rate_limit()
+    except ImportError:
+        return True  # Rate limiter not available, proceed anyway
+
+def report_yf_batch_error(is_rate_limit=False):
+    """Report batch operation error to rate limiter"""
+    try:
+        from handlers.market_data.rate_limiter import report_yfinance_error
+        report_yfinance_error(is_rate_limit=is_rate_limit)
+    except ImportError:
+        pass
+
+def report_yf_batch_success():
+    """Report batch operation success to rate limiter"""
+    try:
+        from handlers.market_data.rate_limiter import report_yfinance_success
+        report_yfinance_success()
+    except ImportError:
+        pass
 
 
 def get_app():

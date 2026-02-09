@@ -75,6 +75,7 @@ def get_stock_quote(symbol: str) -> Optional[Dict[str, Any]]:
 def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     """
     Get real-time quotes for multiple stock symbols.
+    Uses yf.Tickers for batch fetching (more efficient than individual calls).
     
     Args:
         symbols: List of stock ticker symbols
@@ -82,10 +83,19 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     Returns:
         List of dictionaries with stock quote data
     """
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
     results = []
+    
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning("[Stock Handler] Rate limited, returning empty list")
+        return results
+    
     try:
         session = get_yfinance_session()
         tickers = yf.Tickers(' '.join(symbols), session=session)
+        
         for symbol in symbols:
             try:
                 ticker = tickers.tickers.get(symbol.upper())
@@ -110,11 +120,26 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                             'quoteType': info.get('quoteType'),
                         })
             except Exception as e:
+                error_msg = str(e)
+                if 'Too Many Requests' in error_msg or '429' in error_msg:
+                    report_yfinance_error(is_rate_limit=True)
+                    break
                 logger.warning(f"Error fetching {symbol}: {e}")
+        
+        if results:
+            report_yfinance_success()
+            logger.info(f"[Stock Handler] Fetched {len(results)}/{len(symbols)} quotes")
+            
     except Exception as e:
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
         logger.error(f"Error fetching multiple quotes: {e}")
     
     return results
+
 
 
 def get_stock_info(symbol: str) -> Optional[Dict[str, Any]]:

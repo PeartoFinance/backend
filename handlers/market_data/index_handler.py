@@ -3,10 +3,12 @@ Index Data Handler - YFinance Integration
 Functions for fetching market indices data from Yahoo Finance
 """
 import yfinance as yf
+import pandas as pd
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
 from . import get_yfinance_session
+
 
 logger = logging.getLogger(__name__)
 
@@ -81,23 +83,100 @@ def get_index_quote(symbol: str) -> Optional[Dict[str, Any]]:
 
 def get_all_major_indices() -> List[Dict[str, Any]]:
     """
-    Get quotes for all major world indices.
+    Get quotes for all major world indices using BULK FETCH.
+    Uses yf.download() to fetch all indices in a single API call instead of 20+ individual calls.
     
     Returns:
         List of index quote dictionaries
     """
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
+    symbols = list(MAJOR_INDICES.keys())
     results = []
     
-    for symbol, name in MAJOR_INDICES.items():
-        try:
-            quote = get_index_quote(symbol)
-            if quote:
-                quote['displayName'] = name
-                results.append(quote)
-        except Exception as e:
-            logger.warning(f"Error fetching index {symbol}: {e}")
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning("[Index Handler] Rate limited, returning empty list")
+        return results
+    
+    try:
+        session = get_yfinance_session()
+        
+        # BULK DOWNLOAD - One API call for all indices!
+        # Get last 2 days to calculate change
+        data = yf.download(
+            symbols,
+            period='2d',
+            interval='1d',
+            group_by='ticker',
+            progress=False,
+            session=session,
+            threads=False  # Avoid threading issues
+        )
+        
+        if data.empty:
+            logger.warning("[Index Handler] Bulk download returned empty data")
+            report_yfinance_error(is_rate_limit=False)
+            return results
+        
+        report_yfinance_success()
+        
+        # Process each symbol from the bulk data
+        for symbol in symbols:
+            try:
+                if symbol not in data.columns.get_level_values(0):
+                    continue
+                
+                symbol_data = data[symbol]
+                
+                # Get latest values
+                if 'Close' not in symbol_data.columns or symbol_data['Close'].empty:
+                    continue
+                
+                latest = symbol_data.iloc[-1]
+                price = float(latest['Close']) if not pd.isna(latest['Close']) else None
+                
+                # Calculate change from previous close
+                change = None
+                change_percent = None
+                previous_close = None
+                
+                if len(symbol_data) >= 2:
+                    prev = symbol_data.iloc[-2]
+                    previous_close = float(prev['Close']) if not pd.isna(prev['Close']) else None
+                    if previous_close and price:
+                        change = price - previous_close
+                        change_percent = (change / previous_close) * 100
+                
+                results.append({
+                    'symbol': symbol,
+                    'name': MAJOR_INDICES.get(symbol, symbol),
+                    'displayName': MAJOR_INDICES.get(symbol, symbol),
+                    'price': price,
+                    'change': round(change, 4) if change else None,
+                    'changePercent': round(change_percent, 2) if change_percent else None,
+                    'previousClose': previous_close,
+                    'dayHigh': float(latest['High']) if not pd.isna(latest.get('High')) else None,
+                    'dayLow': float(latest['Low']) if not pd.isna(latest.get('Low')) else None,
+                    'volume': int(latest['Volume']) if not pd.isna(latest.get('Volume')) else None,
+                    'currency': 'USD',
+                })
+            except Exception as e:
+                logger.warning(f"Error processing index {symbol} from bulk data: {e}")
+                continue
+        
+        logger.info(f"[Index Handler] Bulk fetched {len(results)}/{len(symbols)} indices")
+        
+    except Exception as e:
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
+        logger.error(f"Error in bulk index fetch: {e}")
     
     return results
+
 
 
 def get_us_indices() -> List[Dict[str, Any]]:

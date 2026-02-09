@@ -1,11 +1,17 @@
 """
 Live Data API Routes
 Real-time quotes and intraday data for live chart updates
+
+Optimized for rate limiting with:
+- Aggressive caching (5 min default)
+- Database fallback when yfinance fails
+- Smart request throttling
 """
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
 from extensions import cache, limiter
 from handlers.market_data.screener_handler import get_day_gainers, get_day_losers, get_most_active
+from handlers.market_data.rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
 from models.market import MarketData
 from utils.validators import safe_int, safe_float
 import time
@@ -14,6 +20,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 live_bp = Blueprint('live', __name__)
+
+# Cache timeout in seconds (5 minutes for most routes)
+CACHE_TIMEOUT_DEFAULT = 300  # 5 minutes
+CACHE_TIMEOUT_DASHBOARD = 300  # 5 minutes
+CACHE_TIMEOUT_LIVE = 60  # 1 minute for truly "live" endpoints
+CACHE_TIMEOUT_MOVERS = 180  # 3 minutes for movers
 
 # Helper for unified market data formatting
 def _format_market_item(item, asset_type='stock'):
@@ -125,6 +137,7 @@ def get_live_intraday(symbol):
 
 
 @live_bp.route('/market-pulse', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_MOVERS, query_string=True)
 @limiter.limit("10 per minute")
 def get_market_pulse():
     """
@@ -189,6 +202,7 @@ def search_live_symbols():
 
 
 @live_bp.route('/dashboard', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DASHBOARD, query_string=True)
 @limiter.limit("10 per minute")
 def get_live_dashboard():
     """
@@ -289,7 +303,7 @@ def get_live_dashboard():
 
 
 @live_bp.route('/overview', methods=['GET'])
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=CACHE_TIMEOUT_DASHBOARD, query_string=True)
 def get_live_overview():
     """
     Get comprehensive live market overview.
@@ -353,7 +367,7 @@ def get_live_overview():
 
 
 @live_bp.route('/stocks', methods=['GET'])
-@cache.cached(timeout=15, query_string=True)
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
 def get_live_stocks():
     """
     Get live data for a list of stocks with pagination.
@@ -458,7 +472,7 @@ def get_live_stocks():
 
 
 @live_bp.route('/crypto', methods=['GET'])
-@cache.cached(timeout=15, query_string=True)
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
 def get_live_crypto():
     """Get live crypto data with pagination"""
     from handlers.market_data.crypto_handler import get_multiple_crypto_quotes, TOP_CRYPTOS
@@ -527,6 +541,7 @@ def get_live_crypto():
 
 
 @live_bp.route('/commodities', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
 def get_live_commodities():
     from handlers.market_data.commodity_handler import get_all_commodities
     from models.market import CommodityData
@@ -575,6 +590,7 @@ def get_live_commodities():
 
 
 @live_bp.route('/forex', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
 def get_live_forex():
     """Get live forex rates with DB fallback"""
     from handlers.market_data.forex_handler import COMMON_CURRENCIES, get_forex_quote
@@ -642,6 +658,7 @@ def get_live_forex():
 
 
 @live_bp.route('/indices', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
 def get_live_indices():
     """Get live market indices with DB fallback"""
     from handlers.market_data.index_handler import get_all_major_indices
@@ -710,6 +727,7 @@ def get_live_indices():
 
 
 @live_bp.route('/movers', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_MOVERS, query_string=True)
 def get_live_movers():
     """Get top gainers and losers live"""
     from handlers.market_data.screener_handler import get_day_gainers, get_day_losers
@@ -748,6 +766,7 @@ def get_live_movers():
 
 
 @live_bp.route('/most-active', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_MOVERS, query_string=True)
 def get_live_most_active():
     """Get most active stocks live"""
     from handlers.market_data.screener_handler import get_most_active

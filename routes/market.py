@@ -17,6 +17,7 @@ market_bp = Blueprint('market', __name__)
 
 
 @market_bp.route('/forex/history/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_forex_pair_history(symbol):
     """Get historical data for a forex pair"""
     period = request.args.get('period', '1mo')
@@ -37,9 +38,9 @@ def get_calendar():
 
 
 @market_bp.route('/overview', methods=['GET'])
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=300, query_string=True)
 def get_market_overview():
-    """Get comprehensive market overview data - cached for 30s"""
+    """Get comprehensive market overview data - cached for 5 minutes"""
     header_country = request.headers.get('X-User-Country')
     if header_country:
         hc = header_country.strip().upper()
@@ -117,8 +118,9 @@ def get_market_overview():
 
 
 @market_bp.route('/indices', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_indices():
-    """Get all market indices"""
+    """Get all market indices - cached for 5 minutes"""""
     region = request.args.get('region')
 
     header_country = request.headers.get('X-User-Country')
@@ -137,16 +139,18 @@ def get_indices():
 
 
 @market_bp.route('/forex', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_forex_metrics():
-    """Get all forex rates"""
+    """Get all forex rates - cached for 5 minutes"""""
     rates = ForexRate.query.all()
     # If no rates found, return empty list instead of 404
     return jsonify([r.to_dict() for r in rates])
 
 
 @market_bp.route('/commodities', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_commodities():
-    """Get commodities data"""
+    """Get commodities data - cached for 5 minutes"""
     # Commodities are global by default; keep as-is but allow header to filter if model had country_code
     header_country = request.headers.get('X-User-Country')
     query = CommodityData.query

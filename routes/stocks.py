@@ -271,9 +271,9 @@ def get_business_directory():
 
 
 @stocks_bp.route('/movers', methods=['GET'])
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=300, query_string=True)
 def get_movers():
-    """Get top gainers and losers"""
+    """Get top gainers and losers - cached for 5 minutes"""
     mover_type = request.args.get('type', 'both')
     # Safe conversion: Returns 10 if invalid characters sent
     limit = min(safe_int(request.args.get('limit'), 10), 50)
@@ -309,9 +309,9 @@ def get_movers():
 
 
 @stocks_bp.route('/most-active', methods=['GET'])
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=300, query_string=True)
 def get_most_active():
-    """Get most actively traded stocks"""
+    """Get most actively traded stocks - cached for 5 minutes"""
     # Safe conversion: Returns 10 if invalid characters sent
     limit = min(safe_int(request.args.get('limit'), 10), 50)
     

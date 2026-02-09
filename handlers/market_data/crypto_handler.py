@@ -198,21 +198,28 @@ TOP_CRYPTOS = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD'
 def get_multiple_crypto_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     """
     Get real-time quotes for multiple crypto symbols.
+    Uses yf.Tickers for batch fetching (more efficient than individual calls).
     """
+    from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    
     results = []
-    # yfinance Tickers can handle multiple space-separated symbols
+    
+    # Check rate limit before making request
+    if not check_rate_limit():
+        logger.warning("[Crypto Handler] Rate limited, returning empty list")
+        return results
+    
     try:
         session = get_yfinance_session()
         tickers = yf.Tickers(' '.join(symbols), session=session)
+        
         for symbol in symbols:
             try:
-                # Accessing the ticker object directly
                 ticker = tickers.tickers.get(symbol.upper())
                 if ticker:
                     info = ticker.info
-                    # Basic validation
                     if info and 'symbol' in info:
-                         results.append({
+                        results.append({
                             'symbol': info.get('symbol', symbol),
                             'name': info.get('shortName') or info.get('longName'),
                             'price': info.get('currentPrice') or info.get('regularMarketPrice'),
@@ -224,11 +231,26 @@ def get_multiple_crypto_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                             'quoteType': 'CRYPTOCURRENCY',
                         })
             except Exception as e:
+                error_msg = str(e)
+                if 'Too Many Requests' in error_msg or '429' in error_msg:
+                    report_yfinance_error(is_rate_limit=True)
+                    break  # Stop processing, we're rate limited
                 logger.warning(f"Error fetching {symbol}: {e}")
+        
+        if results:
+            report_yfinance_success()
+            logger.info(f"[Crypto Handler] Fetched {len(results)}/{len(symbols)} crypto quotes")
+            
     except Exception as e:
-         logger.error(f"Error fetching multiple crypto quotes: {e}")
+        error_msg = str(e)
+        if 'Too Many Requests' in error_msg or '429' in error_msg:
+            report_yfinance_error(is_rate_limit=True)
+        else:
+            report_yfinance_error(is_rate_limit=False)
+        logger.error(f"Error fetching multiple crypto quotes: {e}")
     
     return results
+
 
 
 def import_cryptos_to_db(symbols: List[str], db_session=None) -> Dict[str, int]:
