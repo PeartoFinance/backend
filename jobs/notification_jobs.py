@@ -5,6 +5,7 @@ Background jobs for watchlist alerts and user notifications
 import logging
 from datetime import datetime
 from typing import Dict, Any, List
+from extensions import cache
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,13 @@ def check_watchlist_alerts() -> Dict[str, Any]:
                 current_price = float(market_data.price)
                 target_price = float(item.target_price)
                 
+                # BUG FIX: Legacy Idempotency
+                # WatchlistItem doesn't have an 'is_triggered' column. 
+                # We use cache to prevent spamming the user every minute.
+                cache_key = f"alert_sent_{watchlist.user_id}_{item.symbol}_{item.id}"
+                if cache.get(cache_key):
+                    continue
+
                 # Check if price is within 1% of target
                 if target_price > 0 and abs(current_price - target_price) / target_price < 0.01:
                     try:
@@ -104,6 +112,8 @@ def check_watchlist_alerts() -> Dict[str, Any]:
                             current_price=current_price,
                             target_price=target_price
                         )
+                        # Set cache for 24 hours to prevent repeated alerts
+                        cache.set(cache_key, True, timeout=86400)
                         alerts_sent += 1
                     except Exception as e:
                         logger.warning(f"Failed to send alert for {item.symbol}: {e}")

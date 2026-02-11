@@ -47,9 +47,10 @@ def get_market_overview():
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
         idx_filter = MarketIndices.country_code.in_([hc, 'GLOBAL'])
     else:
-        # default to GLOBAL-only
-        md_filter = (MarketData.country_code == 'GLOBAL')
-        idx_filter = (MarketIndices.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        # This prevents the "Empty Dashboard" bug for guest users.
+        md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])
+        idx_filter = MarketIndices.country_code.in_(['US', 'GLOBAL'])
 
     # Get indices (scoped)
     indices = MarketIndices.query.filter(idx_filter).limit(6).all()
@@ -128,7 +129,8 @@ def get_indices():
         hc = header_country.strip().upper()
         idx_filter = MarketIndices.country_code.in_([hc, 'GLOBAL'])
     else:
-        idx_filter = (MarketIndices.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        idx_filter = MarketIndices.country_code.in_(['US', 'GLOBAL'])
 
     query = MarketIndices.query.filter(idx_filter)
     if region:
@@ -209,8 +211,8 @@ def get_all_stocks():
     limit = min(safe_int(request.args.get('limit'), 50), 100)
     header_country = request.headers.get('X-User-Country')
     if header_country is None:
-        # Default to GLOBAL/All similar to crypto if no country specified
-        md_filter = (MarketData.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])
     else:
         hc = header_country.strip().upper()
         md_filter = (MarketData.country_code == 'GLOBAL') if hc == 'GLOBAL' else (MarketData.country_code == hc)
@@ -251,7 +253,8 @@ def get_crypto_markets():
         hc = header_country.strip().upper()
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
     else:
-        md_filter = (MarketData.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])
 
     cryptos = MarketData.query.filter(
         MarketData.asset_type == 'crypto',
@@ -269,7 +272,8 @@ def get_market_stats():
         hc = header_country.strip().upper()
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
     else:
-        md_filter = (MarketData.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])
 
     all_stocks = MarketData.query.filter(MarketData.asset_type == 'stock', md_filter).all()
 
@@ -340,7 +344,8 @@ def get_sector_analysis():
         hc = header_country.strip().upper()
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
     else:
-        md_filter = (MarketData.country_code == 'GLOBAL')
+        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])   
 
     # Get all stocks grouped by sector
     stocks = MarketData.query.filter(
