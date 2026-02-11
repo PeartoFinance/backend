@@ -413,17 +413,7 @@ def send_daily_pl_summaries() -> Dict[str, Any]:
             for user in users:
                 try:
                     # 2. Check Preferences
-                    if not should_send_notification(user.id, 'daily_summary', 'email'): 
-                        # NB: 'daily_summary' isn't in pref checker yet, might fallback to 'daily_digest' or need update
-                        # For now we'll assume the pref checker defaults to True or we check raw DB col if needed
-                        # But let's rely on the notification handler to double check or the new col.
-                        # Actually preference_checker needs update or we check manually here:
-                        pass
-                    
-                    # Manual check of the new preference column if checker not updated
-                    # (assuming user object has relationship to prefs, or we query prefs)
-                    if user.notification_preferences and \
-                       getattr(user.notification_preferences, 'email_portfolio_summary', True) is False:
+                    if not should_send_notification(user.id, 'daily_summary', 'email'):
                         continue
                     
                     # 3. Get Wealth Data

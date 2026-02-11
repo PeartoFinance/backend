@@ -784,3 +784,75 @@ def get_live_most_active():
         'volume': a.get('volume'),
         'assetType': 'stock'
     } for a in active])
+
+
+# ---------------------------------------------------------------------------
+# Advanced Forex Analytics
+# ---------------------------------------------------------------------------
+
+CACHE_TIMEOUT_CORRELATION = 1800  # 30 min – correlations change slowly
+
+
+@live_bp.route('/forex/strength', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
+def get_forex_strength():
+    """Currency Strength Index – real cross-pair aggregation."""
+    from handlers.market_data.forex_analytics_handler import compute_currency_strength
+    try:
+        return jsonify(compute_currency_strength())
+    except Exception as e:
+        logger.error(f"Forex strength error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@live_bp.route('/forex/correlation', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_CORRELATION, query_string=True)
+def get_forex_correlation():
+    """Cross-pair Pearson correlation matrix from historical prices."""
+    from handlers.market_data.forex_analytics_handler import compute_correlation_matrix
+    period = request.args.get('period', '1mo')
+    interval = request.args.get('interval', '1d')
+    try:
+        return jsonify(compute_correlation_matrix(period=period, interval=interval))
+    except Exception as e:
+        logger.error(f"Forex correlation error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# Floorsheet – real intraday trade data
+# ---------------------------------------------------------------------------
+
+@live_bp.route('/floorsheet', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_LIVE, query_string=True)
+def get_live_floorsheet():
+    """Market transaction floorsheet. DB-first, yfinance fallback."""
+    from handlers.market_data.floorsheet_handler import (
+        get_floorsheet_from_db,
+        fetch_live_floorsheet,
+    )
+
+    limit = min(safe_int(request.args.get('limit'), 100), 500)
+    symbol = request.args.get('symbol', '').strip().upper() or None
+
+    # Path A: DB (fast)
+    db_data = get_floorsheet_from_db(symbol=symbol, limit=limit)
+    if db_data:
+        return jsonify({
+            'trades': db_data,
+            'source': 'database',
+            'timestamp': datetime.utcnow().isoformat(),
+        })
+
+    # Path B: Live yfinance
+    try:
+        return jsonify(fetch_live_floorsheet(symbol=symbol, limit=limit))
+    except Exception as e:
+        logger.error(f"Floorsheet error: {e}")
+        return jsonify({
+            'trades': [],
+            'source': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat(),
+        }), 500
+

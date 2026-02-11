@@ -63,7 +63,7 @@ CORS(app,
          "http://127.0.0.1:3000",
          "https://pearto.com",
          "https://www.pearto.com",
-         "https://test.pearto.com",
+         "https://pearto.com",
          "https://frontend-admin-pearto.vercel.app",
          "https://stocks-nine-blush.vercel.app",
          re.compile(r"^http://192\.168\.\d{1,3}\.\d{1,3}:\d{1,5}$"),  # Matches any local IP

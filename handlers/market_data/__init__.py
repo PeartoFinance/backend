@@ -19,13 +19,30 @@ def get_yfinance_session():
         try:
             from curl_cffi import requests as curl_requests
             _yfinance_session = curl_requests.Session(impersonate="chrome")
-            _yfinance_session._is_curl_cffi = True  # Mark for fallback detection
-            logging.info("[YFinance] Using curl_cffi Chrome-impersonating session")
+            _yfinance_session._is_curl_cffi = True
+            
+            # ENFORCE TIMEOUT: Monkey-patch the request method to ensure timeout
+            original_request = _yfinance_session.request
+            def timeout_request(*args, **kwargs):
+                if 'timeout' not in kwargs:
+                    kwargs['timeout'] = 5  # 5 seconds timeout
+                return original_request(*args, **kwargs)
+            _yfinance_session.request = timeout_request
+            
+            logging.info("[YFinance] Using curl_cffi Chrome-impersonating session with 5s timeout")
         except ImportError:
             logging.warning("[YFinance] curl_cffi not installed, using default requests")
             import requests
             _yfinance_session = requests.Session()
             _yfinance_session._is_curl_cffi = False
+            
+            # ENFORCE TIMEOUT for standard requests
+            original_request = _yfinance_session.request
+            def timeout_request(*args, **kwargs):
+                if 'timeout' not in kwargs:
+                    kwargs['timeout'] = 5  # 5 seconds timeout
+                return original_request(*args, **kwargs)
+            _yfinance_session.request = timeout_request
     return _yfinance_session
 
 

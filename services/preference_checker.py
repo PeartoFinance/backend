@@ -65,6 +65,8 @@ def should_send_notification(user_id: int, notification_type: str, channel: str 
         ('account', 'email'): prefs.email_account,
         ('price_alert', 'email'): prefs.email_price_alerts if prefs.email_price_alerts is not None else prefs.email_alerts,
         ('daily_digest', 'email'): prefs.email_daily_digest,
+        ('daily_summary', 'email'): prefs.email_portfolio_summary, # Added
+        ('portfolio_summary', 'email'): prefs.email_portfolio_summary, # Alias
         ('earnings', 'email'): prefs.email_earnings,
         ('news', 'email'): prefs.email_news,
         ('marketing', 'email'): prefs.email_marketing,

@@ -45,7 +45,7 @@ class Config:
     PORT = int(os.getenv('PORT', 5000))
     
     # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'https://test.pearto.com,https://test.pearto.com').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'https://pearto.com,https://pearto.com').split(',')
 
 
 config = Config()

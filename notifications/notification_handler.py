@@ -41,7 +41,9 @@ def send_notification(
         'security': 'security',
         'earnings_reminder': 'earnings',
         'daily_digest': 'daily_digest',
+        'daily_summary': 'daily_summary',
         'news': 'news',
+        'marketing': 'marketing',
     }
     pref_notification_type = notification_type_map.get(notification_type, 'account')
     
@@ -70,12 +72,14 @@ def send_notification(
             user = User.query.get(user_id)
             if user and user.email:
                 # Build template data based on notification type
-                app_url = os.getenv('APP_URL', 'https://test.pearto.com')
+                app_url = os.getenv('APP_URL', 'https://pearto.com')
                 template_data = {
                     'user_name': user.name or 'User',
                     'app_name': 'Pearto Finance',
                     'dashboard_url': f'{app_url}/dashboard',
                     'security_url': f'{app_url}/profile?tab=devices',
+                    'title': title,     # Inject title
+                    'message': message, # Inject message
                 }
                 
                 # Merge with provided data
@@ -89,6 +93,8 @@ def send_notification(
                     'security': 'login',
                     'earnings_reminder': 'earnings_reminder',
                     'daily_digest': 'daily_digest',
+                    'daily_summary': 'daily_digest', # Re-use daily_digest template
+                    'marketing': 'marketing',
                 }
                 
                 template_type = template_map.get(notification_type, 'login')
@@ -275,7 +281,7 @@ def send_goal_reached_notification(user_id: int, target_amount: float):
     # We use 'price_alerts' category for user preferences check (logic in should_send_notification)
     return send_notification(
         user_id=user_id,
-        notification_type='price_alerts', 
+        notification_type='price_alert', 
         title=title,
         message=message,
         channels=['email', 'push']
@@ -292,10 +298,10 @@ def send_daily_summary(user_id: int, portfolio_val: float, daily_change: float, 
     title = f"{icon} Daily Portfolio Summary: {direction.title()} ${abs(daily_change):.2f}"
     message = f"Your portfolio ended the day at ${portfolio_val:,.2f}, {direction} ${abs(daily_change):.2f} ({change_pct:+.2f}%)."
     
-    # Use 'daily_digest' logic for now or mapped category
+    # Use 'daily_summary' logic for now or mapped category
     return send_notification(
         user_id=user_id,
-        notification_type='daily_digest',
+        notification_type='daily_summary',
         title=title,
         message=message,
         data={
@@ -305,4 +311,19 @@ def send_daily_summary(user_id: int, portfolio_val: float, daily_change: float, 
             'is_summary': True
         },
         channels=['email', 'push']
+    )
+
+
+def send_marketing_email(user_id: int, subject: str, content: str, campaign_id: str = None):
+    """
+    Send marketing/promotional email.
+    Strictly checks the 'marketing' preference.
+    """
+    return send_notification(
+        user_id=user_id,
+        notification_type='marketing',
+        title=subject,
+        message=content,
+        data={'campaign_id': campaign_id},
+        channels=['email'] # Marketing is usually email only
     )

@@ -11,6 +11,7 @@ cryptography==41.0.7
 yfinance>=0.2.36
 curl_cffi>=0.7  # Chrome TLS fingerprint to bypass Yahoo rate limits
 pandas>=2.0.0
+numpy>=1.24.0
 APScheduler>=3.10.0
 google-auth>=2.23.0
 

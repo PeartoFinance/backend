@@ -1,6 +1,10 @@
 """
 YFinance Rate Limiter Utility
-Smart throttling and cooldown management for Yahoo Finance API calls
+Smart throttling and cooldown management for Yahoo Finance API calls.
+
+Uses DUAL BUCKETS to prevent background cron jobs from blocking live user requests:
+  - 'live'       → shorter cooldowns, used by API route handlers (default)
+  - 'background' → longer cooldowns, used by cron/market_jobs only
 """
 import time
 import threading
@@ -12,131 +16,174 @@ logger = logging.getLogger(__name__)
 
 class YFinanceRateLimiter:
     """
-    Smart rate limiter for Yahoo Finance requests to avoid 429 errors.
-    
-    Features:
-    - Minimum delay between requests (prevents burst)
-    - Cooldown period after 429 errors
-    - Request counting per minute
-    - Global lock for thread safety
+    Per-instance rate limiter for Yahoo Finance requests.
+
+    Each instance maintains its own cooldown timer, request window,
+    and failure counter — so background and live traffic are isolated.
     """
-    _lock = threading.Lock()
-    _last_request_time = datetime.min
-    _request_count_window = []  # timestamps of requests in current window
-    _cooldown_until = None
-    _consecutive_failures = 0
-    
-    # Configuration
-    MIN_DELAY_SECONDS = 0.3  # 300ms between requests
-    MAX_REQUESTS_PER_MINUTE = 30
-    COOLDOWN_DURATION_SECONDS = 60  # 1 minute cooldown
-    MAX_CONSECUTIVE_FAILURES = 5  # After this, use longer cooldown
-    EXTENDED_COOLDOWN_SECONDS = 300  # 5 minutes extended cooldown
-    
-    @classmethod
-    def wait_if_needed(cls):
+
+    def __init__(
+        self,
+        name: str,
+        min_delay: float = 0.3,
+        max_rpm: int = 30,
+        cooldown_sec: int = 60,
+        max_failures: int = 5,
+        extended_sec: int = 300,
+    ):
+        self.name = name
+        self._lock = threading.Lock()
+        self._last_request_time = datetime.min
+        self._request_count_window: list = []
+        self._cooldown_until = None
+        self._consecutive_failures = 0
+
+        # Tunables
+        self.MIN_DELAY_SECONDS = min_delay
+        self.MAX_REQUESTS_PER_MINUTE = max_rpm
+        self.COOLDOWN_DURATION_SECONDS = cooldown_sec
+        self.MAX_CONSECUTIVE_FAILURES = max_failures
+        self.EXTENDED_COOLDOWN_SECONDS = extended_sec
+
+    # ── core methods ────────────────────────────────────────────
+
+    def wait_if_needed(self) -> bool:
         """Wait if necessary before making a request. Returns True if OK to proceed."""
-        with cls._lock:
+        with self._lock:
             now = datetime.utcnow()
-            
-            # Check if in cooldown period
-            if cls._cooldown_until and now < cls._cooldown_until:
-                remaining = (cls._cooldown_until - now).total_seconds()
-                logger.warning(f"[YFinance RateLimiter] In cooldown. {remaining:.0f}s remaining.")
+
+            # Check cooldown
+            if self._cooldown_until and now < self._cooldown_until:
+                remaining = (self._cooldown_until - now).total_seconds()
+                logger.warning(
+                    f"[YFinance {self.name}] In cooldown. {remaining:.0f}s remaining."
+                )
                 return False
-            
-            # Clear cooldown if expired
-            if cls._cooldown_until and now >= cls._cooldown_until:
-                cls._cooldown_until = None
-                cls._consecutive_failures = 0
-                logger.info("[YFinance RateLimiter] Cooldown expired, resuming requests")
-            
-            # Clean old requests from window (older than 1 minute)
+
+            # Clear expired cooldown
+            if self._cooldown_until and now >= self._cooldown_until:
+                self._cooldown_until = None
+                self._consecutive_failures = 0
+                logger.info(f"[YFinance {self.name}] Cooldown expired, resuming.")
+
+            # Trim request window to last 60 s
             one_minute_ago = now - timedelta(minutes=1)
-            cls._request_count_window = [t for t in cls._request_count_window if t > one_minute_ago]
-            
-            # Check request count limit
-            if len(cls._request_count_window) >= cls.MAX_REQUESTS_PER_MINUTE:
-                logger.warning(f"[YFinance RateLimiter] Rate limit reached ({cls.MAX_REQUESTS_PER_MINUTE}/min)")
+            self._request_count_window = [
+                t for t in self._request_count_window if t > one_minute_ago
+            ]
+
+            # Per-minute cap
+            if len(self._request_count_window) >= self.MAX_REQUESTS_PER_MINUTE:
+                logger.warning(
+                    f"[YFinance {self.name}] Rate limit reached "
+                    f"({self.MAX_REQUESTS_PER_MINUTE}/min)"
+                )
                 return False
-            
+
             # Enforce minimum delay
-            time_since_last = (now - cls._last_request_time).total_seconds()
-            if time_since_last < cls.MIN_DELAY_SECONDS:
-                sleep_time = cls.MIN_DELAY_SECONDS - time_since_last
-                time.sleep(sleep_time)
-            
-            # Record this request
-            cls._last_request_time = datetime.utcnow()
-            cls._request_count_window.append(cls._last_request_time)
-            
+            time_since_last = (now - self._last_request_time).total_seconds()
+            if time_since_last < self.MIN_DELAY_SECONDS:
+                time.sleep(self.MIN_DELAY_SECONDS - time_since_last)
+
+            # Record request
+            self._last_request_time = datetime.utcnow()
+            self._request_count_window.append(self._last_request_time)
             return True
-    
-    @classmethod
-    def report_success(cls):
-        """Report a successful request (resets failure counter)"""
-        with cls._lock:
-            cls._consecutive_failures = 0
-    
-    @classmethod
-    def report_rate_limit_error(cls):
-        """Report a 429 rate limit error (triggers cooldown)"""
-        with cls._lock:
-            cls._consecutive_failures += 1
-            
-            if cls._consecutive_failures >= cls.MAX_CONSECUTIVE_FAILURES:
-                cooldown = cls.EXTENDED_COOLDOWN_SECONDS
-                logger.error(f"[YFinance RateLimiter] Too many failures ({cls._consecutive_failures}). Extended cooldown: {cooldown}s")
+
+    def report_success(self):
+        """Report a successful request (resets failure counter)."""
+        with self._lock:
+            self._consecutive_failures = 0
+
+    def report_rate_limit_error(self):
+        """Report a 429 rate limit error (triggers cooldown)."""
+        with self._lock:
+            self._consecutive_failures += 1
+
+            if self._consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                cooldown = self.EXTENDED_COOLDOWN_SECONDS
+                logger.error(
+                    f"[YFinance {self.name}] Too many failures "
+                    f"({self._consecutive_failures}). Extended cooldown: {cooldown}s"
+                )
             else:
-                cooldown = cls.COOLDOWN_DURATION_SECONDS
-                logger.warning(f"[YFinance RateLimiter] Rate limit hit. Cooldown: {cooldown}s")
-            
-            cls._cooldown_until = datetime.utcnow() + timedelta(seconds=cooldown)
-    
-    @classmethod
-    def is_in_cooldown(cls):
-        """Check if currently in cooldown period"""
-        with cls._lock:
-            if cls._cooldown_until is None:
+                cooldown = self.COOLDOWN_DURATION_SECONDS
+                logger.warning(
+                    f"[YFinance {self.name}] Rate limit hit. Cooldown: {cooldown}s"
+                )
+
+            self._cooldown_until = datetime.utcnow() + timedelta(seconds=cooldown)
+
+    def is_in_cooldown(self) -> bool:
+        """Check if currently in cooldown period."""
+        with self._lock:
+            if self._cooldown_until is None:
                 return False
-            return datetime.utcnow() < cls._cooldown_until
-    
-    @classmethod
-    def get_cooldown_remaining(cls):
-        """Get remaining cooldown time in seconds"""
-        with cls._lock:
-            if cls._cooldown_until is None:
+            return datetime.utcnow() < self._cooldown_until
+
+    def get_cooldown_remaining(self) -> float:
+        """Get remaining cooldown time in seconds."""
+        with self._lock:
+            if self._cooldown_until is None:
                 return 0
-            remaining = (cls._cooldown_until - datetime.utcnow()).total_seconds()
-            return max(0, remaining)
-    
-    @classmethod
-    def reset(cls):
-        """Reset all state (useful for testing)"""
-        with cls._lock:
-            cls._last_request_time = datetime.min
-            cls._request_count_window = []
-            cls._cooldown_until = None
-            cls._consecutive_failures = 0
+            return max(0, (self._cooldown_until - datetime.utcnow()).total_seconds())
+
+    def reset(self):
+        """Reset all state (useful for testing)."""
+        with self._lock:
+            self._last_request_time = datetime.min
+            self._request_count_window = []
+            self._cooldown_until = None
+            self._consecutive_failures = 0
 
 
-# Convenience function for direct usage
-def check_rate_limit():
+# ── Two independent buckets ─────────────────────────────────────
+#
+# 'live'       – serves real-time user requests; short cooldowns so
+#                the UI recovers quickly even if Yahoo briefly 429s.
+# 'background' – serves cron/batch jobs; longer cooldowns + lower
+#                RPM so bulk syncs don't burn through the quota.
+
+_live_limiter = YFinanceRateLimiter(
+    name="live",
+    max_rpm=30,
+    cooldown_sec=30,
+    extended_sec=60,
+)
+
+_background_limiter = YFinanceRateLimiter(
+    name="background",
+    max_rpm=20,
+    cooldown_sec=120,
+    extended_sec=300,
+)
+
+
+def _get_limiter(context: str = "live") -> YFinanceRateLimiter:
+    return _background_limiter if context == "background" else _live_limiter
+
+
+# ── Convenience functions (backward-compatible) ─────────────────
+# Default context='live' keeps ALL existing handler call-sites
+# working without any code changes.
+
+
+def check_rate_limit(context: str = "live") -> bool:
     """Check if we can make a request. Returns True if OK."""
-    return YFinanceRateLimiter.wait_if_needed()
+    return _get_limiter(context).wait_if_needed()
 
 
-def report_yfinance_error(is_rate_limit=False):
-    """Report an error from yfinance"""
+def report_yfinance_error(is_rate_limit: bool = False, context: str = "live"):
+    """Report an error from yfinance."""
     if is_rate_limit:
-        YFinanceRateLimiter.report_rate_limit_error()
+        _get_limiter(context).report_rate_limit_error()
 
 
-def report_yfinance_success():
-    """Report successful yfinance call"""
-    YFinanceRateLimiter.report_success()
+def report_yfinance_success(context: str = "live"):
+    """Report successful yfinance call."""
+    _get_limiter(context).report_success()
 
 
-def is_in_cooldown():
-    """Check if currently in cooldown period"""
-    return YFinanceRateLimiter.is_in_cooldown()
+def is_in_cooldown(context: str = "live") -> bool:
+    """Check if currently in cooldown period."""
+    return _get_limiter(context).is_in_cooldown()

@@ -15,26 +15,26 @@ def check_yf_rate_limit():
     """Check if we can make yfinance requests - used by batch jobs"""
     try:
         from handlers.market_data.rate_limiter import check_rate_limit, is_in_cooldown
-        if is_in_cooldown():
-            logger.warning("[Market Jobs] YFinance is in cooldown mode, skipping...")
+        if is_in_cooldown(context='background'):
+            logger.warning("[Market Jobs] YFinance background bucket in cooldown, skipping...")
             return False
-        return check_rate_limit()
+        return check_rate_limit(context='background')
     except ImportError:
         return True  # Rate limiter not available, proceed anyway
 
 def report_yf_batch_error(is_rate_limit=False):
-    """Report batch operation error to rate limiter"""
+    """Report batch operation error to rate limiter (background bucket)"""
     try:
         from handlers.market_data.rate_limiter import report_yfinance_error
-        report_yfinance_error(is_rate_limit=is_rate_limit)
+        report_yfinance_error(is_rate_limit=is_rate_limit, context='background')
     except ImportError:
         pass
 
 def report_yf_batch_success():
-    """Report batch operation success to rate limiter"""
+    """Report batch operation success to rate limiter (background bucket)"""
     try:
         from handlers.market_data.rate_limiter import report_yfinance_success
-        report_yfinance_success()
+        report_yfinance_success(context='background')
     except ImportError:
         pass
 

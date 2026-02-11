@@ -1,7 +1,7 @@
 import requests
 import time
 
-BASE_URL = "https://api.pearto.com/api/cron"
+BASE_URL = "https://apipearto.ashlya.com/api/cron"
 TOKEN = "123456789"
 HEADERS = {'X-Cron-Token': TOKEN}
 

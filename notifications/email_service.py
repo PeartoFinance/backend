@@ -28,7 +28,7 @@ EMAIL_CONFIG = {
     'from_address': os.getenv('EMAIL_FROM_ADDRESS', 'noreply@pearto.com'),
 }
 
-APP_URL = os.getenv('APP_URL', 'https://test.pearto.com')
+APP_URL = os.getenv('APP_URL', 'https://pearto.com')
 APP_NAME = 'Pearto Finance'
 
 

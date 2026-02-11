@@ -21,7 +21,7 @@ def verify_cron_token():
 
 @cron_bp.route('/stocks', methods=['GET', 'POST'])
 def cron_update_stocks():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/stocks?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/stocks?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -35,7 +35,7 @@ def cron_update_stocks():
 
 @cron_bp.route('/crypto', methods=['GET', 'POST'])
 def cron_update_crypto():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/crypto?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/crypto?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -49,7 +49,7 @@ def cron_update_crypto():
 
 @cron_bp.route('/indices', methods=['GET', 'POST'])
 def cron_update_indices():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/indices?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/indices?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -63,7 +63,7 @@ def cron_update_indices():
 
 @cron_bp.route('/commodities', methods=['GET', 'POST'])
 def cron_update_commodities():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/commodities?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/commodities?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -77,7 +77,7 @@ def cron_update_commodities():
 
 @cron_bp.route('/earnings', methods=['GET', 'POST'])
 def cron_update_earnings():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/earnings?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/earnings?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -91,7 +91,7 @@ def cron_update_earnings():
 
 @cron_bp.route('/dividends', methods=['GET', 'POST'])
 def cron_update_dividends():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/dividends?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/dividends?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -105,7 +105,7 @@ def cron_update_dividends():
 
 @cron_bp.route('/watchlist-alerts', methods=['GET', 'POST'])
 def cron_check_watchlist():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/watchlist-alerts?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/watchlist-alerts?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -152,7 +152,7 @@ def cron_daily_pl_summary():
 
 @cron_bp.route('/daily-digest', methods=['GET', 'POST'])
 def cron_daily_digest():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/daily-digest?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/daily-digest?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -168,7 +168,7 @@ def cron_daily_digest():
 def cron_all_market():
     """
     Update all market data at once
-    cURL: curl -X POST https://api.pearto.com/api/cron/all-market?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/all-market?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -198,7 +198,7 @@ def cron_all_market():
 
 @cron_bp.route('/business-profiles', methods=['GET', 'POST'])
 def cron_update_business_profiles():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/business-profiles?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/business-profiles?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -214,7 +214,7 @@ def cron_update_business_profiles():
 def cron_cleanup_accounts():
     """
     Permanently delete accounts marked for deletion > 30 days ago.
-    cURL: curl -X POST https://api.pearto.com/api/cron/cleanup-accounts?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/cleanup-accounts?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -231,7 +231,7 @@ def cron_cleanup_accounts():
 def cron_update_financials():
     """
     Sync financial statements for all listed stocks.
-    cURL: curl -X POST https://api.pearto.com/api/cron/financials?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/financials?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -286,7 +286,7 @@ def cron_update_forecast():
 def cron_import_news():
     """
     Import news from all external sources.
-    cURL: curl -X POST https://api.pearto.com/api/cron/import-news?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/import-news?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -336,7 +336,7 @@ def cron_import_biz_profiles():
 def cron_news_notifications():
     """
     Fetch recent news and send notifications to users based on preferences.
-    cURL: curl -X POST https://api.pearto.com/api/cron/news-notifications?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/news-notifications?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -351,7 +351,7 @@ def cron_news_notifications():
 
 @cron_bp.route('/forex', methods=['GET', 'POST'])
 def cron_update_forex():
-    """cURL: curl -X POST https://api.pearto.com/api/cron/forex?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/forex?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -367,7 +367,7 @@ def cron_update_forex():
 def cron_wealth_snapshot():
     """
     Manually trigger a wealth snapshot for all users.
-    cURL: curl -X POST https://api.pearto.com/api/cron/wealth-snapshot?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/wealth-snapshot?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -384,7 +384,7 @@ def cron_wealth_snapshot():
 def cron_check_goals():
     """
     cPanel Cron: URL-accessible endpoint to check user financial goals.
-    cURL example: curl -X POST https://api.pearto.com/api/cron/check-goals?token=YOUR_TOKEN
+    cURL example: curl -X POST https://apipearto.ashlya.com/api/cron/check-goals?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
@@ -401,7 +401,7 @@ def cron_check_goals():
 def cron_update_ytd():
     """
     Trigger YTD calculation via cPanel cron URL.
-    cURL: curl -X POST https://api.pearto.com/api/cron/update-ytd?token=YOUR_TOKEN
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/update-ytd?token=YOUR_TOKEN
     """
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401

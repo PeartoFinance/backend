@@ -28,7 +28,7 @@ EMAIL_CONFIG = {
     'from_address': os.getenv('EMAIL_FROM_ADDRESS', 'noreply@pearto.com'),
 }
 
-APP_URL = os.getenv('APP_URL', 'https://test.pearto.com')
+APP_URL = os.getenv('APP_URL', 'https://pearto.com')
 APP_NAME = 'Pearto Finance'
 
 
@@ -250,6 +250,139 @@ Changes: {{changed_fields}}
 If you didn't make these changes, please contact support.'''
     },
 
+    'password_change': {
+        'subject': f'Your {APP_NAME} Password Was Changed',
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: #dc3545; border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">🔐 Password Changed</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333;">Hi {{user_name}},</p>
+            <p style="font-size: 16px; color: #333;">The password for your {{app_name}} account was recently changed.</p>
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="margin: 5px 0; color: #555;"><strong>Time:</strong> {{time}}</p>
+                <p style="margin: 5px 0; color: #555;"><strong>IP Address:</strong> {{ip_address}}</p>
+            </div>
+            <p style="font-size: 16px; color: #333;">If this was you, you can safely ignore this email.</p>
+            <p style="font-size: 16px; color: #333; font-weight: bold;">If you didn't change your password, please secure your account immediately.</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{security_url}}" style="display: inline-block; background: #dc3545; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600;">Secure My Account</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''Password Changed
+
+Hi {{user_name}},
+
+The password for your {{app_name}} account was recently changed.
+
+Time: {{time}}
+IP Address: {{ip_address}}
+
+If this was you, ignore this email.
+If not, secure your account immediately: {{security_url}}'''
+    },
+
+    'daily_digest': {
+        'subject': '{{title}}',  # Title provided dynamically
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: #1a1a2e; border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">📈 Daily Summary</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333;">Hi {{user_name}},</p>
+            <p style="font-size: 16px; color: #333;">{{message}}</p>
+            
+            {% if is_summary %}
+            <div style="background: #f8f9fa; border-radius: 12px; padding: 25px; margin: 25px 0; text-align: center;">
+                <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">Portfolio Value</p>
+                <h2 style="margin: 0; color: #1a1a2e; font-size: 32px;">${{portfolio_val}}</h2>
+                <div style="display: inline-block; padding: 6px 12px; border-radius: 20px; background: {{ 'rgba(72, 187, 120, 0.1)' if daily_change >= 0 else 'rgba(245, 101, 101, 0.1)' }}; color: {{ '#48bb78' if daily_change >= 0 else '#f56565' }}; margin-top: 10px; font-weight: 600;">
+                    {{ '+' if daily_change >= 0 else '' }}{{daily_change}} ({{change_pct}}%)
+                </div>
+            </div>
+            {% endif %}
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{dashboard_url}}" style="display: inline-block; background: #667eea; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600;">View Portfolio</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''{{title}}
+
+Hi {{user_name}},
+
+{{message}}
+
+Portfolio Value: ${{portfolio_val}}
+Change: {{daily_change}} ({{change_pct}}%)
+
+View Portfolio: {{dashboard_url}}'''
+    },
+
+    'marketing': {
+        'subject': '{{title}}',
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: linear-gradient(135deg, #FF6B6B 0%, #EE5253 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">📢 {{title}}</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333;">Hi {{user_name}},</p>
+            <div style="font-size: 16px; color: #333; line-height: 1.6;">
+                {{message|safe}}
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{dashboard_url}}" style="display: inline-block; background: #FF6B6B; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600;">Check it Out</a>
+            </div>
+            
+             <p style="font-size: 12px; color: #999; text-align: center; margin-top: 30px;">
+                You received this because you are subscribed to marketing updates.
+                <a href="{{app_url}}/profile?tab=notifications" style="color: #999; text-decoration: underline;">Unsubscribe</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''{{title}}
+
+Hi {{user_name}},
+
+{{message}}
+
+Check it out: {{dashboard_url}}
+
+Unsubscribe: {{app_url}}/profile?tab=notifications'''
+    },
+
     'google_login': {
         'subject': f'New Google Sign-in to {APP_NAME}',
         'html': '''
@@ -425,9 +558,18 @@ class EmailService:
             return rendered
 
     def send_email_async(self, to: str, template_type: str, data: Dict[str, Any]):
-        """Send email in a background thread"""
-        thread = threading.Thread(target=self.send_email, args=(to, template_type, data))
-        thread.start()
+        """Send email in a background thread, with fallback to synchronous send"""
+        try:
+            thread = threading.Thread(target=self.send_email, args=(to, template_type, data))
+            thread.start()
+            return True
+        except RuntimeError as e:
+            # Fallback to synchronous send if thread creation fails (e.g. resource exhaustion)
+            print(f"[EmailService] Async send failed ({e}), falling back to synchronous send")
+            return self.send_email(to, template_type, data)
+        except Exception as e:
+            print(f"[EmailService] Async send error: {e}")
+            return False
 
     
     def send_email(self, to: str, template_type: str, data: Dict[str, Any]) -> bool:
@@ -548,6 +690,15 @@ def send_google_login_email(user_email: str, user_name: str,
     })
 
 
+def send_password_change_email(user_email: str, user_name: str, ip_address: str = 'Unknown') -> bool:
+    """Send password change notification email"""
+    return _email_service.send_email_async(user_email, 'password_change', {
+        'user_name': user_name,
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'ip_address': ip_address,
+    })
+
+
 def send_email(to: str, template: str, subject: str = None, variables: dict = None) -> bool:
     """
     Generic convenience function to send an email using a template.
@@ -575,4 +726,5 @@ def send_phone_verification_sms(phone: str, code: str) -> bool:
     print(f'  Code: {code}')
     print(f'  Message: Your Pearto Finance verification code is: {code}')
     return True
+
 

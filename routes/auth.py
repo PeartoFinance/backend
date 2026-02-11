@@ -186,10 +186,8 @@ def signup():
         ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
         track_signup(user.id, method='email', ip=ip_address)
         
-        # Check preferences (default True for account/welcome)
-        from services.preference_checker import should_send_notification
-        if should_send_notification(user.id, 'account', 'email'):
-            send_welcome_email(user.email, user.name)
+        # Always send welcome email for new users
+        send_welcome_email(user.email, user.name)
     except Exception as e:
         print(f'[Auth] Signup tracking/email failed: {e}')
     
@@ -453,5 +451,12 @@ def set_password():
 
     user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     db.session.commit()
+    
+    # Track password change/set
+    try:
+        from handlers import track_password_change
+        track_password_change(user.id, request.remote_addr)
+    except Exception as e:
+        print(f'[Auth] Failed to track password set: {e}')
 
     return jsonify({'message': 'Password set successfully'})

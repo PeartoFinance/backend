@@ -197,6 +197,19 @@ def track_module_complete(user_id: int, module_id: int, course_id: int, ip: str 
 
 def track_profile_update(user_id: int, fields_changed: list, ip: str = None):
     """Track profile update"""
+    # Trigger notification if enabled
+    try:
+        from services.preference_checker import should_send_notification
+        from models import User
+        
+        if should_send_notification(user_id, 'account', 'email'):
+            user = User.query.get(user_id)
+            if user:
+                from .email_service import send_profile_update_email
+                send_profile_update_email(user.email, user.name, fields_changed)
+    except Exception as e:
+        print(f"Failed to send profile update email: {e}")
+
     return track_activity(
         user_id=user_id,
         action='profile_update',
@@ -208,6 +221,26 @@ def track_profile_update(user_id: int, fields_changed: list, ip: str = None):
 
 def track_password_change(user_id: int, ip: str = None):
     """Track password change"""
+    # Trigger notification if enabled
+    try:
+        from models import User
+        
+        # Always send security notification for password changes (Mandatory)
+        user = User.query.get(user_id)
+        if user:
+            from .email_service import send_password_change_email
+            # Use provided IP or fallback
+            actual_ip = ip
+            if not actual_ip:
+                    try:
+                        actual_ip = request.remote_addr
+                    except:
+                        actual_ip = 'Unknown'
+            
+            send_password_change_email(user.email, user.name, actual_ip)
+    except Exception as e:
+        print(f"Failed to send password change email: {e}")
+
     return track_activity(
         user_id=user_id,
         action='password_change',
