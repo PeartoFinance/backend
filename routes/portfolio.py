@@ -615,9 +615,9 @@ def add_transaction(portfolio_id):
         else:
             return jsonify({'error': 'Insufficient shares'}), 400
     
-    # Update current price from market data
-    market = MarketData.query.filter_by(symbol=symbol).first()
-    if market and holding and tx_type != 'sell':
+    # BUG FIX: Recalculate current_value even on 'sell' transactions. 
+    # Previously, line 620 skipped updates for sells, causing "Phantom Balances" in the user dashboard.
+    if market and holding:
         holding.current_price = market.price
         holding.current_value = float(holding.shares) * float(market.price or 0)
         holding.gain_loss = holding.current_value - (float(holding.shares) * float(holding.avg_buy_price or 0))

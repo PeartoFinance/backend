@@ -55,8 +55,10 @@ def init_scheduler(app=None):
     # 5 threads is usually the safe limit for background workers
     pool_size = 5 
     
+    # Optimized for production: 20 threads was causing "fork() failed" on many hosting environments.
+    # Reducing to 5 ensures the server has enough resources for real users.
     executors = {
-        'default': ThreadPoolExecutor(pool_size),
+        'default': ThreadPoolExecutor(5),
     }
     
     job_defaults = {
