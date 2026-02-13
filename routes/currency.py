@@ -4,10 +4,12 @@ Stateless endpoints for currency conversion and exchange rates.
 """
 from flask import Blueprint, request, jsonify
 from services.currency_service import convert_usd_to_target, get_all_available_rates
+from extensions import cache
 
 currency_bp = Blueprint('currency', __name__, url_prefix='/api/currency')
 
 @currency_bp.route('/convert', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def convert_currency():
     """
     Convert USD amount to target currency.
@@ -38,6 +40,7 @@ def convert_currency():
     return jsonify(result)
 
 @currency_bp.route('/rates', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_rates():
     """
     Get all available exchange rates.

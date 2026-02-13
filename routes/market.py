@@ -26,6 +26,7 @@ def get_forex_pair_history(symbol):
 
 
 @market_bp.route('/calendar', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_calendar():
     """Get economic calendar events"""
     start = request.args.get('start')
@@ -169,6 +170,7 @@ def get_commodities():
 
 
 @market_bp.route('/offers', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_offers():
     """Get stock offers (IPO, FPO)"""
     status = request.args.get('status')
@@ -204,6 +206,7 @@ def get_stock_offers():
 
 
 @market_bp.route('/stocks', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_all_stocks():
     """Get all stocks with optional filters"""
     sector = request.args.get('sector')
@@ -230,6 +233,7 @@ def get_all_stocks():
 
 
 @market_bp.route('/crypto', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_crypto_markets():
     """Alias for crypto markets under /api/market/crypto."""
     # Safe conversion: Returns 100 if invalid characters sent
@@ -265,6 +269,7 @@ def get_crypto_markets():
 
 
 @market_bp.route('/stats', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_market_stats():
     """High-level market breadth stats for /api/market/stats."""
     header_country = request.headers.get('X-User-Country')
@@ -292,6 +297,7 @@ def get_market_stats():
 
 
 @market_bp.route('/dividends', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_dividends():
     """Get proposed dividends from database."""
     status = request.args.get('status')  # 'proposed', 'approved', 'paid'
@@ -312,6 +318,7 @@ def get_dividends():
 
 
 @market_bp.route('/bulk-transactions', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_bulk_transactions():
     """Get bulk transactions from database."""
     limit = min(int(request.args.get('limit', 50)), 100)

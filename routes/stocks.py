@@ -15,6 +15,7 @@ stocks_bp = Blueprint('stocks', __name__)
 
 
 @stocks_bp.route('/quotes', methods=['GET'])
+@cache.cached(timeout=30, query_string=True)
 def get_quotes():
     """Get real-time quotes for multiple symbols"""
     symbols_param = request.args.get('symbols', '')
@@ -41,6 +42,7 @@ def get_quotes():
 
 
 @stocks_bp.route('/search', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def search_stocks():
     """Search stocks by name or symbol"""
     query = request.args.get('q', '').strip()
@@ -100,6 +102,7 @@ def search_stocks():
 
 
 @stocks_bp.route('/profile/<symbol>', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_profile(symbol):
     """Get expanded stock profile including financials, news, and issues"""
     header_country = request.headers.get('X-User-Country')
@@ -156,6 +159,7 @@ def get_profile(symbol):
 
 
 @stocks_bp.route('/financials/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_financials(symbol):
     """Get full financial statements for a symbol"""
     symbol = symbol.upper()
@@ -170,6 +174,7 @@ def get_stock_financials(symbol):
 
 
 @stocks_bp.route('/financials/<symbol>/statements', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_financial_statements(symbol):
     """
     Get comprehensive financial statements from database.
@@ -195,6 +200,7 @@ def get_stock_financial_statements(symbol):
 
 
 @stocks_bp.route('/forecast/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_forecast(symbol):
     """
     Get comprehensive analyst forecast data including:
@@ -214,6 +220,7 @@ def get_stock_forecast(symbol):
 
 
 @stocks_bp.route('/statistics/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_statistics(symbol):
     """Get detailed technical and fundamental statistics for a symbol"""
     symbol = symbol.upper()
@@ -245,6 +252,7 @@ def get_stock_statistics(symbol):
 
 
 @stocks_bp.route('/dividends/<symbol>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_stock_dividends(symbol):
     """Get dividend history for a specific symbol"""
     symbol = symbol.upper()
@@ -254,6 +262,7 @@ def get_stock_dividends(symbol):
 
 
 @stocks_bp.route('/directory', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_business_directory():
     """List all businesses marked as 'is_listed' for the public directory"""
     try:
@@ -338,6 +347,7 @@ def get_most_active():
 
 
 @stocks_bp.route('/etfs', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_etfs():
     """List all ETFs with optional search and pagination"""
     query = request.args.get('q', '').strip()
@@ -373,6 +383,7 @@ def get_etfs():
 
 
 @stocks_bp.route('/etfs/movers', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_etf_movers():
     """Get top ETF gainers and losers"""
     # Safe conversion: Returns 10 if invalid characters sent

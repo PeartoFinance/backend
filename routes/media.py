@@ -4,6 +4,7 @@ No auth required, country-filtered based on X-User-Country header
 """
 from flask import Blueprint, jsonify, request
 from models import db, TVChannel, RadioStation
+from extensions import cache
 
 media_bp = Blueprint('media', __name__, url_prefix='/api/media')
 
@@ -43,6 +44,7 @@ def apply_country_filter(query, model, country_code_field='country_code'):
 # ============================================================================
 
 @media_bp.route('/tv-channels', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_tv_channels():
     """List TV channels (public, country-filtered)"""
     try:
@@ -69,6 +71,7 @@ def get_tv_channels():
 
 
 @media_bp.route('/tv-channels/<id>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_tv_channel(id):
     """Get single TV channel by ID"""
     try:
@@ -108,6 +111,7 @@ def get_tv_channel(id):
 # ============================================================================
 
 @media_bp.route('/radio-stations', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_radio_stations():
     """List radio stations (public, country-filtered)"""
     try:
@@ -133,6 +137,7 @@ def get_radio_stations():
 
 
 @media_bp.route('/radio-stations/<int:id>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_radio_station(id):
     """Get single radio station by ID"""
     try:
@@ -176,6 +181,7 @@ def get_radio_station(id):
 # ============================================================================
 
 @media_bp.route('/sports-events', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_sports_events():
     """List sports events (public, country-filtered)"""
     try:
@@ -212,6 +218,7 @@ def get_sports_events():
 
 
 @media_bp.route('/sports-events/<id>', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_sports_event(id):
     """Get single sports event by ID with country scoping"""
     try:

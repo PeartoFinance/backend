@@ -63,6 +63,7 @@ CORS(app,
          "http://127.0.0.1:3000",
          "https://pearto.com",
          "https://www.pearto.com",
+         "https://stocks.pearto.com",
          "https://pearto.com",
          "https://frontend-admin-pearto.vercel.app",
          "https://stocks-nine-blush.vercel.app",
@@ -152,6 +153,12 @@ app.register_blueprint(social_bp, url_prefix='/api/social')
 app.register_blueprint(backup_bp, url_prefix='/api/backup')
 app.register_blueprint(currency_bp)
 app.register_blueprint(subscription_bp, url_prefix='/api/subscription')
+
+from routes.sports import sports_bp
+app.register_blueprint(sports_bp, url_prefix='/api/sports')
+
+from routes.sports_settings import sports_settings_bp
+app.register_blueprint(sports_settings_bp, url_prefix='/api/admin/sports-settings')
 
 # User feature routes
 from routes.alerts import alerts_bp

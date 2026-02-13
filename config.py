@@ -44,8 +44,10 @@ class Config:
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     PORT = int(os.getenv('PORT', 5000))
     
-    # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'https://pearto.com,https://pearto.com').split(',')
+    # API-Sports
+    API_SPORTS_KEY = os.getenv('API_SPORTS_KEY', '')
+    API_SPORTS_BASE_URL = os.getenv('API_SPORTS_BASE_URL', 'https://v3.football.api-sports.io')
+
 
 
 config = Config()

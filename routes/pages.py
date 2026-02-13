@@ -4,12 +4,14 @@ Public Pages API Routes
 """
 from flask import Blueprint, request, jsonify
 from models import Page
+from extensions import cache
 
 
 pages_bp = Blueprint('pages', __name__)
 
 
 @pages_bp.route('/pages', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_pages():
     """
     Public pages listing.
@@ -68,6 +70,7 @@ def get_pages():
 
 
 @pages_bp.route('/pages/<slug>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_page_by_slug(slug):
     """Get a single page by slug"""
     page = Page.query.filter_by(slug=slug, status='published').first()

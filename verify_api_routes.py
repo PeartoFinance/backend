@@ -2,7 +2,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:5000"
+BASE_URL = "https://apipearto.ashlya.com"
 
 ENDPOINTS = [
     {"name": "Health Check", "url": "/api/health", "method": "GET"},

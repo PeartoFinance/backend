@@ -8,11 +8,13 @@ import random
 from urllib.parse import urlparse
 from models.article import NewsItem
 from models.base import db
+from extensions import cache
 
 news_bp = Blueprint('news', __name__)
 
 
 @news_bp.route('/published', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_published_news():
     """Get published news articles with country filtering"""
     limit = min(int(request.args.get('limit', 50)), 200)
@@ -50,6 +52,7 @@ def get_published_news():
 
 
 @news_bp.route('/headlines', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_headlines():
     """Get latest news headlines with country filtering.
 
@@ -118,6 +121,7 @@ def get_headlines():
 
 
 @news_bp.route('/stock/<symbol>', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_news_by_stock(symbol):
     """Get news articles related to a specific stock symbol"""
     limit = min(int(request.args.get('limit', 10)), 50)
@@ -145,6 +149,7 @@ def get_news_by_stock(symbol):
 
 
 @news_bp.route('/search', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def search_news():
     """Search news articles"""
     query_str = request.args.get('q', '').strip()
@@ -175,6 +180,7 @@ def search_news():
 
 
 @news_bp.route('/featured', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_featured():
     """Get featured news articles"""
     limit = min(int(request.args.get('limit', 5)), 20)
@@ -194,6 +200,7 @@ def get_featured():
 
 
 @news_bp.route('/categories', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_categories():
     """Get available news categories"""
     categories = db.session.query(NewsItem.category).filter(
@@ -205,6 +212,7 @@ def get_categories():
 
 
 @news_bp.route('/article/<slug>', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_article_by_slug(slug):
     """Get single article by slug"""
     if not slug or len(slug) < 1:
@@ -240,6 +248,7 @@ def get_article_by_slug(slug):
 
 
 @news_bp.route('/article/id/<int:article_id>', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_article_by_id(article_id):
     """Get single article by ID"""
     article = NewsItem.query.get(article_id)
@@ -263,6 +272,7 @@ def get_article_by_id(article_id):
 
 
 @news_bp.route('/sections', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_sections():
     """
     Sectioned news endpoint for homepage.
@@ -310,6 +320,7 @@ def get_sections():
 
 
 @news_bp.route('/global-latest', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_global_latest():
     """
     Get latest global news with per-host cap.

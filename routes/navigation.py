@@ -4,11 +4,13 @@ Serves navigation menu items to frontend
 """
 from flask import Blueprint, jsonify, request
 from models import NavigationItem, Settings
+from extensions import cache
 
 navigation_bp = Blueprint('navigation', __name__)
 
 
 @navigation_bp.route('/navigation', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_public_navigation():
     """Get all active navigation items for public use"""
     try:
@@ -46,6 +48,7 @@ def get_public_navigation():
 
 
 @navigation_bp.route('/feature-flags', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_public_feature_flags():
     """
     Get public feature flags for frontend.

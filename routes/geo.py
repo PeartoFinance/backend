@@ -5,6 +5,7 @@ Geo-detection API Routes
 from flask import Blueprint, request, jsonify
 import requests
 from models import Country
+from extensions import cache
 
 geo_bp = Blueprint('geo', __name__)
 
@@ -49,6 +50,7 @@ def detect_country():
 
 
 @geo_bp.route('/countries', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_countries():
     """Get list of supported countries"""
     active_only = request.args.get('active', 'true').lower() != 'false'
@@ -65,6 +67,7 @@ def get_countries():
 
 
 @geo_bp.route('/country/<code>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_country(code):
     """Get single country by code"""
     country = Country.query.get(code.upper())

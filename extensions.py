@@ -16,7 +16,7 @@ compress = Compress()
 # Flask-Limiter: Use Redis in production for thread-safe rate limiting
 # Redis URL format: redis://:password@host:port/db
 # Production Redis: 127.0.0.1:38469 with password
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', 'zboeUzOlC2kcjLXWb7v')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
 REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
 REDIS_PORT = os.getenv('REDIS_PORT', '38469')
 REDIS_DB = os.getenv('REDIS_LIMITER_DB', '0')
@@ -45,8 +45,12 @@ if REDIS_USE_SOCKET:
     RATELIMIT_STORAGE_URL = f'redis+unix://{REDIS_SOCKET_PATH}?db={REDIS_DB}'
 
 else:
-    # TCP URL format: redis://:password@host:port
-    REDIS_BASE_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}'
+    # TCP URL format: redis://[:password@]host:port
+    if REDIS_PASSWORD:
+        REDIS_BASE_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}'
+    else:
+        REDIS_BASE_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}'
+        
     print(f"[Redis] Using TCP Connection: {REDIS_HOST}:{REDIS_PORT}")
     
     # Configure URLs for TCP

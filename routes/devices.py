@@ -1,13 +1,14 @@
 """
 Device & Session Management API Routes
 - Session tracking, device management, logout from devices
+- Push notification device registration (OneSignal)
 Based on old/Frontend/server/src/deviceApi.js
 """
 from flask import Blueprint, request, jsonify
 import uuid
 import re
 from datetime import datetime, timedelta
-from models import db, User, UserSession
+from models import db, User, UserSession, UserDevice
 from .decorators import auth_required
 
 devices_bp = Blueprint('devices', __name__)
@@ -241,3 +242,105 @@ def rename_device(session_id):
         'success': True,
         'message': 'Device renamed successfully'
     })
+
+
+# ─── Push Notification Device Registration (OneSignal) ───
+
+@devices_bp.route('/register', methods=['POST'])
+@auth_required
+def register_push_device():
+    """
+    Register a push notification device (OneSignal subscription).
+    Called by frontend after user grants notification permission.
+    Body: { player_id, platform, device_name }
+    """
+    user = request.user
+    data = request.get_json() or {}
+
+    player_id = data.get('player_id')
+    if not player_id:
+        return jsonify({'success': False, 'error': 'player_id is required'}), 400
+
+    platform = data.get('platform', 'web')
+    device_name = data.get('device_name', f'{platform} device')
+
+    try:
+        # Check if this device token is already registered for the user
+        existing = UserDevice.query.filter_by(
+            user_id=user.id,
+            device_token=player_id
+        ).first()
+
+        if existing:
+            existing.is_active = True
+            existing.last_used_at = datetime.utcnow()
+            existing.device_name = device_name[:255] if device_name else existing.device_name
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Device already registered, updated',
+                'device_id': existing.id
+            })
+
+        # Deactivate any old tokens for this user on the same platform
+        # (user may have cleared browser data → new subscription ID)
+        UserDevice.query.filter_by(
+            user_id=user.id,
+            platform=platform
+        ).update({'is_active': False})
+
+        # Create new device registration
+        device = UserDevice(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            device_name=(device_name[:255] if device_name else f'{platform} device'),
+            device_type=platform,
+            device_token=player_id,
+            platform=platform,
+            is_active=True,
+            last_used_at=datetime.utcnow()
+        )
+        db.session.add(device)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Device registered for push notifications',
+            'device_id': device.id
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@devices_bp.route('/register', methods=['DELETE'])
+@auth_required
+def unregister_push_device():
+    """
+    Unregister a push notification device.
+    Body: { player_id }
+    """
+    user = request.user
+    data = request.get_json() or {}
+    player_id = data.get('player_id')
+
+    if not player_id:
+        return jsonify({'success': False, 'error': 'player_id is required'}), 400
+
+    try:
+        device = UserDevice.query.filter_by(
+            user_id=user.id,
+            device_token=player_id
+        ).first()
+
+        if device:
+            device.is_active = False
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Device unregistered'})
+
+        return jsonify({'success': False, 'error': 'Device not found'}), 404
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -5,10 +5,12 @@ Allow users/tools to fetch active vendors by category/service
 from flask import Blueprint, jsonify, request, g
 from models import Vendor
 from .decorators import auth_required
+from extensions import cache
 
 public_vendors_bp = Blueprint('public_vendors', __name__, url_prefix='/api/public/vendors')
 
 @public_vendors_bp.route('', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_public_vendors():
     """
     Get active vendors filtered by params
@@ -65,6 +67,7 @@ def get_public_vendors():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @public_vendors_bp.route('/<vendor_id>', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_vendor_details(vendor_id):
     """Get full vendor details"""
     try:
@@ -94,6 +97,7 @@ def get_vendor_details(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @public_vendors_bp.route('/<vendor_id>/history', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_vendor_history(vendor_id):
     """Get historical data points for analysis"""
     try:
@@ -118,6 +122,7 @@ def get_vendor_history(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @public_vendors_bp.route('/<vendor_id>/reviews', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_vendor_reviews(vendor_id):
     """Get vendor reviews"""
     try:

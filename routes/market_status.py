@@ -5,6 +5,7 @@ Dynamic market open/close status based on user's country
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 import pytz
+from extensions import cache
 
 market_status_bp = Blueprint('market_status', __name__)
 
@@ -97,6 +98,7 @@ def get_market_status_for_exchange(exchange):
 
 
 @market_status_bp.route('/status', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_market_status():
     """
     Get market status for user's country.
@@ -181,6 +183,7 @@ def get_market_status():
 
 
 @market_status_bp.route('/exchanges', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
 def get_all_exchanges():
     """Get all active exchanges"""
     from models import MarketHours

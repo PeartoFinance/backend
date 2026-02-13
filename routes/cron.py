@@ -412,3 +412,51 @@ def cron_update_ytd():
         return jsonify({'ok': True, 'message': 'YTD update job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== SPORTS DATA ====================
+
+@cron_bp.route('/sports-import', methods=['GET', 'POST'])
+def cron_sports_import():
+    """
+    Import all sports events for today into the database.
+    Run every 15-30 min for fresh data.
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/sports-import?token=YOUR_TOKEN
+    Optional: ?date=2026-02-13&sport=football
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+
+    try:
+        date = request.args.get('date')
+        sport_key = request.args.get('sport')
+
+        def _run_sports_import():
+            from services.sports_import_service import SportsImportService
+            return SportsImportService.import_events(date=date, sport_key=sport_key)
+
+        queue_job(_run_sports_import, 'sports_import')
+        return jsonify({'ok': True, 'message': 'Sports import job triggered'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@cron_bp.route('/sports-live-refresh', methods=['GET', 'POST'])
+def cron_sports_live_refresh():
+    """
+    Refresh scores for live events only.
+    Run every 1-2 min for real-time scores.
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/sports-live-refresh?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+
+    try:
+        def _run_live_refresh():
+            from services.sports_import_service import SportsImportService
+            return SportsImportService.refresh_live_events()
+
+        queue_job(_run_live_refresh, 'sports_live_refresh')
+        return jsonify({'ok': True, 'message': 'Sports live refresh job triggered'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

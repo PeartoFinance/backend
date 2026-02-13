@@ -6,11 +6,13 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 from models.base import db
 from models.article import Article, NewsItem, Post
+from extensions import cache
 
 articles_bp = Blueprint('articles', __name__)
 
 
 @articles_bp.route('/featured', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_featured_articles():
     """Get featured articles from news_items or posts"""
     limit = min(int(request.args.get('limit', 5)), 20)
@@ -87,6 +89,7 @@ def get_featured_articles():
 
 
 @articles_bp.route('/categories', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_articles():
     """Get articles with filters"""
     category = request.args.get('category')
@@ -118,6 +121,7 @@ def get_articles():
 
 
 @articles_bp.route('/<article_id>', methods=['GET'])
+@cache.cached(timeout=120, query_string=True)
 def get_article(article_id):
     """Get single article/news item by ID"""
     # Try news item first
