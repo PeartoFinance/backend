@@ -9,53 +9,23 @@ from datetime import datetime
 import jwt
 from config import config
 from models import db, User, UserPortfolio, UserWatchlist, MarketData
+from routes.decorators import auth_required
 
 user_bp = Blueprint('user', __name__)
 
 
 def get_current_user():
-    """Resolve current user from Authorization Bearer JWT or X-User-Email header.
-
-    Priority:
-    1. Authorization: Bearer <token> (JWT with `user_id` claim)
-    2. X-User-Email header (compatibility fallback)
     """
-    # If another middleware/decorator already set request.user, use it
+    Resolve current user from request context (set by @auth_required).
+    The previous X-User-Email header fallback was removed for security.
+    """
     if hasattr(request, 'user') and getattr(request, 'user'):
         return request.user
-
-    # Try Bearer token
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header.split(' ', 1)[1].strip()
-        try:
-            payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
-            user_id = payload.get('user_id')
-            if user_id:
-                user = User.query.get(user_id)
-                if user:
-                    return user
-        except jwt.ExpiredSignatureError:
-            return None
-        except jwt.InvalidTokenError:
-            # Invalid token -> fall through to header fallback
-            pass
-
-    # Compatibility fallback: X-User-Email
-    user_email = request.headers.get('X-User-Email')
-    if not user_email:
-        user = None
-    else:
-        user = User.query.filter_by(email=user_email).first()
-
-    # Final Security Check: If user was found by any method, check their status
-    if user and user.account_status != 'active':
-        return None  # Treat as unauthenticated if account is not active
-        
-    return user
+    return None
 
 
 @user_bp.route('/profile', methods=['GET'])
+@auth_required
 def get_profile():
     """Get current user profile"""
     user = get_current_user()
@@ -66,6 +36,7 @@ def get_profile():
 
 
 @user_bp.route('/profile', methods=['PUT'])
+@auth_required
 def update_profile():
     """Update user profile"""
     user = get_current_user()
@@ -112,6 +83,7 @@ def update_profile():
 
 
 @user_bp.route('/referrals', methods=['GET'])
+@auth_required
 def get_referrals():
     """Get list of users referred by the current user"""
     user = get_current_user()
@@ -140,6 +112,7 @@ def get_referrals():
 
 
 @user_bp.route('/preferences', methods=['GET'])
+@auth_required
 def get_preferences():
     """Get user preferences"""
     user = get_current_user()
@@ -155,6 +128,7 @@ def get_preferences():
 
 
 @user_bp.route('/preferences', methods=['PUT'])
+@auth_required
 def update_preferences():
     """Update user preferences"""
     user = get_current_user()
@@ -203,6 +177,7 @@ def update_preferences():
 
 
 @user_bp.route('/notification-preferences', methods=['GET'])
+@auth_required
 def get_notification_preferences():
     """Get user notification preferences"""
     user = get_current_user()
@@ -222,6 +197,7 @@ def get_notification_preferences():
 
 
 @user_bp.route('/notification-preferences', methods=['PUT'])
+@auth_required
 def update_notification_preferences():
     """Update user notification preferences"""
     user = get_current_user()
@@ -293,6 +269,7 @@ def update_notification_preferences():
 
 
 @user_bp.route('/change-password', methods=['POST'])
+@auth_required
 def change_password():
     """Change user password"""
     user = get_current_user()
@@ -332,6 +309,7 @@ def change_password():
 
 
 @user_bp.route('/portfolio', methods=['GET'])
+@auth_required
 def get_user_portfolio_summary():
     """Return current user's portfolios summary for /api/user/portfolio."""
     user = get_current_user()
@@ -345,6 +323,7 @@ def get_user_portfolio_summary():
 
 
 @user_bp.route('/watchlist', methods=['GET'])
+@auth_required
 def get_user_watchlist():
     """Return current user's watchlist symbols with basic quote info."""
     user = get_current_user()
@@ -377,6 +356,7 @@ def get_user_watchlist():
 
 
 @user_bp.route('/net-worth', methods=['GET'])
+@auth_required
 def get_net_worth():
     """Get user's net worth calculated from portfolio holdings using LIVE market data"""
     user = get_current_user()
@@ -433,6 +413,7 @@ def get_net_worth():
 # ==========================================================
 
 @user_bp.route('/subscription', methods=['GET'])
+@auth_required
 def get_user_subscription():
     """
     Returns the current user's subscription status and feature usage.
@@ -541,6 +522,7 @@ def _get_usage_for_plan(user_id: int, limits: dict) -> dict:
 
 
 @user_bp.route('/usage/<feature_key>', methods=['POST'])
+@auth_required
 def track_feature_usage(feature_key: str):
     """
     Increment usage for a feature and return updated counts.
