@@ -95,15 +95,16 @@ def check_watchlist_alerts() -> Dict[str, Any]:
                 current_price = float(market_data.price)
                 target_price = float(item.target_price)
                 
-                # BUG FIX: Legacy Idempotency
-                # WatchlistItem doesn't have an 'is_triggered' column. 
-                # We use cache to prevent spamming the user every minute.
-                cache_key = f"alert_sent_{watchlist.user_id}_{item.symbol}_{item.id}"
+                # BUG FIX: Legacy Idempotency & Anti-Spam
+                # WatchlistItem doesn't have an 'is_triggered' column, so we use cache.
+                # We include the target_price in the key so if the user updates the target, 
+                # they can get a new alert. We also set a long timeout (30 days) to stop daily spam.
+                cache_key = f"alert_sent_{watchlist.user_id}_{item.symbol}_{item.id}_{target_price}"
                 if cache.get(cache_key):
                     continue
 
-                # Check if price is within 1% of target
-                if target_price > 0 and abs(current_price - target_price) / target_price < 0.01:
+                # Check if price is within a strict 0.5% of target (tighter than 1%)
+                if target_price > 0 and abs(current_price - target_price) / target_price < 0.005:
                     try:
                         from notifications import send_price_alert
                         send_price_alert(
@@ -112,8 +113,8 @@ def check_watchlist_alerts() -> Dict[str, Any]:
                             current_price=current_price,
                             target_price=target_price
                         )
-                        # Set cache for 24 hours to prevent repeated alerts
-                        cache.set(cache_key, True, timeout=86400)
+                        # Set cache for 30 days to prevent repeated alerts for the SAME target hit
+                        cache.set(cache_key, True, timeout=2592000)
                         alerts_sent += 1
                     except Exception as e:
                         logger.warning(f"Failed to send alert for {item.symbol}: {e}")
