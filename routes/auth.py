@@ -21,6 +21,17 @@ from google.auth.transport import requests
 auth_bp = Blueprint('auth', __name__)
 
 
+def _get_client_ip() -> str:
+    """Extract the real client IP from proxy headers, safe for VARCHAR(45)."""
+    ip = (
+        request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+        or request.headers.get('X-Real-IP')
+        or request.remote_addr
+        or 'Unknown'
+    )
+    return ip[:45]
+
+
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login with email and password"""
@@ -85,7 +96,7 @@ def login():
         user_id=user.id,
         token=token,
         expires_at=datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS),
-        ip_address=request.remote_addr,
+        ip_address=_get_client_ip(),
         user_agent=request.headers.get('User-Agent')
     )
     db.session.add(session)
@@ -93,7 +104,7 @@ def login():
     
     # Track login activity
     try:
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+        ip_address = _get_client_ip()
         user_agent = request.headers.get('User-Agent', 'Unknown device')
         track_login(user.id, success=True, method='email', ip=ip_address)
         
@@ -183,7 +194,7 @@ def signup():
     
     # Track signup activity and send welcome email
     try:
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+        ip_address = _get_client_ip()
         track_signup(user.id, method='email', ip=ip_address)
         
         # Always send welcome email for new users
@@ -384,7 +395,7 @@ def google_signin():
 
         # Track signup activity
         try:
-            ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+            ip_address = _get_client_ip()
             track_signup(user.id, method='google', ip=ip_address)
         except Exception as e:
             print(f'[Auth] Signup tracking failed: {e}')
@@ -416,7 +427,7 @@ def google_signin():
 
     # Track login and send notification
     try:
-        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr or 'Unknown')
+        ip_address = _get_client_ip()
         user_agent = request.headers.get('User-Agent', 'Unknown device')
         
         # Track login
@@ -455,7 +466,7 @@ def set_password():
     # Track password change/set
     try:
         from handlers import track_password_change
-        track_password_change(user.id, request.remote_addr)
+        track_password_change(user.id, _get_client_ip())
     except Exception as e:
         print(f'[Auth] Failed to track password set: {e}')
 

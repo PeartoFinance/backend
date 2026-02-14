@@ -132,7 +132,7 @@ def get_favorite_ids():
 
 
 @sports_bp.route('/fixtures', methods=['GET'])
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=10, query_string=True)
 def get_fixtures():
     """
     Get sports events from the database.
@@ -347,8 +347,109 @@ def get_categories():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sports_bp.route('/events/<int:event_id>/details', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
+def get_event_match_detail(event_id):
+    """
+    Proxy enriched match data from API-Sports.
+    Returns events timeline, statistics, lineups, player stats.
+    """
+    try:
+        from models.media import SportsEvent as SE
+        from services.sports_detail_service import get_match_detail
+
+        ev = SE.query.get(event_id)
+        if not ev:
+            return jsonify({'success': False, 'error': 'Event not found'}), 404
+
+        ext = ev.external_id or ''
+        parts = ext.split('-', 1)
+        if len(parts) != 2:
+            return jsonify({'success': True, 'data': {
+                'events': [], 'statistics': [], 'lineups': [], 'periods': [], 'players': []
+            }})
+
+        sport_key, api_id = parts[0], parts[1]
+        data = get_match_detail(sport_key, api_id)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sports_bp.route('/standings', methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
+def get_standings():
+    """
+    Get league standings.
+    Query params: sport (key), league (API league ID), season (optional, defaults to current year)
+    """
+    try:
+        from services.sports_detail_service import get_standings as fetch_standings
+
+        sport_key = request.args.get('sport')
+        league_id = request.args.get('league')
+        season = request.args.get('season')
+
+        if not sport_key or not league_id:
+            return jsonify({'success': False, 'error': 'sport and league params required'}), 400
+
+        data = fetch_standings(sport_key, int(league_id), int(season) if season else None)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sports_bp.route('/h2h', methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
+def get_head_to_head():
+    """
+    Get head-to-head past matches.
+    Query params: sport (key), team1 (API team ID), team2 (API team ID)
+    """
+    try:
+        from services.sports_detail_service import get_h2h
+
+        sport_key = request.args.get('sport')
+        team1 = request.args.get('team1')
+        team2 = request.args.get('team2')
+
+        if not sport_key or not team1 or not team2:
+            return jsonify({'success': False, 'error': 'sport, team1, team2 params required'}), 400
+
+        data = get_h2h(sport_key, team1, team2)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sports_bp.route('/predictions/<int:event_id>', methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
+def get_match_predictions(event_id):
+    """
+    Get AI predictions for a match (Football only on free tier).
+    """
+    try:
+        from models.media import SportsEvent as SE
+        from services.sports_detail_service import get_predictions
+
+        ev = SE.query.get(event_id)
+        if not ev:
+            return jsonify({'success': False, 'error': 'Event not found'}), 404
+
+        ext = ev.external_id or ''
+        parts = ext.split('-', 1)
+        if len(parts) != 2:
+            return jsonify({'success': True, 'data': None})
+
+        sport_key, api_id = parts[0], parts[1]
+        data = get_predictions(sport_key, api_id)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sports_bp.route('/leagues', methods=['GET'])
-@cache.cached(timeout=120, query_string=True)
+@cache.cached(timeout=60, query_string=True)
 def get_leagues():
     """Get unique leagues from stored events"""
     try:

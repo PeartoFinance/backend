@@ -46,9 +46,20 @@ def track_activity(
     # Get IP from request if not provided
     if ip_address is None:
         try:
-            ip_address = request.remote_addr
+            ip_address = (
+                request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+                or request.headers.get('X-Real-IP')
+                or request.remote_addr
+            )
         except RuntimeError:
             ip_address = None
+    
+    # Sanitize: X-Forwarded-For may contain multiple IPs — keep only the first (client)
+    if ip_address and ',' in ip_address:
+        ip_address = ip_address.split(',')[0].strip()
+    # Truncate to fit VARCHAR(45)
+    if ip_address and len(ip_address) > 45:
+        ip_address = ip_address[:45]
     
     activity_id = str(uuid.uuid4())
     
