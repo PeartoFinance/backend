@@ -417,19 +417,37 @@ def add_holding(portfolio_id):
     market = MarketData.query.filter_by(symbol=symbol).first()
     current_price = float(market.price) if market and market.price else avg_buy_price
     
-    # Check if holding already exists
-    existing_holding = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id, symbol=symbol).first()
+    # CRITICAL: Use with_for_update() to lock this row at the database level.
+    # This prevents "Phantom Balance" race conditions where two concurrent 'Buy' requests 
+    # might read the same old balance and overwrite each other's updates.
+    existing_holding = PortfolioHolding.query.filter_by(
+        portfolio_id=portfolio_id, 
+        symbol=symbol
+    ).with_for_update().first()
     
     if existing_holding:
-        # Update existing holding (add to position)
-        old_total = float(existing_holding.shares) * float(existing_holding.avg_buy_price or 0)
-        new_total = shares * avg_buy_price
-        new_shares = float(existing_holding.shares) + shares
-        existing_holding.avg_buy_price = (old_total + new_total) / new_shares if new_shares > 0 else 0
-        existing_holding.shares = new_shares
+        # Update existing holding (Add to position)
+        # We perform the calculation using the locked, most-recent data from the DB
+        old_shares = float(existing_holding.shares or 0)
+        old_avg_price = float(existing_holding.avg_buy_price or 0)
+        
+        new_total_shares = old_shares + shares
+        
+        # Recalculate Average Cost Basis
+        # Formula: (Old Total Cost + New Total Cost) / Total Shares
+        old_cost_basis = old_shares * old_avg_price
+        new_cost_basis = shares * avg_buy_price
+        existing_holding.avg_buy_price = (old_cost_basis + new_cost_basis) / new_total_shares if new_total_shares > 0 else 0
+        
+        # Update shares and current metrics
+        existing_holding.shares = new_total_shares
         existing_holding.current_price = current_price
-        existing_holding.current_value = new_shares * current_price
-        existing_holding.gain_loss = existing_holding.current_value - (new_shares * float(existing_holding.avg_buy_price))
+        existing_holding.current_value = new_total_shares * current_price
+        
+        # P&L is (Current Market Value) - (Total Cost Basis)
+        total_investment_cost = new_total_shares * float(existing_holding.avg_buy_price)
+        existing_holding.gain_loss = existing_holding.current_value - total_investment_cost
+        
         holding = existing_holding
     else:
         # Create new holding
@@ -586,18 +604,27 @@ def add_transaction(portfolio_id):
     db.session.add(transaction)
     
     # Update holding based on transaction type
-    holding = PortfolioHolding.query.filter_by(portfolio_id=portfolio_id, symbol=symbol).first()
+    # CRITICAL: Use with_for_update() to handle currency/shares safely in high-traffic environments.
+    holding = PortfolioHolding.query.filter_by(
+        portfolio_id=portfolio_id, 
+        symbol=symbol
+    ).with_for_update().first()
     
     if tx_type == 'buy':
         if holding:
-            # Update average price
-            old_total = float(holding.shares) * float(holding.avg_buy_price or 0)
-            new_total = shares * price
-            new_shares = float(holding.shares) + shares
-            holding.avg_buy_price = (old_total + new_total) / new_shares if new_shares > 0 else 0
+            # Update average price and shares using locked data
+            old_shares = float(holding.shares or 0)
+            old_avg_price = float(holding.avg_buy_price or 0)
+            
+            new_shares = old_shares + shares
+            
+            # Weighted average cost calculation
+            old_total_cost = old_shares * old_avg_price
+            new_trx_cost = shares * price
+            holding.avg_buy_price = (old_total_cost + new_trx_cost) / new_shares if new_shares > 0 else 0
             holding.shares = new_shares
         else:
-            # Create new holding
+            # Create new holding if it doesn't exist
             holding = PortfolioHolding(
                 id=str(uuid.uuid4()),
                 portfolio_id=portfolio_id,
@@ -609,11 +636,12 @@ def add_transaction(portfolio_id):
     
     elif tx_type == 'sell':
         if holding and float(holding.shares) >= shares:
+            # Safely decrement shares on the locked row
             holding.shares = float(holding.shares) - shares
             if float(holding.shares) <= 0:
                 db.session.delete(holding)
         else:
-            return jsonify({'error': 'Insufficient shares'}), 400
+            return jsonify({'error': f'Insufficient shares. You have {holding.shares if holding else 0} but tried to sell {shares}'}), 400
     
     # Fetch latest market data for the symbol to update holding's current stats
     market = MarketData.query.filter_by(symbol=symbol).first()
