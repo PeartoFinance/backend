@@ -125,13 +125,13 @@ def update_transaction_status(transaction_id):
         if new_status not in ['pending', 'completed', 'failed', 'cancelled']:
             return jsonify({'error': 'Invalid status'}), 400
 
-        tx.status = new_status
-        tx.updated_at = datetime.utcnow()
-        db.session.commit()
-
+        # CRITICAL: Prepare the audit log BEFORE committing the transaction.
+        # This ensures the status change and the log entry are saved together.
         log_audit('TRANSACTION_STATUS_UPDATE', 'transaction', transaction_id, {
             'old': old_status, 'new': new_status
         })
+
+        db.session.commit()
 
         return jsonify({'ok': True, 'message': f'Status updated to {new_status}'})
     except Exception as e:
@@ -228,11 +228,13 @@ def update_deposit_status(deposit_id):
             return jsonify({'error': 'Invalid status'}), 400
 
         d.status = new_status
-        db.session.commit()
-
+        
+        # Prepare log before commit to ensure it's saved to the DB
         log_audit('DEPOSIT_STATUS_UPDATE', 'deposit', deposit_id, {
             'old': old_status, 'new': new_status, 'amount': float(d.amount)
         })
+
+        db.session.commit()
 
         return jsonify({'ok': True, 'message': f'Deposit status updated to {new_status}'})
     except Exception as e:
@@ -335,11 +337,13 @@ def approve_withdrawal(withdrawal_id):
 
         w.status = 'approved'
         w.approved_by = admin_id
-        db.session.commit()
-
+        
+        # Log the approval action within the same transaction
         log_audit('WITHDRAWAL_APPROVED', 'withdrawal', withdrawal_id, {
             'amount': float(w.amount), 'userId': w.user_id
         })
+
+        db.session.commit()
 
         return jsonify({'ok': True, 'message': 'Withdrawal approved'})
     except Exception as e:
@@ -359,11 +363,13 @@ def reject_withdrawal(withdrawal_id):
             return jsonify({'error': f'Cannot reject withdrawal with status: {w.status}'}), 400
 
         w.status = 'rejected'
-        db.session.commit()
-
+        
+        # Log rejection within the same transaction record
         log_audit('WITHDRAWAL_REJECTED', 'withdrawal', withdrawal_id, {
             'amount': float(w.amount), 'userId': w.user_id, 'reason': data.get('reason')
         })
+
+        db.session.commit()
 
         return jsonify({'ok': True, 'message': 'Withdrawal rejected'})
     except Exception as e:
@@ -383,11 +389,13 @@ def process_withdrawal(withdrawal_id):
 
         w.status = 'completed'
         w.processed_at = datetime.utcnow()
-        db.session.commit()
-
+        
+        # Log processing completion
         log_audit('WITHDRAWAL_PROCESSED', 'withdrawal', withdrawal_id, {
             'amount': float(w.amount), 'userId': w.user_id
         })
+
+        db.session.commit()
 
         return jsonify({'ok': True, 'message': 'Withdrawal processed and completed'})
     except Exception as e:
