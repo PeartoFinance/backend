@@ -351,15 +351,29 @@ def get_live_overview():
                 'assetType': 'stock'
             }
 
+        # Compute breadth from available data
+        all_stocks = gainers + losers + most_active
+        # Deduplicate by symbol
+        seen = set()
+        unique_stocks = []
+        for s in all_stocks:
+            sym = s.get('symbol')
+            if sym and sym not in seen:
+                seen.add(sym)
+                unique_stocks.append(s)
+        
+        adv = sum(1 for s in unique_stocks if (s.get('changePercent') or s.get('change') or 0) > 0)
+        dec = sum(1 for s in unique_stocks if (s.get('changePercent') or s.get('change') or 0) < 0)
+        unch = len(unique_stocks) - adv - dec
+
         return jsonify({
             'indices': [format_index(i) for i in indices[:6]],
             'topGainers': [format_stock(g) for g in gainers],
             'topLosers': [format_stock(l) for l in losers],
             'mostActive': [format_stock(a) for a in most_active],
-            # Breadth stats not available live easily, sending 0s or caching
-            'advancers': 0,
-            'decliners': 0,
-            'unchanged': 0,
+            'advancers': adv,
+            'decliners': dec,
+            'unchanged': unch,
             'totalVolume': sum(s.get('volume', 0) for s in most_active) * 10 # Rough estimate
         })
     except Exception as e:
@@ -769,21 +783,177 @@ def get_live_movers():
 @cache.cached(timeout=CACHE_TIMEOUT_MOVERS, query_string=True)
 def get_live_most_active():
     """Get most active stocks live"""
-    from handlers.market_data.screener_handler import get_most_active
-    
-    limit = min(int(request.args.get('limit', 10)), 50)
-    
-    active = get_most_active(limit=limit)
-    
-    return jsonify([{
-        'symbol': a.get('symbol'),
-        'name': a.get('name'),
-        'price': float(a['price']) if a.get('price') else None,
-        'change': float(a['change']) if a.get('change') else None,
-        'changePercent': float(a['changePercent']) if a.get('changePercent') else None,
-        'volume': a.get('volume'),
-        'assetType': 'stock'
-    } for a in active])
+    limit = min(safe_int(request.args.get('limit'), default=10), 50)
+
+    # Try live screener first
+    try:
+        from handlers.market_data.screener_handler import get_most_active
+        active = get_most_active(limit=limit)
+        if active:
+            return jsonify([{
+                'symbol': a.get('symbol'),
+                'name': a.get('name'),
+                'price': float(a['price']) if a.get('price') else None,
+                'change': float(a['change']) if a.get('change') else None,
+                'changePercent': float(a['changePercent']) if a.get('changePercent') else None,
+                'volume': a.get('volume'),
+                'assetType': 'stock'
+            } for a in active])
+    except Exception as e:
+        logger.warning(f"Most-active screener failed: {e}")
+
+    # Fallback: use MarketData table sorted by volume
+    try:
+        from models.market import MarketData
+        stocks = MarketData.query.filter(
+            MarketData.volume.isnot(None),
+            MarketData.volume > 0,
+            MarketData.asset_type != 'crypto'
+        ).order_by(MarketData.volume.desc()).limit(limit).all()
+
+        return jsonify([{
+            'symbol': s.symbol,
+            'name': s.name,
+            'price': float(s.price) if s.price else None,
+            'change': float(s.change) if s.change else None,
+            'changePercent': float(s.change_percent) if s.change_percent else None,
+            'volume': s.volume,
+            'assetType': 'stock'
+        } for s in stocks])
+    except Exception as e:
+        logger.error(f"Most-active DB fallback error: {e}")
+        return jsonify([])
+
+
+# ---------------------------------------------------------------------------
+# Sector Performance Heatmap
+# ---------------------------------------------------------------------------
+
+@live_bp.route('/sector-performance', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
+def get_sector_performance():
+    """
+    Sector performance heatmap data.
+    Aggregates from the MarketData table (no extra yfinance calls).
+    """
+    try:
+        from sqlalchemy import func
+        from models.market import MarketData
+
+        # Query stocks grouped by sector
+        stocks = MarketData.query.filter(
+            MarketData.sector.isnot(None),
+            MarketData.sector != '',
+            MarketData.change_percent.isnot(None)
+        ).all()
+
+        if not stocks:
+            return jsonify([])
+
+        # Aggregate by sector
+        sector_map = {}
+        for s in stocks:
+            sec = s.sector
+            if sec not in sector_map:
+                sector_map[sec] = {
+                    'name': sec,
+                    'stocks': [],
+                    'total_change': 0,
+                    'total_market_cap': 0,
+                    'count': 0,
+                }
+            sector_map[sec]['stocks'].append(s)
+            sector_map[sec]['total_change'] += float(s.change_percent or 0)
+            sector_map[sec]['total_market_cap'] += float(s.market_cap or 0)
+            sector_map[sec]['count'] += 1
+
+        sectors = []
+        for sec_name, info in sector_map.items():
+            if info['count'] == 0:
+                continue
+
+            avg_change = info['total_change'] / info['count']
+
+            # Find top gainer and loser in this sector
+            sorted_stocks = sorted(info['stocks'],
+                                   key=lambda x: float(x.change_percent or 0),
+                                   reverse=True)
+            top_gainer = sorted_stocks[0] if sorted_stocks else None
+            top_loser = sorted_stocks[-1] if len(sorted_stocks) > 1 else None
+
+            sectors.append({
+                'name': sec_name,
+                'avgChangePercent': round(avg_change, 2),
+                'totalMarketCap': info['total_market_cap'],
+                'stockCount': info['count'],
+                'topGainer': {
+                    'symbol': top_gainer.symbol,
+                    'changePercent': round(float(top_gainer.change_percent or 0), 2),
+                } if top_gainer else None,
+                'topLoser': {
+                    'symbol': top_loser.symbol,
+                    'changePercent': round(float(top_loser.change_percent or 0), 2),
+                } if top_loser else None,
+            })
+
+        # Sort by market cap descending for visual weight
+        sectors.sort(key=lambda x: x['totalMarketCap'], reverse=True)
+
+        return jsonify(sectors)
+
+    except Exception as e:
+        logger.error(f"Sector performance error: {e}")
+        return jsonify([])
+
+
+# ---------------------------------------------------------------------------
+# Earnings Calendar (Public)
+# ---------------------------------------------------------------------------
+
+@live_bp.route('/earnings-calendar', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_DEFAULT, query_string=True)
+def get_earnings_calendar():
+    """
+    Public earnings calendar - upcoming and recent earnings reports.
+    """
+    try:
+        from models import EarningsCalendar
+        from datetime import date, timedelta
+
+        limit = safe_int(request.args.get('limit'), default=20)
+        days = safe_int(request.args.get('days'), default=14)
+
+        today = date.today()
+        start_date = today - timedelta(days=3)  # Include recent past
+        end_date = today + timedelta(days=days)
+
+        events = EarningsCalendar.query.filter(
+            EarningsCalendar.earnings_date >= start_date,
+            EarningsCalendar.earnings_date <= end_date,
+        ).order_by(EarningsCalendar.earnings_date.asc()).limit(limit).all()
+
+        if events:
+            return jsonify([{
+                'symbol': e.symbol,
+                'companyName': e.company_name,
+                'earningsDate': e.earnings_date.isoformat() if e.earnings_date else None,
+                'epsEstimate': float(e.eps_estimate) if e.eps_estimate else None,
+                'epsActual': float(e.eps_actual) if e.eps_actual else None,
+                'surprisePercent': float(e.surprise_percent) if e.surprise_percent else None,
+                'revenueEstimate': e.revenue_estimate,
+                'revenueActual': e.revenue_actual,
+                'marketCap': e.market_cap,
+                'timing': e.before_after_market,
+            } for e in events])
+        
+        # Fallback to live YFinance if DB is empty
+        from handlers.market_data.calendar_handler import get_earnings_calendar as fetch_live_earnings
+        live_data = fetch_live_earnings(start=start_date.isoformat(), end=end_date.isoformat(), limit=limit)
+        return jsonify(live_data)
+
+    except Exception as e:
+        logger.error(f"Earnings calendar error: {e}")
+        return jsonify([])
 
 
 # ---------------------------------------------------------------------------

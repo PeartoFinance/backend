@@ -179,11 +179,15 @@ def delete_vendor(vendor_id):
         vendor.status = 'suspended'
         vendor.updated_at = datetime.now(timezone.utc)
         
-        # Also deactivate keys?
-        # keys = VendorAPIKey.query.filter_by(vendor_id=vendor_id).all()
-        # for k in keys: k.is_active = False
+        # Deactivate all API keys on suspend
+        keys = VendorAPIKey.query.filter_by(vendor_id=vendor_id).all()
+        deactivated_count = 0
+        for k in keys:
+            if k.is_active:
+                k.is_active = False
+                deactivated_count += 1
         
-        log_audit('VENDOR_SUSPEND', 'vendor', vendor_id)
+        log_audit('VENDOR_SUSPEND', 'vendor', vendor_id, {'keys_deactivated': deactivated_count})
         db.session.commit()
         return jsonify({'ok': True})
     except Exception as e:
@@ -238,7 +242,7 @@ def create_api_key(vendor_id):
             key_name=key_name,
             api_key=public_key,
             secret_key=secret_hash, # Store HASH
-            permissions=json.dumps(permissions), # Store as JSON
+            permissions=permissions, # JSON column handles serialization
             is_active=True,
             created_at=datetime.now(timezone.utc)
         )
@@ -259,6 +263,28 @@ def create_api_key(vendor_id):
             }
         }), 201
         
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/vendors/<vendor_id>/api-keys/<key_id>', methods=['PATCH'])
+@admin_required
+def toggle_api_key(vendor_id, key_id):
+    """Toggle API Key active status or update permissions"""
+    try:
+        key = VendorAPIKey.query.filter_by(id=key_id, vendor_id=vendor_id).first_or_404()
+        data = request.get_json()
+        
+        if 'isActive' in data:
+            key.is_active = data['isActive']
+        if 'permissions' in data:
+            key.permissions = data['permissions']
+        if 'keyName' in data:
+            key.key_name = data['keyName']
+            
+        log_audit('VENDOR_KEY_UPDATE', 'vendor_api_key', key_id, {'vendor_id': vendor_id, 'changes': list(data.keys())})
+        db.session.commit()
+        return jsonify({'ok': True})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -325,6 +351,32 @@ def create_webhook(vendor_id):
         db.session.commit()
         
         return jsonify({'ok': True, 'id': webhook_id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/vendors/<vendor_id>/custom-apis/<webhook_id>', methods=['PATCH'])
+@admin_required
+def update_webhook(vendor_id, webhook_id):
+    """Update webhook configuration"""
+    try:
+        hook = VendorCustomAPI.query.filter_by(id=webhook_id, vendor_id=vendor_id).first_or_404()
+        data = request.get_json()
+        
+        if 'endpoint' in data:
+            hook.endpoint = data['endpoint']
+        if 'method' in data:
+            hook.method = data['method']
+        if 'headers' in data:
+            hook.headers = json.dumps(data['headers']) if isinstance(data['headers'], dict) else data['headers']
+        if 'bodyTemplate' in data:
+            hook.body_template = data['bodyTemplate']
+        if 'isActive' in data:
+            hook.is_active = data['isActive']
+            
+        log_audit('VENDOR_WEBHOOK_UPDATE', 'vendor_webhook', webhook_id, {'vendor_id': vendor_id})
+        db.session.commit()
+        return jsonify({'ok': True})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -410,11 +462,13 @@ def get_admin_history(vendor_id):
             date_str = h.recorded_at.date().isoformat()
             if date_str not in grouped:
                 grouped[date_str] = {
-                    'id': h.recorded_at.replace(microsecond=0).isoformat(), # Use timestamp as group ID
+                    'id': date_str, # Use date as group ID
                     'date': h.recorded_at.isoformat(),
-                    'metrics': {}
+                    'metrics': {},
+                    'entryIds': {}
                 }
             grouped[date_str]['metrics'][h.metric_type] = float(h.value)
+            grouped[date_str]['entryIds'][h.metric_type] = h.id
             
         results = list(grouped.values())
         return jsonify({'history': results})
@@ -459,6 +513,46 @@ def add_history_point(vendor_id):
         log_audit('VENDOR_HISTORY_ADD', 'vendor_history', vendor_id, {'metrics': created_ids})
         db.session.commit()
         return jsonify({'ok': True, 'count': len(created_ids)}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/vendors/<vendor_id>/history/<int:entry_id>', methods=['DELETE'])
+@admin_required
+def delete_history_point(vendor_id, entry_id):
+    """Delete a single history data point"""
+    try:
+        entry = VendorHistory.query.filter_by(id=entry_id, vendor_id=vendor_id).first_or_404()
+        db.session.delete(entry)
+        log_audit('VENDOR_HISTORY_DELETE', 'vendor_history', str(entry_id), {'vendor_id': vendor_id})
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@vendors_bp.route('/vendors/<vendor_id>/history/batch-delete', methods=['POST'])
+@admin_required
+def delete_history_batch(vendor_id):
+    """Delete all history points for a given date"""
+    try:
+        data = request.get_json()
+        date_str = data.get('date')
+        if not date_str:
+            return jsonify({'error': 'Date required'}), 400
+            
+        target_date = datetime.strptime(date_str[:10], '%Y-%m-%d').date()
+        
+        entries = VendorHistory.query.filter_by(vendor_id=vendor_id).all()
+        deleted = 0
+        for e in entries:
+            if e.recorded_at.date() == target_date:
+                db.session.delete(e)
+                deleted += 1
+        
+        log_audit('VENDOR_HISTORY_BATCH_DELETE', 'vendor_history', vendor_id, {'date': date_str, 'deleted': deleted})
+        db.session.commit()
+        return jsonify({'ok': True, 'deleted': deleted})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

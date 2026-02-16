@@ -452,6 +452,15 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
     return {'imported': imported, 'updated': updated, 'errors': errors}
 
 
+def _detect_stock_news_category(title, summary=''):
+    """Auto-detect news category using shared keyword detection."""
+    try:
+        from services.news_source_manager import detect_category
+        return detect_category(title, summary)
+    except ImportError:
+        return 'business'  # Fallback for stock-related news
+
+
 def sync_stock_news(symbol: str) -> Dict[str, Any]:
     """
     Fetch news for a specific stock from yfinance and save to database.
@@ -525,10 +534,12 @@ def sync_stock_news(symbol: str) -> Dict[str, Any]:
                 curated_status='published', # Auto-publish stock-specific news
                 source_type='yfinance',
                 image=image_url,
+                category=_detect_stock_news_category(title, content.get('summary') or ''),
                 created_at=datetime.utcnow()
             )
             db.session.add(new_news)
             added_count += 1
+
             
         db.session.commit()
         return {'status': 'success', 'added': added_count, 'message': f'Added {added_count} news items for {symbol}'}

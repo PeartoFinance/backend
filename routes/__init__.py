@@ -24,6 +24,8 @@ from .news_preferences import news_prefs_bp
 from .public_vendors import public_vendors_bp
 from .chart import chart_bp
 from .subscription import subscription_bp
+from .glossary import glossary_bp
+from .help_public import help_public_bp
 
 __all__ = [
     'auth_bp',
@@ -49,4 +51,6 @@ __all__ = [
     'public_vendors_bp',
     'chart_bp',
     'subscription_bp',
+    'glossary_bp',
+    'help_public_bp',
 ]

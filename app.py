@@ -125,6 +125,8 @@ from routes.backup import backup_bp
 from routes.news_preferences import news_prefs_bp
 from routes.currency import currency_bp
 from routes.subscription import subscription_bp
+from routes.glossary import glossary_bp
+from routes.help_public import help_public_bp
 
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -153,6 +155,8 @@ app.register_blueprint(social_bp, url_prefix='/api/social')
 app.register_blueprint(backup_bp, url_prefix='/api/backup')
 app.register_blueprint(currency_bp)
 app.register_blueprint(subscription_bp, url_prefix='/api/subscription')
+app.register_blueprint(glossary_bp, url_prefix='/api')
+app.register_blueprint(help_public_bp, url_prefix='/api')
 
 from routes.sports import sports_bp
 app.register_blueprint(sports_bp, url_prefix='/api/sports')

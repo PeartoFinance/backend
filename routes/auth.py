@@ -265,6 +265,8 @@ def reset_password():
     if user:
         user.password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         reset_token.used = True
+        # Invalidate all active sessions so everyone must re-login with new password
+        UserSession.query.filter_by(user_id=user.id).delete()
         db.session.commit()
     
     return jsonify({'message': 'Password reset successful'})
@@ -461,6 +463,8 @@ def set_password():
         return jsonify({'error': 'Password must be at least 8 characters'}), 400
 
     user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    # Invalidate all active sessions so everyone must re-login with new password
+    UserSession.query.filter_by(user_id=user.id).delete()
     db.session.commit()
     
     # Track password change/set

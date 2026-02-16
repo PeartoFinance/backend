@@ -188,6 +188,7 @@ def cron_all_market():
         queue_job(update_all_crypto, 'update_all_crypto')
         queue_job(update_all_indices, 'update_all_indices')
         queue_job(update_all_commodities, 'update_all_commodities')
+        queue_job(update_earnings_calendar, 'update_earnings_calendar')
         queue_job(update_business_profiles, 'update_business_profiles')
         queue_job(update_all_forex, 'update_all_forex')
         

@@ -105,9 +105,16 @@ def get_vendor_history(vendor_id):
         metric = request.args.get('metric')
         days = request.args.get('days', 365, type=int)
         
+        from datetime import datetime, timedelta
+        
         query = VendorHistory.query.filter_by(vendor_id=vendor_id)
         if metric:
             query = query.filter_by(metric_type=metric)
+        
+        # Apply days filter
+        if days and days > 0:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            query = query.filter(VendorHistory.recorded_at >= cutoff)
             
         history = query.order_by(VendorHistory.recorded_at.asc()).all()
         

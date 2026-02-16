@@ -30,6 +30,10 @@ from .sellers import sellers_bp
 from .help import help_bp
 from .ai import ai_bp
 from .bookings import bookings_bp
+from .vendors import vendors_bp
+from .faq import admin_faq_bp
+from .testimonials import admin_testimonials_bp
+from .glossary import admin_glossary_bp
 
 # Main admin blueprint
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -62,5 +66,9 @@ admin_bp.register_blueprint(sellers_bp)
 admin_bp.register_blueprint(help_bp)
 admin_bp.register_blueprint(ai_bp)
 admin_bp.register_blueprint(bookings_bp)
+admin_bp.register_blueprint(vendors_bp)
+admin_bp.register_blueprint(admin_faq_bp)
+admin_bp.register_blueprint(admin_testimonials_bp)
+admin_bp.register_blueprint(admin_glossary_bp)
 
 __all__ = ['admin_bp']

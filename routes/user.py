@@ -9,6 +9,7 @@ from datetime import datetime
 import jwt
 from config import config
 from models import db, User, UserPortfolio, UserWatchlist, MarketData
+from models.user import UserSession
 from routes.decorators import auth_required
 
 user_bp = Blueprint('user', __name__)
@@ -293,6 +294,8 @@ def change_password():
     # Update password
     user.password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     user.updated_at = datetime.utcnow()
+    # Invalidate all active sessions so everyone must re-login with new password
+    UserSession.query.filter_by(user_id=user.id).delete()
     db.session.commit()
     
     # Track password change activity

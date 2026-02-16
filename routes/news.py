@@ -20,6 +20,7 @@ def get_published_news():
     limit = min(int(request.args.get('limit', 50)), 200)
     offset = int(request.args.get('offset', 0))
     category = request.args.get('category')
+    search = request.args.get('search')
     country = getattr(request, 'user_country', None)
     
     query = NewsItem.query.filter(
@@ -34,6 +35,20 @@ def get_published_news():
     if category:
         query = query.filter(NewsItem.category == category)
     
+    if search:
+        # Split into keywords and match any keyword in title or summary
+        keywords = [k.strip() for k in search.split() if k.strip()]
+        if keywords:
+            keyword_filters = []
+            for kw in keywords:
+                term = f'%{kw}%'
+                keyword_filters.append(NewsItem.title.ilike(term))
+                keyword_filters.append(NewsItem.summary.ilike(term))
+            query = query.filter(or_(*keyword_filters))
+    
+    # Get total count BEFORE applying offset/limit (for pagination)
+    total_count = query.count()
+    
     # Order: prioritize country match, then featured, then items with images, then date
     articles = query.order_by(
         desc(NewsItem.country_code == country),
@@ -44,11 +59,37 @@ def get_published_news():
     
     return jsonify({
         'items': [a.to_dict() for a in articles],
-        'total': len(articles),
+        'total': total_count,
         'limit': limit,
         'offset': offset,
         'source': 'database'
     })
+
+
+@news_bp.route('/categories', methods=['GET'])
+@cache.cached(timeout=300)
+def get_news_categories():
+    """Return all categories that have at least 1 published article, with counts"""
+    from sqlalchemy import func
+    
+    country = getattr(request, 'user_country', None)
+    
+    rows = db.session.query(
+        NewsItem.category,
+        func.count(NewsItem.id).label('count')
+    ).filter(
+        NewsItem.curated_status == 'published',
+        or_(
+            NewsItem.country_code == country,
+            NewsItem.country_code == 'GLOBAL',
+            NewsItem.country_code == None
+        ),
+        NewsItem.category != None
+    ).group_by(NewsItem.category).order_by(func.count(NewsItem.id).desc()).all()
+    
+    categories = [{'name': row[0], 'count': row[1]} for row in rows if row[0]]
+    
+    return jsonify({'categories': categories})
 
 
 @news_bp.route('/headlines', methods=['GET'])

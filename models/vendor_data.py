@@ -31,7 +31,7 @@ class VendorHistory(db.Model):
     value = db.Column(db.Numeric(10, 2), nullable=False)
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # We might want unique constraint on specific metric per day/time
-    # __table_args__ = (db.UniqueConstraint('vendor_id', 'metric_type', 'recorded_at', name='_vendor_metric_uc'),)
+    # Unique constraint: one value per metric per vendor per timestamp
+    __table_args__ = (db.UniqueConstraint('vendor_id', 'metric_type', 'recorded_at', name='_vendor_metric_uc'),)
     
     vendor = db.relationship('Vendor', backref='history', lazy=True)

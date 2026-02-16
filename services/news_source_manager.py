@@ -9,16 +9,114 @@ import xml.etree.ElementTree as ET
 from models import db, NewsItem
 
 
+# Keyword-based auto-category detection
+CATEGORY_KEYWORDS = {
+    'technology': [
+        'ai', 'artificial intelligence', 'machine learning', 'gpu', 'chip', 'semiconductor',
+        'software', 'cloud', 'cybersecurity', 'tech', 'apple', 'google', 'microsoft',
+        'nvidia', 'meta', 'amazon web services', 'saas', 'data center', 'quantum',
+        'robotics', 'automation', '5g', 'startup', 'silicon valley', 'coding'
+    ],
+    'markets': [
+        'stock market', 's&p 500', 'nasdaq', 'dow jones', 'wall street', 'bull market',
+        'bear market', 'ipo', 'stock rally', 'stock surge', 'market cap', 'trading',
+        'hedge fund', 'etf', 'mutual fund', 'index fund', 'options', 'short selling',
+        'rally', 'selloff', 'correction', 'all-time high', 'record high'
+    ],
+    'crypto': [
+        'bitcoin', 'ethereum', 'crypto', 'blockchain', 'defi', 'nft', 'token',
+        'altcoin', 'stablecoin', 'web3', 'mining', 'solana', 'dogecoin', 'binance',
+        'coinbase', 'cryptocurrency'
+    ],
+    'business': [
+        'merger', 'acquisition', 'earnings', 'revenue', 'profit', 'ceo', 'layoff',
+        'restructuring', 'quarterly results', 'annual report', 'corporate', 'company',
+        'startup', 'venture capital', 'private equity', 'bankruptcy', 'ipo filing',
+        'sec filing', 'board of directors', 'dividend', 'buyback', 'shareholder'
+    ],
+    'economy': [
+        'inflation', 'interest rate', 'federal reserve', 'fed', 'gdp', 'unemployment',
+        'recession', 'economic growth', 'monetary policy', 'fiscal policy', 'tariff',
+        'trade war', 'stimulus', 'central bank', 'treasury', 'debt ceiling', 'cpi',
+        'consumer spending', 'jobs report', 'labor market', 'rate cut', 'rate hike'
+    ],
+    'energy': [
+        'oil', 'crude', 'natural gas', 'opec', 'renewable', 'solar', 'wind',
+        'ev', 'electric vehicle', 'battery', 'clean energy', 'hydrogen', 'nuclear',
+        'pipeline', 'fossil fuel', 'carbon', 'emission', 'climate', 'esg'
+    ],
+    'commodities': [
+        'gold', 'silver', 'copper', 'platinum', 'palladium', 'iron ore', 'lithium',
+        'wheat', 'corn', 'commodity', 'precious metal', 'base metal', 'mining'
+    ],
+    'world': [
+        'geopolitical', 'sanctions', 'trade deal', 'european union', 'china economy',
+        'emerging market', 'brics', 'g7', 'g20', 'world bank', 'imf', 'global economy',
+        'forex', 'currency', 'euro', 'yen', 'yuan', 'pound'
+    ],
+    'healthcare': [
+        'pharma', 'biotech', 'fda', 'drug', 'vaccine', 'clinical trial', 'healthcare',
+        'hospital', 'insurance', 'medicare', 'medicaid', 'health', 'medical device'
+    ],
+    'realestate': [
+        'real estate', 'housing', 'mortgage', 'reit', 'commercial property',
+        'rental', 'homebuilder', 'construction', 'property market'
+    ],
+}
+
+
+def detect_category(title, summary=''):
+    """Auto-detect category from title and summary using keyword matching."""
+    text = f"{title} {summary or ''}".lower()
+    scores = {}
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > 0:
+            scores[category] = score
+    if scores:
+        return max(scores, key=scores.get)
+    return 'general'
+
+
 class NewsSourceManager:
     """Manages news fetching from RSS feeds and external APIs"""
     
-    # Default RSS queries for finance news
+    # Expanded RSS queries mapped to categories
     RSS_QUERIES = [
-        'personal finance',
-        'investing stocks',
-        'cryptocurrency bitcoin',
-        'Federal Reserve economy',
-        'stock market news'
+        # Markets & Stocks
+        ('stock market today', 'markets'),
+        ('stock market rally selloff', 'markets'),
+        ('S&P 500 Nasdaq Dow Jones', 'markets'),
+        ('IPO stock listing', 'markets'),
+        ('ETF mutual fund investing', 'markets'),
+        # Business & Earnings
+        ('corporate earnings quarterly results', 'business'),
+        ('merger acquisition deal', 'business'),
+        ('CEO company layoffs restructuring', 'business'),
+        # Economy & Policy
+        ('Federal Reserve interest rate', 'economy'),
+        ('inflation GDP economy outlook', 'economy'),
+        ('unemployment jobs report labor', 'economy'),
+        # Technology
+        ('AI artificial intelligence tech stocks', 'technology'),
+        ('cloud computing software SaaS', 'technology'),
+        ('semiconductor chip shortage', 'technology'),
+        # Crypto
+        ('bitcoin cryptocurrency ethereum', 'crypto'),
+        # Energy
+        ('oil prices OPEC energy market', 'energy'),
+        ('renewable energy solar wind EV', 'energy'),
+        # Commodities
+        ('gold silver commodity prices', 'commodities'),
+        # World / Macro
+        ('global trade tariff sanctions', 'world'),
+        ('emerging markets BRICS economy', 'world'),
+        # Healthcare
+        ('biotech pharma FDA drug approval', 'healthcare'),
+        # Real Estate
+        ('real estate housing market mortgage rates', 'realestate'),
+        # Personal Finance
+        ('personal finance retirement investing', 'business'),
     ]
     
     MAX_PER_PULL = 100
@@ -34,10 +132,11 @@ class NewsSourceManager:
         results = []
         
         # Pull from Google News RSS for each query
-        for query in self.RSS_QUERIES:
+        for query_info in self.RSS_QUERIES:
+            query, default_category = query_info
             try:
-                print(f'[NewsSourceManager] Fetching RSS: "{query}"')
-                items = self.pull_rss_feed(query)
+                print(f'[NewsSourceManager] Fetching RSS: "{query}" (category: {default_category})')
+                items = self.pull_rss_feed(query, default_category)
                 print(f'[NewsSourceManager] RSS "{query}" returned {len(items)} items')
                 results.extend(items)
             except Exception as e:
@@ -50,7 +149,7 @@ class NewsSourceManager:
         print(f'[NewsSourceManager] New items added: {len(processed)}')
         return processed
     
-    def pull_rss_feed(self, query):
+    def pull_rss_feed(self, query, default_category='general'):
         """Fetch news from Google News RSS"""
         encoded_query = requests.utils.quote(query)
         rss_url = f'https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en'
@@ -75,13 +174,21 @@ class NewsSourceManager:
             if title is None or link is None:
                 continue
             
+            title_text = title.text or ''
+            summary_text = description.text if description is not None else title_text
+            
+            # Auto-detect category from content, fallback to query's default
+            detected = detect_category(title_text, summary_text)
+            category = detected if detected != 'general' else default_category
+            
             items.append({
                 'source': 'rss_google_news',
                 'source_url': link.text,
                 'canonical_url': self.extract_canonical_url(link.text),
-                'title': title.text,
-                'summary': description.text if description is not None else title.text,
+                'title': title_text,
+                'summary': summary_text,
                 'published_at': self.parse_pub_date(pub_date.text if pub_date is not None else None),
+                'category': category,
                 'query': query
             })
         
@@ -164,8 +271,9 @@ class NewsSourceManager:
                     hash=item_hash,
                     simhash=simhash,
                     status='queued',
-                    curated_status='draft',
+                    curated_status='published',
                     source_type='rss',
+                    category=item.get('category', 'general'),
                     created_at=datetime.utcnow()
                 )
                 
