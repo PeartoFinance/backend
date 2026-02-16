@@ -80,24 +80,28 @@ def get_market_overview():
         md_filter
     ).order_by(desc(MarketData.volume)).limit(5).all()
     
-    # Calculate market stats using efficient SQL COUNT (instead of loading all rows)
+    # Calculate market stats using efficient SQL COUNT with the SAME country filter
     advancers = db.session.query(db.func.count(MarketData.id)).filter(
         MarketData.asset_type == 'stock',
-        MarketData.change_percent > 0
+        MarketData.change_percent > 0,
+        md_filter
     ).scalar() or 0
     
     decliners = db.session.query(db.func.count(MarketData.id)).filter(
         MarketData.asset_type == 'stock',
-        MarketData.change_percent < 0
+        MarketData.change_percent < 0,
+        md_filter
     ).scalar() or 0
     
     total_count = db.session.query(db.func.count(MarketData.id)).filter(
-        MarketData.asset_type == 'stock'
+        MarketData.asset_type == 'stock',
+        md_filter
     ).scalar() or 0
     unchanged = total_count - advancers - decliners
     
     total_volume = db.session.query(db.func.sum(MarketData.volume)).filter(
-        MarketData.asset_type == 'stock'
+        MarketData.asset_type == 'stock',
+        md_filter
     ).scalar() or 0
     
     return jsonify({
