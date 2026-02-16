@@ -14,8 +14,10 @@ def auth_required(f):
             
         auth_header = request.headers.get('Authorization', '')
         
+        # DEBUG: Log full request context for auth debugging
+        print(f'[AUTH DEBUG] {request.method} {request.path} | Origin: {request.headers.get("Origin", "none")} | Auth: {auth_header[:80] if auth_header else "EMPTY"}')
+        
         if not auth_header.startswith('Bearer '):
-            print(f'[AUTH DEBUG] No Bearer token. Header: {auth_header[:50]}...' if auth_header else '[AUTH DEBUG] No Authorization header')
             return jsonify({'error': 'No token provided'}), 401
         
         token = auth_header.split(' ')[1]

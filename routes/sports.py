@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request
 from extensions import cache
 from datetime import datetime
+from routes.decorators import auth_required
 
 sports_bp = Blueprint('sports', __name__)
 
@@ -15,6 +16,7 @@ def _get_current_user():
 # ─── Favorites ───
 
 @sports_bp.route('/favorites', methods=['GET'])
+@auth_required
 def get_favorites():
     """Get current user's favorite/pinned sports events"""
     user = _get_current_user()
@@ -33,6 +35,7 @@ def get_favorites():
 
 
 @sports_bp.route('/favorites', methods=['POST'])
+@auth_required
 def add_favorite():
     """Add a sports event to user's favorites/pins"""
     user = _get_current_user()
@@ -71,6 +74,7 @@ def add_favorite():
 
 
 @sports_bp.route('/favorites/<int:event_id>', methods=['DELETE'])
+@auth_required
 def remove_favorite(event_id):
     """Remove a sports event from user's favorites"""
     user = _get_current_user()
@@ -91,6 +95,7 @@ def remove_favorite(event_id):
 
 
 @sports_bp.route('/favorites/<int:event_id>/notifications', methods=['PUT'])
+@auth_required
 def update_favorite_notifications(event_id):
     """Update notification preferences for a favorited event"""
     user = _get_current_user()
@@ -115,6 +120,7 @@ def update_favorite_notifications(event_id):
 
 
 @sports_bp.route('/favorites/ids', methods=['GET'])
+@auth_required
 def get_favorite_ids():
     """Get just the event IDs of user's favorites (lightweight for checking pin status)"""
     user = _get_current_user()

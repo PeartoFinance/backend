@@ -296,6 +296,27 @@ def change_password():
     user.updated_at = datetime.utcnow()
     # Invalidate all active sessions so everyone must re-login with new password
     UserSession.query.filter_by(user_id=user.id).delete()
+    
+    # Create a new session for the current user so they stay logged in
+    from datetime import timedelta, timezone as tz
+    payload = {
+        'user_id': user.id,
+        'email': user.email,
+        'role': user.role,
+        'exp': datetime.now(tz.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
+    }
+    new_token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+    if isinstance(new_token, bytes):
+        new_token = new_token.decode('utf-8')
+    
+    new_session = UserSession(
+        user_id=user.id,
+        token=new_token,
+        expires_at=datetime.now(tz.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS),
+        ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(new_session)
     db.session.commit()
     
     # Track password change activity
@@ -307,7 +328,8 @@ def change_password():
     
     return jsonify({
         'success': True,
-        'message': 'Password changed successfully'
+        'message': 'Password changed successfully',
+        'token': new_token
     })
 
 

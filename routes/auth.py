@@ -465,6 +465,26 @@ def set_password():
     user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     # Invalidate all active sessions so everyone must re-login with new password
     UserSession.query.filter_by(user_id=user.id).delete()
+    
+    # Create a new session for the current user so they stay logged in
+    payload = {
+        'user_id': user.id,
+        'email': user.email,
+        'role': user.role,
+        'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
+    }
+    new_token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+    if isinstance(new_token, bytes):
+        new_token = new_token.decode('utf-8')
+    
+    new_session = UserSession(
+        user_id=user.id,
+        token=new_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS),
+        ip_address=_get_client_ip(),
+        user_agent=request.headers.get('User-Agent')
+    )
+    db.session.add(new_session)
     db.session.commit()
     
     # Track password change/set
@@ -474,4 +494,4 @@ def set_password():
     except Exception as e:
         print(f'[Auth] Failed to track password set: {e}')
 
-    return jsonify({'message': 'Password set successfully'})
+    return jsonify({'message': 'Password set successfully', 'token': new_token})
