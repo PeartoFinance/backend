@@ -447,6 +447,28 @@ def google_signin():
     })
 
 
+@auth_bp.route('/logout', methods=['POST'])
+@auth_required
+def logout():
+    """
+    Logout the current user by destroying their session in the DB.
+    This prevents 'ghost sessions' and improves security.
+    """
+    try:
+        # User is already identified by @auth_required
+        auth_header = request.headers.get('Authorization', '')
+        token = auth_header.split(' ')[1] if ' ' in auth_header else None
+
+        if token:
+            UserSession.query.filter_by(user_id=request.user.id, token=token).delete()
+            db.session.commit()
+            
+        return jsonify({'success': True, 'message': 'Logged out successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 # set password for google user
 @auth_bp.route('/set-password', methods=['POST'])
 @auth_required

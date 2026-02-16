@@ -5,7 +5,7 @@ CRUD for /api/admin/users
 import bcrypt
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timezone
-from models import db, User, Role, LoginEvent, UserActivity
+from models import db, User, AdminUser, Role, LoginEvent, UserActivity
 
 users_bp = Blueprint('admin_users', __name__)
 
@@ -79,6 +79,14 @@ def create_user():
         # Hash password
         password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
+        # SECURITY CHECK: Only Superadmins can create other Admin accounts.
+        # This prevents a junior admin from creating "backdoor" master keys.
+        requested_role = data.get('role', 'user')
+        if requested_role == 'admin':
+            caller_admin = AdminUser.query.filter_by(user_id=request.user.id).first()
+            if not caller_admin or not caller_admin.is_superadmin:
+                return jsonify({'error': 'Only Superadmins can create admin accounts'}), 403
+
         user = User(
             name=data.get('name'),
             email=data.get('email'),
@@ -104,10 +112,16 @@ def update_user(user_id):
         user = User.query.get_or_404(user_id)
         data = request.get_json()
         
-        if 'name' in data:
-            user.name = data['name']
         if 'role' in data:
-            user.role = data['role']
+            new_role = data['role']
+            # SECURITY CHECK: Only Superadmins can promote someone to Admin 
+            # or demote an existing Admin.
+            if new_role == 'admin' or user.role == 'admin':
+                caller_admin = AdminUser.query.filter_by(user_id=request.user.id).first()
+                if not caller_admin or not caller_admin.is_superadmin:
+                    return jsonify({'error': 'Only Superadmins can modify admin roles or accounts'}), 403
+            user.role = new_role
+        
         if 'is_active' in data:
             user.active = 1 if data['is_active'] else 0
         if 'is_verified' in data:
@@ -127,6 +141,13 @@ def delete_user(user_id):
     """Delete user"""
     try:
         user = User.query.get_or_404(user_id)
+        
+        # SECURITY CHECK: Prevent junior admins from deleting other admins.
+        if user.role == 'admin':
+            caller_admin = AdminUser.query.filter_by(user_id=request.user.id).first()
+            if not caller_admin or not caller_admin.is_superadmin:
+                return jsonify({'error': 'Only Superadmins can delete admin accounts'}), 403
+                
         db.session.delete(user)
         db.session.commit()
         return jsonify({'ok': True})
