@@ -75,7 +75,9 @@ def get_stock_quote(symbol: str) -> Optional[Dict[str, Any]]:
 def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
     """
     Get real-time quotes for multiple stock symbols.
-    Uses yf.Tickers for batch fetching (more efficient than individual calls).
+    
+    [PERFORMANCE FIX] Uses yf.download for batch price fetching (1 request) 
+    and DB lookup for static metadata to avoid IP bans and improve speed.
     
     Args:
         symbols: List of stock ticker symbols
@@ -84,59 +86,104 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
         List of dictionaries with stock quote data
     """
     from .rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
+    from models import MarketData
+    import pandas as pd
+    import numpy as np
     
     results = []
-    
+    if not symbols:
+        return results
+        
     # Check rate limit before making request
     if not check_rate_limit():
         logger.warning("[Stock Handler] Rate limited, returning empty list")
         return results
     
     try:
-        session = get_yfinance_session()
-        tickers = yf.Tickers(' '.join(symbols), session=session)
+        # 1. Bulk Fetch prices (One API call for up to 50+ tickers)
+        yf_session = get_yfinance_session()
+        # threads=False is used for shared hosting compatibility
+        tickers_data = yf.download(
+            symbols, 
+            period='1d', 
+            interval='1m', 
+            group_by='ticker', 
+            threads=False, 
+            progress=False, 
+            session=yf_session
+        )
+        
+        # 2. Fetch static metadata (names, sectors) from DB in one query to avoid 50 individual .info calls
+        db_stocks = MarketData.query.filter(MarketData.symbol.in_(symbols)).all()
+        db_map = {s.symbol.upper(): s for s in db_stocks}
         
         for symbol in symbols:
+            symbol = symbol.upper()
             try:
-                ticker = tickers.tickers.get(symbol.upper())
-                if ticker:
-                    info = ticker.info
-                    if info and 'symbol' in info:
-                        results.append({
-                            'symbol': info.get('symbol', symbol),
-                            'name': info.get('shortName') or info.get('longName'),
-                            'price': info.get('currentPrice') or info.get('regularMarketPrice'),
-                            'change': info.get('regularMarketChange'),
-                            'changePercent': info.get('regularMarketChangePercent'),
-                            'volume': info.get('regularMarketVolume') or info.get('volume'),
-                            'marketCap': info.get('marketCap'),
-                            'peRatio': info.get('trailingPE'),
-                            'high52w': info.get('fiftyTwoWeekHigh'),
-                            'low52w': info.get('fiftyTwoWeekLow'),
-                            'sector': info.get('sector'),
-                            'industry': info.get('industry'),
-                            'exchange': info.get('exchange'),
-                            'currency': info.get('currency', 'USD'),
-                            'quoteType': info.get('quoteType'),
-                        })
+                # Extract this specific ticker from the bulk response
+                if len(symbols) > 1:
+                    # In group_by='ticker' mode, columns are MultiIndex: (Symbol, Field)
+                    if symbol in tickers_data.columns.levels[0]:
+                        ticker_df = tickers_data[symbol]
+                    else:
+                        ticker_df = None
+                else:
+                    ticker_df = tickers_data
+                
+                # Fetch cached/static metadata from our database
+                stock_md = db_map.get(symbol)
+                
+                if ticker_df is not None and not ticker_df.empty and 'Close' in ticker_df.columns:
+                    # Successfully got live price from true batch fetch
+                    latest_row = ticker_df.iloc[-1]
+                    first_row = ticker_df.iloc[0]
+                    
+                    def sanitize(val, default=0.0):
+                        return float(val) if not pd.isna(val) else default
+
+                    price = sanitize(latest_row['Close'])
+                    # Estimate change since open of the interval
+                    open_price = sanitize(first_row['Open'])
+                    change = price - open_price
+                    change_pct = (change / open_price * 100) if open_price != 0 else 0
+                    
+                    # Merge Batch Price with localized metadata
+                    results.append({
+                        'symbol': symbol,
+                        'name': stock_md.name if stock_md else symbol,
+                        'price': price,
+                        'change': change,
+                        'changePercent': change_pct,
+                        'volume': int(latest_row['Volume']) if 'Volume' in ticker_df.columns and not pd.isna(latest_row['Volume']) else 0,
+                        'marketCap': stock_md.market_cap if stock_md else None,
+                        'peRatio': float(stock_md.pe_ratio) if stock_md and stock_md.pe_ratio else None,
+                        'high52w': float(stock_md._52_week_high) if stock_md and stock_md._52_week_high else None,
+                        'low52w': float(stock_md._52_week_low) if stock_md and stock_md._52_week_low else None,
+                        'sector': stock_md.sector if stock_md else None,
+                        'industry': stock_md.industry if stock_md else None,
+                        'exchange': stock_md.exchange if stock_md else None,
+                        'currency': stock_md.currency if stock_md else 'USD',
+                        'quoteType': stock_md.asset_type.upper() if stock_md and stock_md.asset_type else 'EQUITY',
+                    })
+                else:
+                    # Fallback to individual .info call ONLY for stickers missing from batch or DB
+                    # This ensures reliability for new or obscure symbols
+                    single = get_stock_quote(symbol)
+                    if single:
+                        results.append(single)
             except Exception as e:
-                error_msg = str(e)
-                if 'Too Many Requests' in error_msg or '429' in error_msg:
-                    report_yfinance_error(is_rate_limit=True)
-                    break
-                logger.warning(f"Error fetching {symbol}: {e}")
-        
+                logger.warning(f"Error processing {symbol} in batch: {e}")
+
         if results:
             report_yfinance_success()
-            logger.info(f"[Stock Handler] Fetched {len(results)}/{len(symbols)} quotes")
+            logger.info(f"[Stock Handler] Fetched {len(results)}/{len(symbols)} quotes (True Batch)")
             
     except Exception as e:
+        # Check for rate limit error in bulk request
         error_msg = str(e)
-        if 'Too Many Requests' in error_msg or '429' in error_msg:
-            report_yfinance_error(is_rate_limit=True)
-        else:
-            report_yfinance_error(is_rate_limit=False)
-        logger.error(f"Error fetching multiple quotes: {e}")
+        is_rate_limit = 'Too Many Requests' in error_msg or '429' in error_msg
+        report_yfinance_error(is_rate_limit=is_rate_limit)
+        logger.error(f"Batch quote fetch failed: {e}")
     
     return results
 

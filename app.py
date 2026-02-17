@@ -19,6 +19,12 @@ from extensions import cache, compress, limiter, CACHE_REDIS_URL
 # Initialize Flask app
 app = Flask(__name__)
 
+# [PROD FIX] Enable ProxyFix to get the REAL client IP when running behind 
+# a reverse proxy (like Nginx, Gunicorn, or Cloudflare). 
+# Without this, all users appear to have the same IP, which breaks rate limiting.
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
+
 # Load configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
@@ -252,28 +258,21 @@ with app.app_context():
         print(f"[WARNING] Database setup note: {e}")
 
 
-if __name__ == '__main__':
-    import os
-    
-    # Initialize background job scheduler
-    # Only run scheduler in the main process, not in the reloader child process
-    # When Flask debug mode is on, WERKZEUG_RUN_MAIN is set to 'true' in the child process
+# Initialize background job scheduler
+# [PROD FIX] Moved outside __main__ so it starts in production (Gunicorn/UWSGI).
+# This is required for the Sequential Queue and automatic alerts to function.
+enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
+if enable_scheduler:
+    # Logic to prevent double-starting in Flask debug mode (reloader)
     is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
-    
-    # In debug mode, only start scheduler in the reloader child process (after restart)
-    # In production (non-debug), start scheduler immediately
-    if enable_scheduler:
-        if config.DEBUG:
-            if is_reloader_process:
-                from jobs.scheduler import init_scheduler
-                init_scheduler(app)
-                print("[OK] Background scheduler started (debug mode)")
-        else:
-            from jobs.scheduler import init_scheduler
-            init_scheduler(app)
-            print("[OK] Background scheduler started")
-    
+    if not config.DEBUG or is_reloader_process:
+        from jobs.scheduler import init_scheduler
+        init_scheduler(app)
+        status = "(debug mode)" if config.DEBUG else ""
+        print(f"[OK] Background scheduler started {status}")
+
+
+if __name__ == '__main__':
     print(f"[INFO] Starting PeartoFinance API on port {config.PORT}")
     app.run(
         host='0.0.0.0',
