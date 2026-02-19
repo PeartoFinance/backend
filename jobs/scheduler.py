@@ -238,6 +238,7 @@ def _execute_job_by_name(job_name, params_json):
     from .system_jobs import snapshot_user_wealth, cleanup_deleted_accounts
     from .news_jobs import import_all_news
     from handlers.market_data.forecast_handler import sync_forecast_data
+    from services.sports_import_service import SportsImportService
     
     # Map names to functions
     # Using a mapping ensures safe execution of only allowed functions
@@ -264,7 +265,11 @@ def _execute_job_by_name(job_name, params_json):
         'snapshot_user_wealth': snapshot_user_wealth,
         'cleanup_deleted_accounts': cleanup_deleted_accounts,
         'import_all_news': import_all_news,
-        'sync_forecast_data': sync_forecast_data
+        'sync_forecast_data': sync_forecast_data,
+        
+        # Sports Jobs (Added for sequential processing)
+        'sports_import': SportsImportService.import_events,
+        'sports_live_refresh': SportsImportService.refresh_live_events
     }
     
     func = job_map.get(job_name)
