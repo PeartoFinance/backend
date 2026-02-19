@@ -146,16 +146,16 @@ class YFinanceRateLimiter:
 
 _live_limiter = YFinanceRateLimiter(
     name="live",
-    max_rpm=30,
-    cooldown_sec=30,
-    extended_sec=60,
+    max_rpm=120,  # Increased from 30 to allow dashboard parallelism
+    cooldown_sec=10,  # Reduced from 30
+    extended_sec=30,  # Reduced from 60
 )
 
 _background_limiter = YFinanceRateLimiter(
     name="background",
-    max_rpm=20,
-    cooldown_sec=120,
-    extended_sec=300,
+    max_rpm=60,  # Increased from 20
+    cooldown_sec=60,
+    extended_sec=120,
 )
 
 

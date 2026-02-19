@@ -9,6 +9,13 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 os.environ['NUMEXPR_NUM_THREADS'] = '1'
 os.environ['OMP_NUM_THREADS'] = '1'
+
+# Patch yfinance BEFORE importing anything else that might check for SQLite
+try:
+    import patch_yfinance
+except ImportError:
+    pass
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import config

@@ -17,6 +17,18 @@ def get_yfinance_session():
     global _yfinance_session
     if _yfinance_session is None:
         try:
+            # Force yfinance to use a custom cache location to avoid permission/driver issues
+            import yfinance as yf
+            import os
+            import tempfile
+            
+            try:
+                cache_dir = os.path.join(tempfile.gettempdir(), 'yf_cache')
+                os.makedirs(cache_dir, exist_ok=True)
+                yf.set_tz_cache_location(cache_dir)
+            except Exception as e:
+                logging.warning(f"[YFinance] Could not set custom cache location: {e}")
+
             from curl_cffi import requests as curl_requests
             _yfinance_session = curl_requests.Session(impersonate="chrome")
             _yfinance_session._is_curl_cffi = True

@@ -366,21 +366,6 @@ def create_admin_article():
         return jsonify({'error': str(e)}), 500
 
 
-@news_bp.route('/news/publish-all-drafts', methods=['POST'])
-@admin_required
-def publish_all_drafts():
-    """Publish ALL draft news items (Maintenance)"""
-    try:
-        count = NewsItem.query.filter_by(curated_status='draft').update(
-            {'curated_status': 'published'}, synchronize_session=False
-        )
-        db.session.commit()
-        return jsonify({'success': True, 'updated': count, 'message': f'Published {count} draft items'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
 @news_bp.route('/news/bulk-action', methods=['POST'])
 @admin_required
 def bulk_action_news():

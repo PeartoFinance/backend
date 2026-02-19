@@ -16,10 +16,12 @@ from utils.validators import safe_int
 market_bp = Blueprint('market', __name__)
 
 
-@market_bp.route('/forex/history/<symbol>', methods=['GET'])
+@market_bp.route('/forex/history/<path:symbol>', methods=['GET'])
 @cache.cached(timeout=300, query_string=True)
 def get_forex_pair_history(symbol):
     """Get historical data for a forex pair"""
+    # Normalize symbol: USD/NPR → USDNPR, USD-NPR → USDNPR
+    symbol = symbol.replace('/', '').replace('-', '').upper()
     period = request.args.get('period', '1mo')
     interval = request.args.get('interval', '1d')
     return jsonify(get_forex_history(symbol, period, interval))
