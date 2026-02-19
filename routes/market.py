@@ -275,28 +275,50 @@ def get_crypto_markets():
 @market_bp.route('/stats', methods=['GET'])
 @cache.cached(timeout=120, query_string=True)
 def get_market_stats():
-    """High-level market breadth stats for /api/market/stats."""
+    """
+    High-level market breadth stats for /api/market/stats.
+    PERFORMANCE FIX: Use database aggregation (COUNT/SUM) instead of fetching 
+    all records into memory. This prevents server crashes as the database grows.
+    """
     header_country = request.headers.get('X-User-Country')
     if header_country:
         hc = header_country.strip().upper()
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
     else:
-        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        # Fallback to US/GLOBAL for guest users
         md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])
 
-    all_stocks = MarketData.query.filter(MarketData.asset_type == 'stock', md_filter).all()
-
-    advancers = sum(1 for s in all_stocks if s.change_percent and s.change_percent > 0)
-    decliners = sum(1 for s in all_stocks if s.change_percent and s.change_percent < 0)
-    unchanged = len(all_stocks) - advancers - decliners
-    total_volume = sum(s.volume or 0 for s in all_stocks)
+    # Query counts directly from the database (much faster and memory-efficient)
+    advancers = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock',
+        MarketData.change_percent > 0,
+        md_filter
+    ).scalar() or 0
+    
+    decliners = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock',
+        MarketData.change_percent < 0,
+        md_filter
+    ).scalar() or 0
+    
+    total_count = db.session.query(db.func.count(MarketData.id)).filter(
+        MarketData.asset_type == 'stock',
+        md_filter
+    ).scalar() or 0
+    
+    total_volume = db.session.query(db.func.sum(MarketData.volume)).filter(
+        MarketData.asset_type == 'stock',
+        md_filter
+    ).scalar() or 0
+    
+    unchanged = total_count - advancers - decliners
 
     return jsonify({
         'advancers': advancers,
         'decliners': decliners,
         'unchanged': unchanged,
         'totalVolume': total_volume,
-        'totalCount': len(all_stocks),
+        'totalCount': total_count,
     })
 
 
@@ -346,7 +368,7 @@ def get_bulk_transactions():
 def get_sector_analysis():
     """
     Get comprehensive sector analysis for market visualization.
-    Returns sector breakdown by turnover, volume, and transaction count.
+    PERFORMANCE FIX: Use SQL GROUP BY instead of fetching 5000+ records into memory.
     """
     from sqlalchemy import func
     
@@ -355,84 +377,48 @@ def get_sector_analysis():
         hc = header_country.strip().upper()
         md_filter = MarketData.country_code.in_([hc, 'GLOBAL'])
     else:
-        # UX IMPROVEMENT: Fallback to 'US' instead of just 'GLOBAL' if header is missing.
+        # Fallback to US/GLOBAL for guest users
         md_filter = MarketData.country_code.in_(['US', 'GLOBAL'])   
 
-    # Get all stocks grouped by sector
-    stocks = MarketData.query.filter(
+    # Aggregate data by sector directly in SQL (Massive performance boost)
+    sector_stats = db.session.query(
+        MarketData.sector,
+        func.sum(MarketData.volume * MarketData.price).label('turnover'),
+        func.sum(MarketData.volume).label('volume'),
+        func.count(MarketData.id).label('stock_count'),
+        func.avg(MarketData.change_percent).label('avg_change'),
+        func.avg(MarketData.ytd_return).label('avg_ytd'),
+        func.sum(db.case((MarketData.change_percent > 0, 1), else_=0)).label('advancers'),
+        func.sum(db.case((MarketData.change_percent < 0, 1), else_=0)).label('decliners'),
+        func.sum(db.case((MarketData.change_percent == 0, 1), else_=0)).label('unchanged')
+    ).filter(
         MarketData.asset_type == 'stock',
         MarketData.sector.isnot(None),
         MarketData.sector != '',
         md_filter
-    ).all()
+    ).group_by(MarketData.sector).all()
 
-    # Aggregate by sector
-    sector_data = {}
-    for stock in stocks:
-        sector = stock.sector or 'Others'
-        if sector not in sector_data:
-            sector_data[sector] = {
-                'sector': sector,
-                'turnover': 0,
-                'volume': 0,
-                'transactions': 0,  # count of stocks as proxy
-                'totalChange': 0,
-                'changeCount': 0,
-                'totalYTD': 0,
-                'ytdCount': 0,
-                'advancers': 0,
-                'decliners': 0,
-                'unchanged': 0
-            }
-        
-        # Calculate turnover (volume * price)
-        turnover = (stock.volume or 0) * (stock.price or 0)
-        sector_data[sector]['turnover'] += turnover
-        sector_data[sector]['volume'] += stock.volume or 0
-        sector_data[sector]['transactions'] += 1
-        
-        if stock.change_percent:
-            sector_data[sector]['totalChange'] += stock.change_percent
-            sector_data[sector]['changeCount'] += 1
-            
-            if stock.change_percent > 0:
-                sector_data[sector]['advancers'] += 1
-            elif stock.change_percent < 0:
-                sector_data[sector]['decliners'] += 1
-            else:
-                sector_data[sector]['unchanged'] += 1
-        else:
-            sector_data[sector]['unchanged'] += 1
-            
-        # PROD ADDITION: Accumulate YTD for average calculation
-        if stock.ytd_return is not None:
-            sector_data[sector]['totalYTD'] += stock.ytd_return
-            sector_data[sector]['ytdCount'] += 1
+    # Calculate global totals for percentages
+    total_turnover = sum(s.turnover or 0 for s in sector_stats)
+    total_volume = sum(s.volume or 0 for s in sector_stats)
+    total_stocks = sum(s.stock_count or 0 for s in sector_stats)
 
-    # Calculate totals for percentages
-    total_turnover = sum(s['turnover'] for s in sector_data.values())
-    total_volume = sum(s['volume'] for s in sector_data.values())
-    total_transactions = sum(s['transactions'] for s in sector_data.values())
-
-    # Build response with percentages
     sectors = []
-    for sector, data in sector_data.items():
-        avg_change = float(data['totalChange']) / float(data['changeCount']) if data['changeCount'] > 0 else 0.0
-        avg_ytd = float(data['totalYTD']) / float(data['ytdCount']) if data['ytdCount'] > 0 else 0.0
-        
+    for s in sector_stats:
+        sector_name = s.sector or 'Others'
         sectors.append({
-            'sector': sector,
-            'turnover': float(round(data['turnover'], 2)),
-            'turnoverPercent': float(round((data['turnover'] / total_turnover * 100) if total_turnover > 0 else 0, 2)),
-            'volume': int(data['volume']),
-            'volumePercent': float(round((data['volume'] / total_volume * 100) if total_volume > 0 else 0, 2)),
-            'stockCount': int(data['transactions']),
-            'weight': float(round((data['transactions'] / total_transactions * 100) if total_transactions > 0 else 0, 2)),
-            'avgChangePercent': float(round(avg_change, 2)),
-            'avgYtdReturn': float(round(avg_ytd, 2)),
-            'advancers': int(data['advancers']),
-            'decliners': int(data['decliners']),
-            'unchanged': int(data['unchanged'])
+            'sector': sector_name,
+            'turnover': float(round(s.turnover or 0, 2)),
+            'turnoverPercent': float(round((s.turnover / total_turnover * 100) if total_turnover > 0 else 0, 2)),
+            'volume': int(s.volume or 0),
+            'volumePercent': float(round((s.volume / total_volume * 100) if total_volume > 0 else 0, 2)),
+            'stockCount': int(s.stock_count or 0),
+            'weight': float(round((s.stock_count / total_stocks * 100) if total_stocks > 0 else 0, 2)),
+            'avgChangePercent': float(round(s.avg_change or 0, 2)),
+            'avgYtdReturn': float(round(s.avg_ytd or 0, 2)),
+            'advancers': int(s.advancers or 0),
+            'decliners': int(s.decliners or 0),
+            'unchanged': int(s.unchanged or 0)
         })
 
     # Sort by turnover descending
@@ -441,9 +427,9 @@ def get_sector_analysis():
     return jsonify({
         'sectors': sectors,
         'totals': {
-            'turnover': round(total_turnover, 2),
-            'volume': total_volume,
-            'transactions': total_transactions,
+            'turnover': float(round(total_turnover, 2)),
+            'volume': int(total_volume),
+            'transactions': int(total_stocks),
             'sectorCount': len(sectors)
         }
     })

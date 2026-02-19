@@ -432,11 +432,9 @@ def cron_sports_import():
         date = request.args.get('date')
         sport_key = request.args.get('sport')
 
-        def _run_sports_import():
-            from services.sports_import_service import SportsImportService
-            return SportsImportService.import_events(date=date, sport_key=sport_key)
-
-        queue_job(_run_sports_import, 'sports_import')
+        from services.sports_import_service import SportsImportService
+        # Fix: Pass params directly to queue_job so they can be saved in the database queue
+        queue_job(SportsImportService.import_events, 'sports_import', date=date, sport_key=sport_key)
         return jsonify({'ok': True, 'message': 'Sports import job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -453,11 +451,9 @@ def cron_sports_live_refresh():
         return jsonify({'error': 'Invalid cron token'}), 401
 
     try:
-        def _run_live_refresh():
-            from services.sports_import_service import SportsImportService
-            return SportsImportService.refresh_live_events()
-
-        queue_job(_run_live_refresh, 'sports_live_refresh')
+        from services.sports_import_service import SportsImportService
+        # Fix: Using top-level function reference for sequential mode compatibility
+        queue_job(SportsImportService.refresh_live_events, 'sports_live_refresh')
         return jsonify({'ok': True, 'message': 'Sports live refresh job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
