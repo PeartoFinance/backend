@@ -2,8 +2,11 @@ from functools import wraps
 from flask import request, jsonify, g
 import jwt
 from config import config
-from models import User
+from models import User, ApiKey, ApiUsageLog, UserSubscription, db
 from models.user import UserSession
+import bcrypt
+import time
+from datetime import datetime, timezone
 
 def auth_required(f):
     @wraps(f)
@@ -80,4 +83,139 @@ def admin_required(f):
         if request.user.role != 'admin':
             return jsonify({'error': 'Admin privileges required'}), 403
         return f(*args, **kwargs)
+    return decorated
+
+
+def _get_client_ip() -> str:
+    """Extract the real client IP from proxy headers, safe for VARCHAR(45)."""
+    ip = (
+        request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+        or request.headers.get('X-Real-IP')
+        or request.remote_addr
+        or 'Unknown'
+    )
+    return ip[:45]
+
+def api_key_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            return '', 200
+            
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'No API key provided. Format: Bearer <key>'}), 401
+            
+        raw_key = auth_header.split(' ')[1]
+        
+        # A valid key must be at least 8 characters
+        if len(raw_key) < 8:
+            return jsonify({'error': 'Invalid API key format'}), 401
+            
+        key_prefix = raw_key[:8]
+        
+        # Find potential keys by prefix
+        api_keys = ApiKey.query.filter_by(key_prefix=key_prefix, is_active=True).all()
+        
+        valid_key = None
+        for k in api_keys:
+            if bcrypt.checkpw(raw_key.encode('utf-8'), k.key_hash.encode('utf-8')):
+                valid_key = k
+                break
+                
+        if not valid_key:
+            return jsonify({'error': 'Invalid or inactive API key'}), 401
+            
+        # Check expiry
+        if valid_key.expires_at and valid_key.expires_at < datetime.now(timezone.utc):
+            return jsonify({'error': 'API key has expired'}), 401
+            
+        # Set context variables
+        user = User.query.get(valid_key.user_id)
+        if not user or user.account_status != 'active':
+            return jsonify({'error': 'Associated user account is not active'}), 403
+            
+        # Determine Daily API Limit
+        daily_limit = 50 # Default Free Tier
+        
+        # Check for active subscription
+        active_sub = UserSubscription.query.filter_by(
+            user_id=user.id,
+            status='active'
+        ).first()
+        
+        if active_sub and active_sub.plan and active_sub.plan.features:
+            features = active_sub.plan.features
+            if isinstance(features, dict) and 'api_daily_limit' in features:
+                daily_limit = int(features['api_daily_limit'])
+        
+        # Count usage today
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Get all keys belonging to this user
+        user_keys = ApiKey.query.filter_by(user_id=user.id).all()
+        key_ids = [k.id for k in user_keys]
+        
+        today_usage = 0
+        if key_ids:
+            today_usage = ApiUsageLog.query.filter(
+                ApiUsageLog.api_key_id.in_(key_ids),
+                ApiUsageLog.created_at >= today
+            ).count()
+            
+        if today_usage >= daily_limit:
+            return jsonify({
+                'error': 'Daily API Limit Exceeded',
+                'message': f'You have reached your limit of {daily_limit} requests/day. Upgrade your plan to increase limits.',
+                'status': 429
+            }), 429
+            
+        request.user = user
+        g.user = user
+        g.api_key = valid_key
+        
+        start_time = time.time()
+        
+        # Execute the route
+        try:
+            response = f(*args, **kwargs)
+        except Exception as e:
+            # Log failure
+            duration_ms = int((time.time() - start_time) * 1000)
+            log = ApiUsageLog(
+                api_key_id=valid_key.id,
+                endpoint=request.path,
+                method=request.method,
+                status_code=500,
+                ip_address=_get_client_ip(),
+                duration_ms=duration_ms
+            )
+            db.session.add(log)
+            db.session.commit()
+            raise e
+            
+        # Ensure response is a tuple to extract status code
+        status_code = 200
+        if isinstance(response, tuple) and len(response) > 1:
+            status_code = response[1]
+        elif hasattr(response, 'status_code'):
+            status_code = response.status_code
+            
+        # Log success
+        duration_ms = int((time.time() - start_time) * 1000)
+        log = ApiUsageLog(
+            api_key_id=valid_key.id,
+            endpoint=request.path,
+            method=request.method,
+            status_code=status_code,
+            ip_address=_get_client_ip(),
+            duration_ms=duration_ms
+        )
+        valid_key.last_used_at = datetime.now(timezone.utc)
+        
+        db.session.add(log)
+        db.session.commit()
+        
+        return response
+        
     return decorated

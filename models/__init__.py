@@ -200,6 +200,9 @@ from .subscription import (
 # Feature Usage tracking
 from .feature_usage import UserFeatureUsage
 
+# API Keys
+from .api_key import ApiKey, ApiUsageLog
+
 # All models list for migrations
 __all__ = [
     'db',
@@ -249,5 +252,7 @@ __all__ = [
     'SubscriptionPlan', 'SubscriptionCoupon', 'UserSubscription', 'PaymentTransaction',
     # Feature Usage
     'UserFeatureUsage',
+    # API Keys
+    'ApiKey', 'ApiUsageLog',
 ]
 

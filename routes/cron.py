@@ -164,6 +164,38 @@ def cron_daily_digest():
         return jsonify({'error': str(e)}), 500
 
 
+@cron_bp.route('/all-notifications', methods=['GET', 'POST'])
+def cron_all_notifications():
+    """
+    Trigger all notification jobs at once.
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/all-notifications?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import (
+            check_watchlist_alerts,
+            check_earnings_alerts,
+            send_daily_pl_summaries,
+            send_daily_digest,
+            process_news_notifications,
+            check_financial_goals
+        )
+        
+        # Enqueue individual jobs so they run sequentially in the worker
+        queue_job(check_watchlist_alerts, 'check_watchlist_alerts')
+        queue_job(check_earnings_alerts, 'check_earnings_alerts')
+        queue_job(send_daily_pl_summaries, 'send_daily_pl_summaries')
+        queue_job(send_daily_digest, 'send_daily_digest')
+        queue_job(process_news_notifications, 'process_news_notifications')
+        queue_job(check_financial_goals, 'check_financial_goals')
+        
+        return jsonify({'ok': True, 'message': 'All notification jobs triggered/queued'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @cron_bp.route('/all-market', methods=['GET', 'POST'])
 def cron_all_market():
     """

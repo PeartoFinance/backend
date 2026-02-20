@@ -140,6 +140,8 @@ from routes.currency import currency_bp
 from routes.subscription import subscription_bp
 from routes.glossary import glossary_bp
 from routes.help_public import help_public_bp
+from routes.developer import developer_bp
+from routes.public_v1 import public_v1_bp
 
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -170,6 +172,8 @@ app.register_blueprint(currency_bp)
 app.register_blueprint(subscription_bp, url_prefix='/api/subscription')
 app.register_blueprint(glossary_bp, url_prefix='/api')
 app.register_blueprint(help_public_bp, url_prefix='/api')
+app.register_blueprint(developer_bp, url_prefix='/api/developer')
+app.register_blueprint(public_v1_bp, url_prefix='/api/v1/public')
 
 from routes.sports import sports_bp
 app.register_blueprint(sports_bp, url_prefix='/api/sports')
@@ -216,6 +220,10 @@ app.register_blueprint(admin_testimonials_bp, url_prefix='/api/admin')
 # Admin FAQ
 from routes.admin.faq import admin_faq_bp
 app.register_blueprint(admin_faq_bp, url_prefix='/api/admin')
+
+# Admin API Management
+from routes.admin.api_management import admin_api_management_bp
+app.register_blueprint(admin_api_management_bp, url_prefix='/api/admin')
 
 
 # Error handlers
