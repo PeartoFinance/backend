@@ -19,7 +19,13 @@ def get_users():
     """List all users"""
     try:
         country = getattr(request, 'user_country', 'US')
-        users = User.query.filter_by(country_code=country).order_by(User.created_at.desc()).limit(500).all()
+        
+        # If 'GLOBAL' or empty, show users from all countries
+        query = User.query
+        if country and country != 'GLOBAL':
+            query = query.filter_by(country_code=country)
+            
+        users = query.order_by(User.created_at.desc()).limit(500).all()
         return jsonify({
             'users': [u.to_dict() for u in users]
         })
