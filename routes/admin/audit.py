@@ -17,10 +17,15 @@ def get_audit_events():
         limit = min(200, request.args.get('limit', 50, type=int))
         cursor = request.args.get('cursor')
         country = getattr(request, 'user_country', 'US')
+        is_global = not country or country == 'GLOBAL'
         
-        query = AuditEvent.query.filter(
-            (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
-        ).order_by(AuditEvent.ts.desc())
+        query = AuditEvent.query
+        if not is_global:
+            query = query.filter(
+                (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
+            )
+        
+        query = query.order_by(AuditEvent.ts.desc())
         
         if cursor:
             query = query.filter(AuditEvent.ts < cursor)
@@ -52,17 +57,26 @@ def get_audit_stats():
     """Get audit statistics"""
     try:
         country = getattr(request, 'user_country', 'US')
-        total = AuditEvent.query.filter(
-            (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
-        ).count()
+        is_global = not country or country == 'GLOBAL'
+
+        query = AuditEvent.query
+        if not is_global:
+            query = query.filter(
+                (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
+            )
+            
+        total = query.count()
         
         # Group by action
         from sqlalchemy import func
-        action_counts = db.session.query(
+        stats_query = db.session.query(
             AuditEvent.action, func.count(AuditEvent.id)
-        ).filter(
-            (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
-        ).group_by(AuditEvent.action).all()
+        )
+        if not is_global:
+            stats_query = stats_query.filter(
+                (AuditEvent.country_code == country) | (AuditEvent.country_code == 'GLOBAL')
+            )
+        action_counts = stats_query.group_by(AuditEvent.action).all()
         
         return jsonify({
             'total': total,

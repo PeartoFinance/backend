@@ -18,10 +18,15 @@ def get_tools():
     try:
         # Filter by user's country or GLOBAL settings
         country = getattr(request, 'user_country', 'US')
-        tools = ToolSettings.query.filter(
-            (ToolSettings.country_code == country) | 
-            (ToolSettings.country_code == 'GLOBAL')
-        ).order_by(ToolSettings.order_index).all()
+        is_global = not country or country == 'GLOBAL'
+        
+        query = ToolSettings.query
+        if not is_global:
+            query = query.filter(
+                (ToolSettings.country_code == country) | 
+                (ToolSettings.country_code == 'GLOBAL')
+            )
+        tools = query.order_by(ToolSettings.order_index).all()
         
         return jsonify({
             'tools': [{

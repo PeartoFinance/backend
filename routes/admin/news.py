@@ -16,6 +16,8 @@ def get_news():
     """List all news articles with filters"""
     try:
         country = getattr(request, 'user_country', 'US')
+        is_global = not country or country == 'GLOBAL'
+        
         status = request.args.get('status')  # draft, published, archived
         source_type = request.args.get('source_type')  # rss, admin
         category = request.args.get('category')
@@ -23,12 +25,16 @@ def get_news():
         limit = min(int(request.args.get('limit', 100)), 500)
         offset = int(request.args.get('offset', 0))
         
-        # Base query with country filter
-        query = NewsItem.query.filter(
-            (NewsItem.country_code == country) | 
-            (NewsItem.country_code == 'GLOBAL') |
-            (NewsItem.country_code == None)
-        )
+        # Base query
+        query = NewsItem.query
+        
+        # Apply country filter if not in "All Countries" mode
+        if not is_global:
+            query = query.filter(
+                (NewsItem.country_code == country) | 
+                (NewsItem.country_code == 'GLOBAL') |
+                (NewsItem.country_code == None)
+            )
         
         # Apply filters
         if status and status != 'all':
