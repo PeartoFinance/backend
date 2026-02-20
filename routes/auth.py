@@ -12,6 +12,7 @@ from config import config
 from models import db, User, PasswordResetToken, UserProfile
 from handlers import send_welcome_email, send_login_notification_email, send_password_reset_email, track_login, track_signup
 from models.user import UserSession
+from utils.device import parse_user_agent
 from .decorators import auth_required
 import os
 from google.oauth2 import id_token
@@ -111,7 +112,8 @@ def login():
         # Check user preferences before sending login notification
         from services.preference_checker import should_send_notification
         if should_send_notification(user.id, 'security', 'email'):
-            send_login_notification_email(user.email, user.name, ip_address, user_agent)
+            friendly_device = parse_user_agent(user_agent)
+            send_login_notification_email(user.email, user.name, ip_address, friendly_device)
     except Exception as e:
         print(f'[Auth] Login notification failed: {e}')
     
@@ -437,7 +439,8 @@ def google_signin():
         
         from services.preference_checker import should_send_notification
         if should_send_notification(user.id, 'security', 'email'):
-            send_google_login_email(user.email, user.name, ip_address, user_agent)
+            friendly_device = parse_user_agent(user_agent)
+            send_google_login_email(user.email, user.name, ip_address, friendly_device)
     except Exception as e:
         print(f'[Auth] Google login email failed: {e}')
     

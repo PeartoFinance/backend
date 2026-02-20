@@ -46,7 +46,7 @@ TEMPLATES = {
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to {{app_name}}! 🎉</h1>
         </div>
         <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
@@ -60,7 +60,7 @@ TEMPLATES = {
                 <li>Join live webinars and learning sessions</li>
             </ul>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{{login_url}}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Get Started</a>
+                <a href="{{login_url}}" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Get Started</a>
             </div>
             <p style="font-size: 14px; color: #666; line-height: 1.6;">If you have any questions, feel free to reach out to our support team.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
@@ -144,7 +144,7 @@ Secure your account: {{security_url}}'''
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">🔑 Password Reset</h1>
         </div>
         <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
@@ -152,12 +152,12 @@ Secure your account: {{security_url}}'''
             <p style="font-size: 16px; color: #333; line-height: 1.6;">We received a request to reset your password for your {{app_name}} account.</p>
             <p style="font-size: 16px; color: #333; line-height: 1.6;">Click the button below to create a new password:</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{{reset_url}}" style="display: inline-block; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Reset Password</a>
+                <a href="{{reset_url}}" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Reset Password</a>
             </div>
             <p style="font-size: 14px; color: #666; line-height: 1.6;">This link will expire in <strong>1 hour</strong> for security reasons.</p>
             <p style="font-size: 14px; color: #666; line-height: 1.6;">If you didn't request a password reset, you can safely ignore this email.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-            <p style="font-size: 12px; color: #999; text-align: center;">If the button doesn't work, copy and paste this link:<br><a href="{{reset_url}}" style="color: #667eea;">{{reset_url}}</a></p>
+            <p style="font-size: 12px; color: #999; text-align: center;">If the button doesn't work, copy and paste this link:<br><a href="{{reset_url}}" style="color: #10b981;">{{reset_url}}</a></p>
         </div>
     </div>
 </body>
@@ -187,15 +187,15 @@ If you didn't request a password reset, you can safely ignore this email.'''
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px;">📧 Verify Your Email</h1>
         </div>
         <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
             <p style="font-size: 16px; color: #333; line-height: 1.6;">Hi {{user_name}},</p>
             <p style="font-size: 16px; color: #333; line-height: 1.6;">Your verification code is:</p>
             <div style="text-align: center; margin: 30px 0;">
-                <div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 12px; padding: 30px; display: inline-block;">
-                    <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #667eea;">{{code}}</span>
+                <div style="background: #f8f9fa; border: 2px dashed #10b981; border-radius: 12px; padding: 30px; display: inline-block;">
+                    <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #10b981;">{{code}}</span>
                 </div>
             </div>
             <p style="font-size: 14px; color: #666; line-height: 1.6;">This code will expire in <strong>15 minutes</strong>.</p>
@@ -228,13 +228,13 @@ If you didn't request this code, please ignore this email.'''
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 24px;">👤 Profile Updated</h1>
         </div>
         <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px;">
             <p style="font-size: 16px; color: #333;">Hi {{user_name}},</p>
             <p style="font-size: 16px; color: #333;">Your profile was updated successfully.</p>
-            <div style="background: #f0f9ff; border-left: 4px solid #667eea; padding: 15px; margin: 20px 0;">
+            <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0;">
                 <p style="margin: 0; color: #333;"><strong>Changes:</strong> {{changed_fields}}</p>
             </div>
             <p style="font-size: 14px; color: #666;">If you didn't make these changes, please contact support immediately.</p>
@@ -261,7 +261,7 @@ If you didn't make these changes, please contact support.'''
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
     <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: linear-gradient(135deg, #4285F4 0%, #34A853 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 30px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 24px;">🔐 Google Sign-in Detected</h1>
         </div>
         <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
@@ -288,6 +288,61 @@ Device: {{device_info}}
 IP: {{ip_address}}
 
 If this wasn't you, please secure your account.'''
+    },
+    
+    'subscription_success': {
+        'subject': f'Welcome to {{{{plan_name}}}}! Subscription Confirmed',
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #f0fdf4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to {{plan_name}}! 🎉</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">Hi {{user_name}},</p>
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">Thank you for your purchase! Your subscription to <strong>{{plan_name}}</strong> has been activated.</p>
+            
+            <div style="background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 30px 0;">
+                <h3 style="margin-top: 0; color: #333; font-size: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">Payment Receipt</h3>
+                <div style="display: flex; justify-content: space-between; margin-top: 16px;">
+                    <span style="color: #64748b;">Plan:</span>
+                    <strong style="color: #0f172a;">{{plan_name}}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 12px;">
+                    <span style="color: #64748b;">Amount Paid:</span>
+                    <strong style="color: #10b981;">{{amount}}</strong>
+                </div>
+            </div>
+            
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">You now have full access to your premium features.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{login_url}}" style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Go to Dashboard</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666; line-height: 1.6;">If you have any questions about your subscription, please contact our support team.</p>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''Subscription Confirmed!
+
+Hi {{user_name}},
+
+Thank you for your purchase! Your subscription to {{plan_name}} has been activated.
+Amount Paid: {{amount}}
+
+You now have full access to your premium features.
+
+Go to your dashboard: {{login_url}}
+
+If you have any questions, please contact our support team.'''
     },
 }
 
@@ -483,4 +538,13 @@ def send_phone_verification_sms(phone: str, code: str) -> bool:
     print(f'  Code: {code}')
     print(f'  Message: Your Pearto Finance verification code is: {code}')
     return True
+
+
+def send_subscription_success_email(user_email: str, user_name: str, plan_name: str, amount: float) -> bool:
+    """Send subscription confirmation email"""
+    return _email_service.send_email_async(user_email, 'subscription_success', {
+        'user_name': user_name,
+        'plan_name': plan_name,
+        'amount': f"${amount:.2f}"
+    })
 

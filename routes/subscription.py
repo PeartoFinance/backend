@@ -203,6 +203,18 @@ def capture():
         # ONE SINGLE COMMIT for everything
         db.session.commit()
         
+        # Send Subscription Receipt Email
+        try:
+            from notifications.email_service import send_subscription_success_email
+            send_subscription_success_email(
+                user.email, 
+                user.name, 
+                sub.plan.name, 
+                capture_result.get('amount', 0)
+            )
+        except Exception as email_err:
+            print(f"[Subscription] Failed to send receipt email: {email_err}")
+        
         return jsonify({
             'success': True,
             'message': 'Subscription activated successfully!',

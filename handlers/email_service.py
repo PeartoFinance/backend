@@ -430,10 +430,6 @@ If this wasn't you, please secure your account.'''
 <html>
 <head>
     <meta charset="utf-8">
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
@@ -472,47 +468,6 @@ Hi {{user_name}},
 
 {{news_title}}
 Source: {{news_source}}
-
-{{news_summary}}
-
-Read more: {{news_url}}'''
-    },
-
-    'news_notification': {
-        'subject': '{{news_title}}',
-        'html': '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-</head>
-<body style="font-family: sans-serif; background-color: #f4f7fa; padding: 20px;">
-    <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-        <div style="background: #2563EB; padding: 20px; color: white;">
-            <h2 style="margin:0;">{{news_source}} News</h2>
-        </div>
-        <div style="padding: 24px;">
-            <p>Hi {{user_name}},</p>
-            <h3 style="margin-top:0;">{{news_title}}</h3>
-            <p style="color: #555;">{{news_summary}}</p>
-            <div style="margin-top: 24px;">
-                <a href="{{news_url}}" style="background: #2563EB; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block;">Read Full Story</a>
-            </div>
-        </div>
-    </div>
-</body>
-</html>''',
-        'text': '''{{news_source}}: {{news_title}}
-
-Hi {{user_name}},
 
 {{news_summary}}
 

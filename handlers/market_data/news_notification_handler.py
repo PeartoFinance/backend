@@ -151,7 +151,9 @@ def send_user_notification(user: 'User', news_item: NewsItem, notif_prefs: 'User
     
     # Step 2: Try email
     email_sent = False
-    if notif_prefs and notif_prefs.email_news:
+    should_email = notif_prefs.email_news if notif_prefs else True
+    
+    if should_email:
         try:
             _email_service.send_email(
                 to=user.email,
@@ -172,7 +174,9 @@ def send_user_notification(user: 'User', news_item: NewsItem, notif_prefs: 'User
     
     # Step 3: Try push notification
     push_sent = False
-    if notif_prefs and notif_prefs.push_news:
+    should_push = notif_prefs.push_news if notif_prefs else True
+    
+    if should_push:
         try:
             push_result = send_push_notification(
                 user_id=user.id,
