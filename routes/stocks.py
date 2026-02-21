@@ -34,7 +34,6 @@ def get_quotes():
 
     prices = MarketData.query.filter(
         MarketData.symbol.in_(symbols),
-        MarketData.asset_type == 'stock',
         filter_condition
     ).all()
     
@@ -58,16 +57,15 @@ def search_stocks():
     else:
         country = header_country.strip().upper()
         filter_condition = MarketData.country_code.in_([country, 'GLOBAL'])
-    stocks = MarketData.query.filter(
+    market_items = MarketData.query.filter(
         db.or_(
             MarketData.symbol.ilike(f'%{query}%'),
             MarketData.name.ilike(f'%{query}%')
         ),
-        MarketData.asset_type == 'stock',
         filter_condition
     ).limit(limit).all()
     
-    results = [s.to_dict() for s in stocks]
+    results = [s.to_dict() for s in market_items]
 
     # 2. Safe Discovery: If few local results, search Yahoo for Names/Symbols ONLY.
     # We do NOT fetch prices here to prevent Yahoo from blocking us (Rate Limiting).
@@ -115,7 +113,6 @@ def get_profile(symbol):
     symbol = symbol.upper()
     stock = MarketData.query.filter(
         MarketData.symbol == symbol,
-        MarketData.asset_type == 'stock',
         filter_condition
     ).first()
     
@@ -132,7 +129,6 @@ def get_profile(symbol):
         # Query again - whether we added it or someone else did
         stock = MarketData.query.filter(
             MarketData.symbol == symbol,
-            MarketData.asset_type == 'stock',
             filter_condition
         ).first()
     
@@ -224,10 +220,10 @@ def get_stock_forecast(symbol):
 def get_stock_statistics(symbol):
     """Get detailed technical and fundamental statistics for a symbol"""
     symbol = symbol.upper()
-    stock = MarketData.query.filter_by(symbol=symbol, asset_type='stock').first()
+    stock = MarketData.query.filter_by(symbol=symbol).first()
     
     if not stock:
-        return jsonify({'error': 'Stock not found'}), 404
+        return jsonify({'error': 'Asset not found'}), 404
         
     stats = {
         'symbol': stock.symbol,
