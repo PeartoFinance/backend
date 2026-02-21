@@ -107,27 +107,72 @@ def get_watchlist():
     if not symbols:
         return jsonify([])
 
-    stocks = MarketData.query.filter(
+    # 1. Fetch from MarketData (Stocks & Crypto)
+    market_items = MarketData.query.filter(
         MarketData.symbol.in_(symbols),
-        MarketData.asset_type == 'stock',
         filter_condition
     ).all()
 
-    # map market data by symbol for robust response even when some symbols lack market rows
-    market_map = {m.symbol: m for m in stocks}
+    # 2. Fetch from CommodityData
+    commodity_items = CommodityData.query.filter(
+        CommodityData.symbol.in_(symbols)
+    ).all()
+
+    # 3. Fetch from MarketIndices
+    index_items = MarketIndices.query.filter(
+        MarketIndices.symbol.in_(symbols)
+    ).all()
+
+    # Unified mapping logic for different models
+    market_map = {}
+    
+    # Process MarketData
+    for m in market_items:
+        market_map[m.symbol.strip().upper()] = {
+            'name': m.name,
+            'price': float(m.price) if m.price else 0,
+            'change': float(m.change) if m.change else 0,
+            'changePercent': float(m.change_percent) if m.change_percent else 0,
+            'updated': m.last_updated
+        }
+    
+    # Process Commodities (if not already found)
+    for c in commodity_items:
+        sym = c.symbol.strip().upper()
+        if sym not in market_map:
+            market_map[sym] = {
+                'name': c.name,
+                'price': float(c.price) if c.price else 0,
+                'change': float(c.change) if c.change else 0,
+                'changePercent': float(c.change_percent) if c.change_percent else 0,
+                'updated': c.last_updated
+            }
+
+    # Process Indices (if not already found)
+    for i in index_items:
+        sym = i.symbol.strip().upper()
+        if sym not in market_map:
+            market_map[sym] = {
+                'name': i.name,
+                'price': float(i.price) if i.price else 0,
+                'change': float(i.change_amount) if i.change_amount else 0,
+                'changePercent': float(i.change_percent) if i.change_percent else 0,
+                'updated': i.last_updated
+            }
 
     result = []
     for i, sym in enumerate(symbols):
-        m = market_map.get(sym)
+        lookup_sym = sym.strip().upper()
+        m = market_map.get(lookup_sym)
         if m:
             result.append({
                 'id': i + 1,
-                'symbol': m.symbol,
-                'name': m.name,
-                'price': float(m.price) if m.price else 0,
-                'change': float(m.change) if m.change else 0,
-                'changePercent': float(m.change_percent) if m.change_percent else 0,
-                'addedAt': m.last_updated.isoformat() if m.last_updated else None
+                'symbol': sym, # Keep original casing for symbol
+                'name': m['name'],
+                'price': m['price'],
+                'change': m['change'],
+                'changePercent': m['changePercent'],
+                'addedAt': m['updated'].isoformat() if m['updated'] else None
             })
         else:
             result.append({
