@@ -15,6 +15,7 @@ from models.user import UserSession
 from utils.device import parse_user_agent
 from .decorators import auth_required
 import os
+from services.settings_service import get_setting_secure
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
@@ -80,7 +81,8 @@ def login():
         'role': user.role,
         'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
-    token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+    jwt_secret = get_setting_secure('JWT_SECRET', config.JWT_SECRET)
+    token = jwt.encode(payload, jwt_secret, algorithm='HS256')
     
     # Update last login
     user.last_login_at = datetime.now(timezone.utc)
@@ -297,7 +299,7 @@ def google_signin():
     try:
          # Verify Firebase ID Token to prevent account spoofing
         # Firebase tokens use a different certificate URL than standard Google tokens
-        firebase_project_id = os.getenv('FIREBASE_PROJECT_ID')
+        firebase_project_id = get_setting_secure('FIREBASE_PROJECT_ID')
         certs_url = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
         
         idinfo = id_token.verify_token(
@@ -411,7 +413,8 @@ def google_signin():
         'role': user.role,
         'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
-    token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+    jwt_secret = get_setting_secure('JWT_SECRET', config.JWT_SECRET)
+    token = jwt.encode(payload, jwt_secret, algorithm='HS256')
 
     # normalize token
     if isinstance(token, bytes):
@@ -498,7 +501,8 @@ def set_password():
         'role': user.role,
         'exp': datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     }
-    new_token = jwt.encode(payload, config.JWT_SECRET, algorithm='HS256')
+    jwt_secret = get_setting_secure('JWT_SECRET', config.JWT_SECRET)
+    new_token = jwt.encode(payload, jwt_secret, algorithm='HS256')
     if isinstance(new_token, bytes):
         new_token = new_token.decode('utf-8')
     

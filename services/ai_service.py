@@ -1,8 +1,8 @@
 """
 AI Service - OpenAI-compatible client for SathiAI
 """
-import os
 import httpx
+from services.settings_service import get_setting_secure
 from typing import Optional, List, Dict, Any
 
 
@@ -10,8 +10,8 @@ class AIService:
     """AI Service using OpenAI-compatible API"""
     
     def __init__(self):
-        self.api_key = os.getenv('SATHI_AI_API_KEY', 'sk-0mw9OdrHDBiYOE5VeEDyieB1IAk9imlBF3uQMXXCIh8Chmug')
-        self.base_url = os.getenv('SATHI_AI_BASE_URL', 'https://sathiaiapi.ashlya.com/v1')
+        self.api_key = get_setting_secure('SATHI_AI_API_KEY', 'sk-0mw9OdrHDBiYOE5VeEDyieB1IAk9imlBF3uQMXXCIh8Chmug')
+        self.base_url = get_setting_secure('SATHI_AI_BASE_URL', 'https://sathiaiapi.ashlya.com/v1')
         self.default_model = 'gpt-4'
         self.max_tokens = 500
         self.temperature = 0.7

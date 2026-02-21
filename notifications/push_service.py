@@ -7,11 +7,17 @@ import logging
 from typing import Dict, List, Optional, Any
 import requests
 
+from services.settings_service import get_setting_secure
+
 logger = logging.getLogger(__name__)
 
-# OneSignal Configuration
-ONESIGNAL_APP_ID = os.getenv('ONESIGNAL_APP_ID', '')
-ONESIGNAL_API_KEY = os.getenv('ONESIGNAL_API_KEY', '')
+# OneSignal Configuration Helpers
+def get_onesignal_app_id():
+    return get_setting_secure('ONESIGNAL_APP_ID', '')
+
+def get_onesignal_api_key():
+    return get_setting_secure('ONESIGNAL_API_KEY', '')
+
 ONESIGNAL_API_URL = 'https://onesignal.com/api/v1'
 
 
@@ -35,7 +41,10 @@ def send_push_notification(
     Returns:
         API response dict
     """
-    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
+    app_id = get_onesignal_app_id()
+    api_key = get_onesignal_api_key()
+    
+    if not app_id or not api_key:
         logger.warning("OneSignal not configured, skipping push notification")
         return {'status': 'skipped', 'reason': 'not_configured'}
     
@@ -89,17 +98,20 @@ def send_bulk_push(
     Returns:
         API response dict
     """
-    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
+    app_id = get_onesignal_app_id()
+    api_key = get_onesignal_api_key()
+    
+    if not app_id or not api_key:
         logger.warning("OneSignal not configured")
         return {'status': 'skipped', 'reason': 'not_configured'}
     
     headers = {
-        'Authorization': f'Basic {ONESIGNAL_API_KEY}',
+        'Authorization': f'Basic {api_key}',
         'Content-Type': 'application/json',
     }
     
     payload = {
-        'app_id': ONESIGNAL_APP_ID,
+        'app_id': app_id,
         'include_player_ids': player_ids,
         'headings': {'en': title},
         'contents': {'en': message},
@@ -215,16 +227,19 @@ def send_topic_notification(
     Send notification to all users subscribed to a topic.
     Topics: 'market_alerts', 'news', 'earnings', 'dividends'
     """
-    if not ONESIGNAL_APP_ID or not ONESIGNAL_API_KEY:
+    app_id = get_onesignal_app_id()
+    api_key = get_onesignal_api_key()
+    
+    if not app_id or not api_key:
         return {'status': 'skipped', 'reason': 'not_configured'}
     
     headers = {
-        'Authorization': f'Basic {ONESIGNAL_API_KEY}',
+        'Authorization': f'Basic {api_key}',
         'Content-Type': 'application/json',
     }
     
     payload = {
-        'app_id': ONESIGNAL_APP_ID,
+        'app_id': app_id,
         'included_segments': [topic],
         'headings': {'en': title},
         'contents': {'en': message},

@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta
 from extensions import cache
 from config import config
+from services.settings_service import get_setting_secure
 
 class APISportsService:
     """
@@ -12,7 +13,10 @@ class APISportsService:
     Handball, Volleyball, Formula 1, MMA
     """
     
-    API_KEY = os.getenv('API_SPORTS_KEY')
+    @classmethod
+    def get_api_key(cls):
+        """Fetch API key securely from DB or Env"""
+        return get_setting_secure('API_SPORTS_KEY')
 
     # Map sport key -> correct API endpoint path
     # Football (v3) uses /fixtures; all other sports use /games
@@ -40,14 +44,15 @@ class APISportsService:
 
     @classmethod
     def _get_headers(cls, api_url):
-        if not cls.API_KEY:
-            print("WARNING: API_SPORTS_KEY not found in environment variables")
+        api_key = cls.get_api_key()
+        if not api_key:
+            print("WARNING: API_SPORTS_KEY not found in environment variables or DB")
         
         host = api_url.replace('https://', '').split('/')[0]
             
         return {
             'x-rapidapi-host': host,
-            'x-rapidapi-key': cls.API_KEY
+            'x-rapidapi-key': api_key
         }
 
     @classmethod
@@ -80,7 +85,8 @@ class APISportsService:
         :param status: 'live', 'upcoming', 'all'
         :param date: YYYY-MM-DD (optional, defaults to today for upcoming/all)
         """
-        if not cls.API_KEY:
+        api_key = cls.get_api_key()
+        if not api_key:
             return []
 
         from models.media import SportsCategory

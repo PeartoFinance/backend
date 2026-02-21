@@ -3,6 +3,7 @@ Market Status Routes
 Dynamic market open/close status based on user's country
 """
 from flask import Blueprint, jsonify, request
+from services.settings_service import get_setting_secure
 from datetime import datetime
 import pytz
 from extensions import cache
@@ -203,8 +204,7 @@ def seed_market_hours():
     
     # Check for admin token
     token = request.headers.get('X-Cron-Token') or request.args.get('token')
-    import os
-    if token != os.getenv('CRON_SECRET', 'your-cron-secret-key'):
+    if token != get_setting_secure('CRON_SECRET', 'your-cron-secret-key'):
         return jsonify({'error': 'Unauthorized'}), 401
     
     # Demo data for major exchanges

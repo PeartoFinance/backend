@@ -2,6 +2,7 @@ from functools import wraps
 from flask import request, jsonify, g
 import jwt
 from config import config
+from services.settings_service import get_setting_secure
 from models import User, ApiKey, ApiUsageLog, UserSubscription, db
 from models.user import UserSession
 import bcrypt
@@ -29,7 +30,8 @@ def auth_required(f):
         print(f'[AUTH DEBUG] Token received: {token[:20]}...{token[-20:] if len(token) > 40 else ""}')
         
         try:
-            payload = jwt.decode(token, config.JWT_SECRET, algorithms=['HS256'])
+            jwt_secret = get_setting_secure('JWT_SECRET', config.JWT_SECRET)
+            payload = jwt.decode(token, jwt_secret, algorithms=['HS256'])
             print(f'[AUTH DEBUG] Token decoded successfully. User ID: {payload.get("user_id")}')
             user = User.query.get(payload['user_id'])
             

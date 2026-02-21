@@ -5,18 +5,19 @@ These endpoints don't start the scheduler but run jobs directly or enqueue them
 """
 from flask import Blueprint, jsonify, request
 import os
-from jobs.scheduler import queue_job
+from services.settings_service import get_setting_secure
 
 cron_bp = Blueprint('cron', __name__)
 
-# Secret token for cron requests - set in .env
-CRON_SECRET = os.getenv('CRON_SECRET', 'your-cron-secret-key')
+def get_cron_secret():
+    """Get cron secret token securely"""
+    return get_setting_secure('CRON_SECRET', 'your-cron-secret-key')
 
 
 def verify_cron_token():
     """Verify the cron secret token from request"""
     token = request.headers.get('X-Cron-Token') or request.args.get('token')
-    return token == CRON_SECRET
+    return token == get_cron_secret()
 
 
 @cron_bp.route('/stocks', methods=['GET', 'POST'])

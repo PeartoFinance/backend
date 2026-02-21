@@ -13,22 +13,23 @@ from dotenv import load_dotenv
 import threading
 from jinja2 import Template
 
-# Load environment variables
-load_dotenv()
+from services.settings_service import get_setting_secure
 
+# Email configuration from environment/DB
+def get_email_config():
+    return {
+        'host': get_setting_secure('SMTP_HOST', 'smtp.gmail.com'),
+        'port': int(get_setting_secure('SMTP_PORT', '587')),
+        'secure': str(get_setting_secure('SMTP_SECURE', 'false')).lower() == 'true',
+        'user': get_setting_secure('SMTP_USER', ''),
+        'password': get_setting_secure('SMTP_PASS', ''),
+        'from_name': get_setting_secure('EMAIL_FROM_NAME', 'Pearto Finance'),
+        'from_address': get_setting_secure('EMAIL_FROM_ADDRESS', 'noreply@pearto.com'),
+    }
 
-# Email configuration from environment
-EMAIL_CONFIG = {
-    'host': os.getenv('SMTP_HOST', 'smtp.gmail.com'),
-    'port': int(os.getenv('SMTP_PORT', '587')),
-    'secure': os.getenv('SMTP_SECURE', 'false').lower() == 'true',
-    'user': os.getenv('SMTP_USER', ''),
-    'password': os.getenv('SMTP_PASS', ''),
-    'from_name': os.getenv('EMAIL_FROM_NAME', 'Pearto Finance'),
-    'from_address': os.getenv('EMAIL_FROM_ADDRESS', 'noreply@pearto.com'),
-}
+def get_app_url():
+    return get_setting_secure('APP_URL', 'https://pearto.com')
 
-APP_URL = os.getenv('APP_URL', 'https://pearto.com')
 APP_NAME = 'Pearto Finance'
 
 
@@ -351,8 +352,17 @@ class EmailService:
     """Email service using Python smtplib (similar to PHP mail function)"""
     
     def __init__(self):
-        self.config = EMAIL_CONFIG
-        self.is_configured = bool(self.config['user'] and self.config['password'])
+        # We don't store config in __init__ anymore to allow dynamic updates
+        pass
+
+    @property
+    def config(self):
+        return get_email_config()
+
+    @property
+    def is_configured(self):
+        conf = self.config
+        return bool(conf['user'] and conf['password'])
     
     def _get_smtp_connection(self):
         """Create SMTP connection"""
@@ -369,9 +379,10 @@ class EmailService:
     
     def _render_template(self, template: str, data: Dict[str, Any]) -> str:
         """Replace template variables with actual values using Jinja2 (standalone)"""
+        app_url = get_app_url()
         data['app_name'] = APP_NAME
-        data['login_url'] = f"{APP_URL}/login"
-        data['security_url'] = f"{APP_URL}/profile?tab=devices"
+        data['login_url'] = f"{app_url}/login"
+        data['security_url'] = f"{app_url}/profile?tab=devices"
         
         try:
             return Template(template).render(**data)
@@ -489,7 +500,7 @@ def send_login_notification_email(user_email: str, user_name: str,
 
 def send_password_reset_email(user_email: str, user_name: str, reset_token: str) -> bool:
     """Send password reset email"""
-    reset_url = f"{APP_URL}/auth/reset-password?token={reset_token}"
+    reset_url = f"{get_app_url()}/auth/reset-password?token={reset_token}"
     return _email_service.send_email_async(user_email, 'forgot_password', {
         'user_name': user_name,
         'reset_url': reset_url,

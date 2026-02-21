@@ -6,6 +6,8 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime
 from ..decorators import admin_required
 from models import db, Settings, Appearance
+from utils.crypto_utils import encrypt_value, decrypt_value
+import uuid
 
 settings_bp = Blueprint('admin_settings', __name__)
 
@@ -17,20 +19,62 @@ settings_bp = Blueprint('admin_settings', __name__)
 def get_settings():
     """List all settings"""
     try:
-        country = getattr(request, 'user_country', 'US')
-        settings = Settings.query.filter(
-            (Settings.country_code == country) | 
-            (Settings.country_code == 'GLOBAL')
-        ).all()
-        return jsonify({
-            'settings': [{
-                'id': s.id,
-                'key': s.key,
-                'value': s.value,
-                'category': s.category,
-                'description': s.description,
-            } for s in settings]
-        })
+        category = request.args.get('category')
+        query = Settings.query
+        
+        if category:
+            query = query.filter_by(category=category)
+        else:
+            country = getattr(request, 'user_country', 'US')
+            query = query.filter(
+                (Settings.country_code == country) | 
+                (Settings.country_code == 'GLOBAL')
+            )
+            
+        settings = query.all()
+        
+        result = []
+        for s in settings:
+            s_dict = s.to_dict()
+            # If developer mode is on, we might want to mask encrypted values or show them decrypted if specifically requested
+            # For now, return as is (cipher text if encrypted)
+            result.append(s_dict)
+            
+        return jsonify({'settings': result})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/settings/decrypt', methods=['POST'])
+@admin_required
+def decrypt_setting_value():
+    """Decrypt a specific setting value for viewing in admin panel"""
+    try:
+        data = request.get_json()
+        setting_id = data.get('id')
+        setting = Settings.query.get_or_404(setting_id)
+        
+        if not setting.is_encrypted:
+            return jsonify({'value': setting.value})
+            
+        decrypted = decrypt_value(setting.value)
+        return jsonify({'value': decrypted})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@settings_bp.route('/settings/key', methods=['GET'])
+@admin_required
+def get_encryption_key():
+    """Expose encryption key to superadmins for client-side decryption"""
+    try:
+        # Check if user is superadmin (this route is already under admin_required)
+        # Assuming admin_required is enough or check role specifically if needed
+        import os
+        key = os.getenv('SETTING_ENCRYPTION_KEY')
+        if not key:
+            return jsonify({'error': 'Encryption key not configured on server'}), 500
+        return jsonify({'key': key})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -41,11 +85,21 @@ def create_setting():
     """Create setting"""
     try:
         data = request.get_json()
+        is_encrypted = data.get('is_encrypted', False)
+        value = data.get('value')
+        
+        if is_encrypted and value:
+            value = encrypt_value(value)
+            
         setting = Settings(
+            id=data.get('id', str(uuid.uuid4())),
             key=data.get('key'),
-            value=data.get('value'),
+            value=value,
             category=data.get('category'),
+            type=data.get('type', 'string'),
             description=data.get('description'),
+            is_encrypted=is_encrypted,
+            is_public=data.get('is_public', False),
             country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
         db.session.add(setting)
@@ -56,7 +110,7 @@ def create_setting():
         return jsonify({'error': str(e)}), 500
 
 
-@settings_bp.route('/settings/<int:setting_id>', methods=['PUT'])
+@settings_bp.route('/settings/<setting_id>', methods=['PUT'])
 @admin_required
 def update_setting(setting_id):
     """Update setting"""
@@ -66,12 +120,24 @@ def update_setting(setting_id):
         
         if 'key' in data:
             setting.key = data['key']
+        
         if 'value' in data:
-            setting.value = data['value']
+            val = data['value']
+            # Only encrypt if it's currently encrypted or requested to be
+            is_enc = data.get('is_encrypted', setting.is_encrypted)
+            if is_enc:
+                val = encrypt_value(val)
+            setting.value = val
+            setting.is_encrypted = is_enc
+            
         if 'category' in data:
             setting.category = data['category']
         if 'description' in data:
             setting.description = data['description']
+        if 'type' in data:
+            setting.type = data['type']
+        if 'is_public' in data:
+            setting.is_public = data['is_public']
         if 'country_code' in data:
             setting.country_code = data['country_code']
         

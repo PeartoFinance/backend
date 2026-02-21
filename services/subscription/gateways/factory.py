@@ -1,4 +1,5 @@
 import os
+from services.settings_service import get_setting_secure
 from .paypal import PayPalGateway
 from .stripe import StripeGateway
 
@@ -18,7 +19,7 @@ def get_payment_gateway(gateway_type=None):
     Args:
         gateway_type: 'paypal' or 'stripe'. If None, uses env var.
     """
-    gateway_type = (gateway_type or os.getenv('ACTIVE_PAYMENT_GATEWAY', 'paypal')).lower()
+    gateway_type = (gateway_type or get_setting_secure('ACTIVE_PAYMENT_GATEWAY', 'paypal')).lower()
 
     if gateway_type == 'paypal':
         return PayPalGateway()

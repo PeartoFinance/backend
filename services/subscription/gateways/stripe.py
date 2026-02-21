@@ -1,6 +1,7 @@
 import stripe
 import os
 from .base import PaymentGateway
+from services.settings_service import get_setting_secure
 
 # ==========================================================
 # STRIPE ADAPTER
@@ -14,13 +15,13 @@ from .base import PaymentGateway
 
 class StripeGateway(PaymentGateway):
     def __init__(self):
-        # Configure Stripe with secret key from environment
-        self.secret_key = os.getenv('STRIPE_SECRET_KEY')
-        stripe.api_key = self.secret_key
-        
         # Get return/cancel URLs
-        self.success_url = os.getenv('STRIPE_SUCCESS_URL', 'http://localhost:3000/subscription/success')
-        self.cancel_url = os.getenv('STRIPE_CANCEL_URL', 'http://localhost:3000/pricing')
+        self.success_url = get_setting_secure('STRIPE_SUCCESS_URL', 'http://localhost:3000/subscription/success')
+        self.cancel_url = get_setting_secure('STRIPE_CANCEL_URL', 'http://localhost:3000/pricing')
+
+    def _set_api_key(self):
+        """Fetch and set Stripe API key dynamically"""
+        stripe.api_key = get_setting_secure('STRIPE_SECRET_KEY')
 
     def create_order(self, plan_name, final_price, currency="USD", trial_days=None, plan_id=None):
         """
@@ -30,6 +31,7 @@ class StripeGateway(PaymentGateway):
         """
         try:
             # Convert price to cents (Stripe uses smallest currency unit)
+            self._set_api_key()
             amount_cents = int(float(final_price) * 100)
             
             if trial_days and trial_days > 0:
@@ -92,6 +94,7 @@ class StripeGateway(PaymentGateway):
         Handles both one-time payments and subscriptions (including trials).
         """
         try:
+            self._set_api_key()
             session = stripe.checkout.Session.retrieve(session_id)
             
             # Handle subscription mode (including trials)
@@ -133,6 +136,7 @@ class StripeGateway(PaymentGateway):
             return True, "One-time payment, no subscription to cancel"
             
         try:
+            self._set_api_key()
             stripe.Subscription.cancel(external_sub_id)
             return True, "Subscription cancelled"
         except stripe.error.StripeError as e:

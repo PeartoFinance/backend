@@ -8,10 +8,11 @@ All calls are cached in Redis to respect rate limits.
 
 import os
 import requests
+from services.settings_service import get_setting_secure
 from datetime import datetime
 from extensions import cache
 
-API_KEY = os.getenv('API_SPORTS_KEY')
+API_KEY = get_setting_secure('API_SPORTS_KEY')
 
 # Sport-key → API base URL mapping (matches SportsCategory.api_url)
 SPORT_URLS = {

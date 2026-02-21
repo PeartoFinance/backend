@@ -17,8 +17,23 @@ class Settings(db.Model):
     category = db.Column(db.String(100))
     description = db.Column(db.Text)
     is_public = db.Column(db.Boolean, default=False)
+    is_encrypted = db.Column(db.Boolean, default=False)
     country_code = db.Column(db.String(10))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'key': self.key,
+            'value': self.value,
+            'type': self.type,
+            'category': self.category,
+            'description': self.description,
+            'is_public': self.is_public,
+            'is_encrypted': self.is_encrypted,
+            'country_code': self.country_code,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 
 
 class Appearance(db.Model):

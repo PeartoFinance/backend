@@ -19,6 +19,7 @@ except ImportError:
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from config import config
+from services.settings_service import get_setting_secure
 from models.base import db
 from flask_migrate import Migrate
 from extensions import cache, compress, limiter, CACHE_REDIS_URL
@@ -269,22 +270,21 @@ with app.app_context():
     try:
         db.create_all()
         print("[OK] Database tables ready")
+        
+        # Initialize background job scheduler
+        # [PROD FIX] Moved inside __main__ so it starts in production (Gunicorn/UWSGI).
+        # This is required for the Sequential Queue and automatic alerts to function.
+        enable_scheduler = get_setting_secure('ENABLE_SCHEDULER', 'true').lower() == 'true'
+        if enable_scheduler:
+            # Logic to prevent double-starting in Flask debug mode (reloader)
+            is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+            if not config.DEBUG or is_reloader_process:
+                from jobs.scheduler import init_scheduler
+                init_scheduler(app)
+                status = "(debug mode)" if config.DEBUG else ""
+                print(f"[OK] Background scheduler started {status}")
     except Exception as e:
-        print(f"[WARNING] Database setup note: {e}")
-
-
-# Initialize background job scheduler
-# [PROD FIX] Moved outside __main__ so it starts in production (Gunicorn/UWSGI).
-# This is required for the Sequential Queue and automatic alerts to function.
-enable_scheduler = os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true'
-if enable_scheduler:
-    # Logic to prevent double-starting in Flask debug mode (reloader)
-    is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    if not config.DEBUG or is_reloader_process:
-        from jobs.scheduler import init_scheduler
-        init_scheduler(app)
-        status = "(debug mode)" if config.DEBUG else ""
-        print(f"[OK] Background scheduler started {status}")
+        print(f"[WARNING] Database setup/scheduler note: {e}")
 
 
 if __name__ == '__main__':

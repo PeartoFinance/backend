@@ -7,11 +7,13 @@ from datetime import datetime
 import uuid
 import os
 from routes.decorators import auth_required
+from services.settings_service import get_setting_secure
 from models import db, UserDocument
 
 documents_bp = Blueprint('documents', __name__)
 
-UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads/documents')
+def get_upload_folder():
+    return get_setting_secure('UPLOAD_FOLDER', 'uploads/documents')
 
 
 @documents_bp.route('', methods=['GET'])
@@ -49,10 +51,11 @@ def upload_document():
     filename = f"{uuid.uuid4()}.{ext}"
     
     # Ensure upload folder exists
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    upload_folder = get_upload_folder()
+    os.makedirs(upload_folder, exist_ok=True)
     
     # Save file
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    filepath = os.path.join(upload_folder, filename)
     file.save(filepath)
     
     # Create document record

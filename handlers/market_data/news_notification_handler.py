@@ -11,10 +11,13 @@ from handlers.email_service import _email_service
 import logging
 import os
 
+from services.settings_service import get_setting_secure
+
 logger = logging.getLogger(__name__)
 
-# Get app URL from environment, default to placeholder
-APP_URL = os.getenv('APP_URL', 'https://pearto.com')
+def get_app_url():
+    """Get APP_URL from settings with fallback"""
+    return get_setting_secure('APP_URL', 'https://pearto.com')
 
 
 def process_news_notifications() -> dict:
@@ -144,7 +147,7 @@ def send_user_notification(user: 'User', news_item: NewsItem, notif_prefs: 'User
     
     title = f"News: {news_item.title[:60]}"
     message = news_item.summary or news_item.title
-    news_url = f"{APP_URL}/news/{news_item.slug}" if news_item.slug else news_item.canonical_url
+    news_url = f"{get_app_url()}/news/{news_item.slug}" if news_item.slug else news_item.canonical_url
     
     # Step 1: Log the notification (always)
     logger.info(f"Sending news notification - User: {user.id}, News: {news_item.id}, Title: {news_item.title[:50]}")

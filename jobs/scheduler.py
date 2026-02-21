@@ -13,24 +13,28 @@ from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from flask import current_app
 
+from services.settings_service import get_setting_secure
+
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
 scheduler = None
 _app = None
 
-# Job configuration from environment
-JOB_CONFIG = {
-    'stocks_interval_minutes': int(os.getenv('JOB_STOCKS_INTERVAL', 15)),
-    'crypto_interval_minutes': int(os.getenv('JOB_CRYPTO_INTERVAL', 5)),
-    'indices_interval_minutes': int(os.getenv('JOB_INDICES_INTERVAL', 5)),
-    'commodities_interval_minutes': int(os.getenv('JOB_COMMODITIES_INTERVAL', 15)),
-    'watchlist_interval_seconds': int(os.getenv('JOB_WATCHLIST_INTERVAL', 60)),
-    'calendar_hour': int(os.getenv('JOB_CALENDAR_HOUR', 6)),  # 6 AM
-}
+def get_job_config():
+    """Get job configuration dynamically"""
+    return {
+        'stocks_interval_minutes': int(get_setting_secure('JOB_STOCKS_INTERVAL', 15)),
+        'crypto_interval_minutes': int(get_setting_secure('JOB_CRYPTO_INTERVAL', 5)),
+        'indices_interval_minutes': int(get_setting_secure('JOB_INDICES_INTERVAL', 5)),
+        'commodities_interval_minutes': int(get_setting_secure('JOB_COMMODITIES_INTERVAL', 15)),
+        'watchlist_interval_seconds': int(get_setting_secure('JOB_WATCHLIST_INTERVAL', 60)),
+        'calendar_hour': int(get_setting_secure('JOB_CALENDAR_HOUR', 6)),  # 6 AM
+    }
 
-# Cron mode: 'parallel' (standard) or 'sequential' (queue-based)
-CRON_MODE = os.getenv('CRON_MODE', 'parallel').lower()
+def get_cron_mode():
+    """Get cron mode dynamically"""
+    return get_setting_secure('CRON_MODE', 'parallel').lower()
 
 
 def init_scheduler(app=None):
@@ -79,7 +83,8 @@ def init_scheduler(app=None):
     _register_notification_jobs()
     
     # Register queue processor if in sequential mode
-    if CRON_MODE == 'sequential':
+    cron_mode = get_cron_mode()
+    if cron_mode == 'sequential':
         _register_queue_processor(app)
         logger.info("Scheduler initialized in SEQUENTIAL mode (database queue)")
     else:
@@ -96,7 +101,7 @@ def queue_job(func, job_name, *args, **kwargs):
     Wrapper to either run job immediately or queue it based on CRON_MODE.
     Usage: scheduler.add_job(lambda: queue_job(actual_func, 'job_name'), ...)
     """
-    if CRON_MODE == 'sequential':
+    if get_cron_mode() == 'sequential':
         # Define inner logic to run within context
         def _enqueue():
             try:
@@ -311,10 +316,11 @@ def _register_market_jobs():
     )
     
     # Stock updates
+    job_config = get_job_config()
     scheduler.add_job(
         lambda: queue_job(update_all_stocks, 'update_all_stocks'),
         'interval',
-        minutes=JOB_CONFIG['stocks_interval_minutes'],
+        minutes=job_config['stocks_interval_minutes'],
         start_date=start_date,
         id='update_stocks',
         name='Update Stock Prices',
@@ -325,7 +331,7 @@ def _register_market_jobs():
     scheduler.add_job(
         lambda: queue_job(update_all_crypto, 'update_all_crypto'),
         'interval',
-        minutes=JOB_CONFIG['crypto_interval_minutes'],
+        minutes=job_config['crypto_interval_minutes'],
         start_date=start_date,
         id='update_crypto',
         name='Update Crypto Prices',
@@ -336,7 +342,7 @@ def _register_market_jobs():
     scheduler.add_job(
         lambda: queue_job(update_all_indices, 'update_all_indices'),
         'interval',
-        minutes=JOB_CONFIG['indices_interval_minutes'],
+        minutes=job_config['indices_interval_minutes'],
         start_date=start_date,
         id='update_indices',
         name='Update Market Indices',
@@ -347,7 +353,7 @@ def _register_market_jobs():
     scheduler.add_job(
         lambda: queue_job(update_all_commodities, 'update_all_commodities'),
         'interval',
-        minutes=JOB_CONFIG['commodities_interval_minutes'],
+        minutes=job_config['commodities_interval_minutes'],
         start_date=start_date,
         id='update_commodities',
         name='Update Commodities',
@@ -358,7 +364,7 @@ def _register_market_jobs():
     scheduler.add_job(
         lambda: queue_job(update_earnings_calendar, 'update_earnings_calendar'),
         'cron',
-        hour=JOB_CONFIG['calendar_hour'],
+        hour=job_config['calendar_hour'],
         id='update_earnings',
         name='Update Earnings Calendar',
         replace_existing=True
@@ -368,7 +374,7 @@ def _register_market_jobs():
     scheduler.add_job(
         lambda: queue_job(update_dividends, 'update_dividends'),
         'cron',
-        hour=JOB_CONFIG['calendar_hour'],
+        hour=job_config['calendar_hour'],
         minute=30,
         id='update_dividends',
         name='Update Dividends',
@@ -400,10 +406,11 @@ def _register_notification_jobs():
     start_date = datetime.utcnow() + timedelta(minutes=2)
     
     # Watchlist price alerts
+    job_config = get_job_config()
     scheduler.add_job(
         lambda: queue_job(check_watchlist_alerts, 'check_watchlist_alerts'),
         'interval',
-        seconds=JOB_CONFIG['watchlist_interval_seconds'],
+        seconds=job_config['watchlist_interval_seconds'],
         start_date=start_date,
         id='check_watchlist',
         name='Check Watchlist Alerts',
@@ -498,7 +505,8 @@ def get_job_status():
     
     # If in sequential mode, also fetch pending queue stats
     queue_stats = {}
-    if CRON_MODE == 'sequential':
+    cron_mode = get_cron_mode()
+    if cron_mode == 'sequential':
         try:
             from models.cron_job import CronJob, JobStatus
             pending_count = CronJob.query.filter_by(status=JobStatus.PENDING).count()
@@ -515,7 +523,7 @@ def get_job_status():
     
     return {
         'status': 'running' if scheduler.running else 'stopped',
-        'mode': CRON_MODE,
+        'mode': get_cron_mode(),
         'jobs': jobs,
         'queue_stats': queue_stats,
         'timestamp': datetime.utcnow().isoformat()

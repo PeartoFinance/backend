@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from .base import PaymentGateway
+from services.settings_service import get_setting_secure
 
 # ==========================================================
 # PAYPAL ADAPTER
@@ -21,19 +22,15 @@ from .base import PaymentGateway
 
 class PayPalGateway(PaymentGateway):
     def __init__(self):
-        # We fetch credentials from environment variables for security
-        self.client_id = os.getenv('PAYPAL_CLIENT_ID')
-        self.secret = os.getenv('PAYPAL_SECRET')
-        
         # Determine if we are in Sandbox (testing) or Live mode
-        self.mode = os.getenv('PAYPAL_MODE', 'sandbox')
+        self.mode = get_setting_secure('PAYPAL_MODE', 'sandbox')
         if self.mode == 'live':
             self.base_url = "https://api-m.paypal.com"
         else:
             self.base_url = "https://api-m.sandbox.paypal.com"
         
-        self.return_url = os.getenv('PAYPAL_RETURN_URL')
-        self.cancel_url = os.getenv('PAYPAL_CANCEL_URL')
+        self.return_url = get_setting_secure('PAYPAL_RETURN_URL')
+        self.cancel_url = get_setting_secure('PAYPAL_CANCEL_URL')
 
     def _get_access_token(self):
         """
@@ -48,9 +45,12 @@ class PayPalGateway(PaymentGateway):
         data = {"grant_type": "client_credentials"}
         
         # PayPal uses 'Basic Auth' with (Client_ID:Secret) encoded in Base64
+        client_id = get_setting_secure('PAYPAL_CLIENT_ID')
+        secret = get_setting_secure('PAYPAL_SECRET')
+        
         response = requests.post(
             url, 
-            auth=(self.client_id, self.secret), 
+            auth=(client_id, secret), 
             headers=headers, 
             data=data
         )
@@ -258,7 +258,7 @@ class PayPalGateway(PaymentGateway):
         Handles both order-based payments and subscription activations.
         """
         # TESTING BYPASS: Allows testing DB logic without visiting the PayPal site
-        if os.getenv('PAYPAL_BYPASS_APPROVAL', 'false').lower() == 'true':
+        if get_setting_secure('PAYPAL_BYPASS_APPROVAL', 'false').lower() == 'true':
             print(f"[DEBUG] Bypassing PayPal Approval for Order: {order_id}")
             return {
                 'success': True,

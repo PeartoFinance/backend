@@ -13,16 +13,18 @@ from flask_limiter.util import get_remote_address
 cache = Cache()
 compress = Compress()
 
+from services.settings_service import get_setting_secure
+
 # Flask-Limiter: Use Redis in production for thread-safe rate limiting
 # Redis URL format: redis://:password@host:port/db
 # Production Redis: 127.0.0.1:38469 with password
-REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
-REDIS_HOST = os.getenv('REDIS_HOST', '127.0.0.1')
-REDIS_PORT = os.getenv('REDIS_PORT', '38469')
-REDIS_DB = os.getenv('REDIS_LIMITER_DB', '0')
-REDIS_CACHE_DB = os.getenv('REDIS_CACHE_DB', '1')  # Separate DB for cache
-REDIS_SOCKET_PATH = os.getenv('REDIS_SOCKET_PATH', '/home2/ashlya/.redis/redis.sock')
-REDIS_USE_SOCKET = os.getenv('REDIS_USE_SOCKET', 'false').lower() == 'true'
+REDIS_PASSWORD = get_setting_secure('REDIS_PASSWORD', '')
+REDIS_HOST = get_setting_secure('REDIS_HOST', '127.0.0.1')
+REDIS_PORT = get_setting_secure('REDIS_PORT', '38469')
+REDIS_DB = get_setting_secure('REDIS_LIMITER_DB', '0')
+REDIS_CACHE_DB = get_setting_secure('REDIS_CACHE_DB', '1')  # Separate DB for cache
+REDIS_SOCKET_PATH = get_setting_secure('REDIS_SOCKET_PATH', '/home2/ashlya/.redis/redis.sock')
+REDIS_USE_SOCKET = str(get_setting_secure('REDIS_USE_SOCKET', 'false')).lower() == 'true'
 
 # Build Redis URLs based on mode
 if REDIS_USE_SOCKET:
@@ -54,8 +56,8 @@ else:
     print(f"[Redis] Using TCP Connection: {REDIS_HOST}:{REDIS_PORT}")
     
     # Configure URLs for TCP
-    CACHE_REDIS_URL = os.getenv('CACHE_REDIS_URL', f'{REDIS_BASE_URL}/{REDIS_CACHE_DB}')
-    RATELIMIT_STORAGE_URL = os.getenv('RATELIMIT_STORAGE_URL', f'{REDIS_BASE_URL}/{REDIS_DB}')
+    CACHE_REDIS_URL = get_setting_secure('CACHE_REDIS_URL', f'{REDIS_BASE_URL}/{REDIS_CACHE_DB}')
+    RATELIMIT_STORAGE_URL = get_setting_secure('RATELIMIT_STORAGE_URL', f'{REDIS_BASE_URL}/{REDIS_DB}')
 
 # Suppress the production warning when using memory storage intentionally
 if RATELIMIT_STORAGE_URL == 'memory://':
