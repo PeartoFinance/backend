@@ -390,21 +390,37 @@ class Role(db.Model):
         'content',
         'educational',
         'news_media',
-        'events_jobs',
+        'live_sports',      # Granular
+        'sports_config',    # Granular
+        'events_jobs',      # Will be used as 'jobs' in UI for consistency
         'help_center',
         'users_access',
+        'users_view',       # Granular
+        'roles_management', # Granular
+        'subscriptions_view', # Granular
         'bookings',
         'business',
+        'vendors_manage',   # Granular
+        'sellers_manage',   # Granular
+        'seller_applications', # Granular
         'financial',
+        'transactions_view', # Granular
+        'deposits_manage',   # Granular
+        'withdrawals_manage', # Granular
         'market_data',
         'business_profiles',
         'marketing',
         'communications',
         'ai_features',
+        'ai_agent',          # Granular
+        'ai_content_writer', # Granular
         'system',
+        'system_tools',      # Granular
+        'system_tasks',      # Granular
+        'system_scheduler',  # Granular
+        'system_audit',      # Granular
         'apis_integration',
         'configuration',
-        'roles_management',  # Only for superadmin
     ]
     
     def to_dict(self):
