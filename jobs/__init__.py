@@ -3,7 +3,7 @@ Jobs Package - Background Task Scheduling
 Uses APScheduler for periodic market data updates and notifications
 """
 
-from .scheduler import init_scheduler, scheduler, get_job_status
+from .scheduler import init_scheduler, scheduler, get_job_status, queue_job
 from .market_jobs import (
     update_all_stocks,
     update_all_crypto,
@@ -24,6 +24,7 @@ __all__ = [
     'init_scheduler',
     'scheduler',
     'get_job_status',
+    'queue_job',
     'update_all_stocks',
     'update_all_crypto',
     'update_all_indices',

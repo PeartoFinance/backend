@@ -6,6 +6,7 @@ These endpoints don't start the scheduler but run jobs directly or enqueue them
 from flask import Blueprint, jsonify, request
 import os
 from services.settings_service import get_setting_secure
+from jobs import queue_job
 
 cron_bp = Blueprint('cron', __name__)
 

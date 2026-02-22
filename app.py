@@ -274,7 +274,8 @@ with app.app_context():
         # Initialize background job scheduler
         # [PROD FIX] Moved inside __main__ so it starts in production (Gunicorn/UWSGI).
         # This is required for the Sequential Queue and automatic alerts to function.
-        enable_scheduler = get_setting_secure('ENABLE_SCHEDULER', 'true').lower() == 'true'
+        enable_scheduler_val = get_setting_secure('ENABLE_SCHEDULER', 'true')
+        enable_scheduler = str(enable_scheduler_val).lower() == 'true'
         if enable_scheduler:
             # Logic to prevent double-starting in Flask debug mode (reloader)
             is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'

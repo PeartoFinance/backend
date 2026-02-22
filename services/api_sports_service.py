@@ -52,7 +52,8 @@ class APISportsService:
             
         return {
             'x-rapidapi-host': host,
-            'x-rapidapi-key': api_key
+            'x-rapidapi-key': api_key,
+            'x-apisports-key': api_key  # Direct API-Sports header
         }
 
     @classmethod
