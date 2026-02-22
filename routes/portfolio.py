@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import desc
 import uuid
 from routes.decorators import auth_required
-from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, UserInvestmentGoal, FinancialGoal
+from models import db, Watchlist, WatchlistItem, UserPortfolio, PortfolioHolding, MarketData, CommodityData, MarketIndices, UserInvestmentGoal, FinancialGoal
 from utils.validators import safe_int
 
 from services.portfolio_service import calculate_portfolio_health
@@ -133,10 +133,11 @@ def get_watchlist():
             'price': float(m.price) if m.price else 0,
             'change': float(m.change) if m.change else 0,
             'changePercent': float(m.change_percent) if m.change_percent else 0,
-            'updated': m.last_updated
+            'updated': m.last_updated,
+            'assetType': m.asset_type
         }
     
-    # Process Commodities (if not already found)
+    # Process Commodities
     for c in commodity_items:
         sym = c.symbol.strip().upper()
         if sym not in market_map:
@@ -145,10 +146,11 @@ def get_watchlist():
                 'price': float(c.price) if c.price else 0,
                 'change': float(c.change) if c.change else 0,
                 'changePercent': float(c.change_percent) if c.change_percent else 0,
-                'updated': c.last_updated
+                'updated': c.last_updated,
+                'assetType': 'commodity'
             }
 
-    # Process Indices (if not already found)
+    # Process Indices
     for i in index_items:
         sym = i.symbol.strip().upper()
         if sym not in market_map:
@@ -157,7 +159,8 @@ def get_watchlist():
                 'price': float(i.price) if i.price else 0,
                 'change': float(i.change_amount) if i.change_amount else 0,
                 'changePercent': float(i.change_percent) if i.change_percent else 0,
-                'updated': i.last_updated
+                'updated': i.last_updated,
+                'assetType': 'index'
             }
 
     result = []
@@ -167,11 +170,12 @@ def get_watchlist():
         if m:
             result.append({
                 'id': i + 1,
-                'symbol': sym, # Keep original casing for symbol
+                'symbol': sym,
                 'name': m['name'],
                 'price': m['price'],
                 'change': m['change'],
                 'changePercent': m['changePercent'],
+                'assetType': m['assetType'],
                 'addedAt': m['updated'].isoformat() if m['updated'] else None
             })
         else:
@@ -182,6 +186,7 @@ def get_watchlist():
                 'price': None,
                 'change': None,
                 'changePercent': None,
+                'assetType': 'stock',  # Default fallback
                 'addedAt': None
             })
 
