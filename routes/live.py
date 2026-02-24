@@ -108,6 +108,7 @@ def get_live_quotes():
 
 
 @live_bp.route('/intraday/<symbol>', methods=['GET'])
+@cache.cached(timeout=CACHE_TIMEOUT_LIVE, query_string=True)
 @limiter.limit("20 per minute")
 def get_live_intraday(symbol):
     """

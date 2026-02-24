@@ -469,16 +469,30 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     existing.last_updated = datetime.utcnow()
                     updated += 1
                 else:
-                    # For new stocks, we still need full info once
+                    # For new symbols, we must fetch full metadata to determine asset type
                     full_quote = get_stock_quote(symbol)
                     if full_quote:
+                        # [SMART FIX] Better Asset Type Detection
+                        # Yahoo doesn't always provide quoteType in bulk, so we verify here
+                        q_type = (full_quote.get('quoteType') or '').upper()
+                        if q_type == 'CRYPTOCURRENCY' or '-USD' in symbol:
+                            final_asset_type = 'crypto'
+                        elif q_type == 'ETF':
+                            final_asset_type = 'etf'
+                        elif q_type in ('INDEX', 'CURRENCY'):
+                            final_asset_type = 'index' # Grouping for backend logic consistency
+                        elif '=F' in symbol:
+                            final_asset_type = 'commodity'
+                        else:
+                            final_asset_type = 'stock'
+
                         new_stock = MarketData(
                             symbol=symbol,
                             name=full_quote.get('name', symbol),
                             price=full_quote.get('price', 0),
                             change=full_quote.get('change', 0),
                             change_percent=full_quote.get('changePercent', 0),
-                            asset_type='etf' if full_quote.get('quoteType') == 'ETF' else 'stock',
+                            asset_type=final_asset_type,
                             country_code=country_code,
                             is_listed=True,
                             currency=full_quote.get('currency', 'USD'),

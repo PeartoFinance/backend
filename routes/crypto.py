@@ -107,10 +107,14 @@ def get_coin(symbol):
     return jsonify(crypto.to_dict())
 
 
+# In-memory cache for historical data (Speed optimization)
+history_cache = {}
+
 @crypto_bp.route('/history/<symbol>', methods=['GET'])
 def get_history(symbol):
     """Get cryptocurrency historical data"""
     from handlers.market_data.crypto_handler import get_crypto_history
+    import time
     
     symbol = symbol.upper()
     period = request.args.get('period', '1mo')
@@ -123,9 +127,27 @@ def get_history(symbol):
         if 'y' in period or 'max' in period:
             period = '1mo'
     
+    # 1. Check In-Memory Cache first (Consistent with stocks.py performance)
+    cache_key = f"{symbol}_{period}_{interval}"
+    now = time.time()
+    if cache_key in history_cache:
+        cache_time, cached_data = history_cache[cache_key]
+        if now - cache_time < 300:  # 5 minute cache
+            return jsonify({
+                'symbol': symbol,
+                'period': period,
+                'interval': interval,
+                'data': cached_data,
+                'source': 'memory_cache'
+            })
+            
     try:
         history = get_crypto_history(symbol, period=period, interval=interval)
         
+        # Save to memory cache for next user
+        if history:
+            history_cache[cache_key] = (now, history)
+            
         return jsonify({
             'symbol': symbol,
             'period': period,
