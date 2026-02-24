@@ -16,10 +16,14 @@ from utils.validators import safe_int
 market_bp = Blueprint('market', __name__)
 
 
+# In-memory cache for historical data (Speed optimization)
+history_cache = {}
+
 @market_bp.route('/forex/history/<path:symbol>', methods=['GET'])
 @cache.cached(timeout=300, query_string=True)
 def get_forex_pair_history(symbol):
     """Get historical data for a forex pair"""
+    import time
     # Normalize symbol: USD/NPR → USDNPR, USD-NPR → USDNPR
     symbol = symbol.replace('/', '').replace('-', '').upper()
     period = request.args.get('period', '1mo')
@@ -33,7 +37,21 @@ def get_forex_pair_history(symbol):
         if 'y' in period or 'max' in period:
             period = '1mo'
 
-    return jsonify(get_forex_history(symbol, period, interval))
+    # 1. Check In-Memory Cache first (Fastest response)
+    cache_key = f"{symbol}_{period}_{interval}"
+    now = time.time()
+    if cache_key in history_cache:
+        cache_time, cached_data = history_cache[cache_key]
+        if now - cache_time < 300:  # 5 minute cache
+            return jsonify(cached_data)
+
+    data = get_forex_history(symbol, period, interval)
+    
+    # Save to memory cache for next user
+    if data:
+        history_cache[cache_key] = (now, data)
+        
+    return jsonify(data)
 
 
 @market_bp.route('/calendar', methods=['GET'])

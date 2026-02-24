@@ -79,6 +79,20 @@ def search_stocks():
             
             for q in yahoo_results.get('quotes', []):
                 sym = q.get('symbol', '').upper()
+                q_type = (q.get('quoteType') or '').upper()
+                
+                # [SMART DETECTION] Determine likely asset type from Yahoo properties
+                if q_type == 'CRYPTOCURRENCY' or '-USD' in sym:
+                    detected_type = 'crypto'
+                elif q_type == 'ETF':
+                    detected_type = 'etf'
+                elif q_type in ('INDEX', 'CURRENCY'):
+                    detected_type = 'index'
+                elif '=F' in sym:
+                    detected_type = 'commodity'
+                else:
+                    detected_type = 'stock'
+
                 # Only add if not already in results and looks like a valid stock
                 if sym and sym not in existing_symbols:
                     results.append({
@@ -89,7 +103,7 @@ def search_stocks():
                         'changePercent': None,
                         'currency': 'USD',
                         'exchange': q.get('exchange'),
-                        'asset_type': 'stock',
+                        'asset_type': detected_type,
                         'is_discovery': True, # Frontend can show "Click to Load" badge
                         'country_code': 'GLOBAL'
                     })
@@ -118,21 +132,34 @@ def get_profile(symbol):
     
     # 2. If not found, try to auto-import from Yahoo Finance (Live Discovery)
     if not stock:
-        try:
-            from handlers.market_data.stock_handler import import_stocks_to_db
-            # Import as GLOBAL so everyone can see it
-            import_stocks_to_db([symbol], country_code='GLOBAL')
-        except Exception as e:
-            # If race condition (duplicate entry), just ignore and query again
-            print(f"Auto-import note for {symbol}: {e}")
+        # [CRITICAL FIX] "Thundering Herd" Protection
+        # We use a short-lived cache key as a 'lock' to prevent multiple requests 
+        # from hitting Yahoo at the same millisecond for the same new symbol.
+        lock_key = f"discovery_lock_{symbol}"
+        if not cache.get(lock_key):
+            # No one is currently fetching this, so let's mark it as 'fetching' for 10 seconds
+            cache.set(lock_key, True, timeout=10)
+            try:
+                from handlers.market_data.stock_handler import import_stocks_to_db
+                # Import as GLOBAL so everyone can see it
+                import_stocks_to_db([symbol], country_code='GLOBAL')
+            except Exception as e:
+                # If race condition (duplicate entry), just ignore and query again
+                print(f"Auto-import note for {symbol}: {e}")
+        else:
+            # Another request is already fetching this symbol.
+            # We wait a tiny bit (500ms) so the first request has time to finish saving to DB.
+            import time
+            time.sleep(0.5)
             
-        # Query again - whether we added it or someone else did
+        # Final query attempt - whether we added it or the parallel request did
         stock = MarketData.query.filter(
             MarketData.symbol == symbol,
             filter_condition
         ).first()
     
     if not stock:
+        # If still not found after discovery attempt, it's truly missing
         return jsonify({'error': 'Stock not found'}), 404
     
     data = stock.to_dict()
