@@ -116,6 +116,13 @@ def get_history(symbol):
     period = request.args.get('period', '1mo')
     interval = request.args.get('interval', '1d')
     
+    # SMART VALIDATION: Yahoo Finance intraday limits (1m = max 7 days)
+    if interval == '1m' and period not in ('1d', '5d', '7d'):
+        period = '1d' # Ensure 1-min charts load by defaulting to 1-day period
+    elif interval in ('2m', '5m', '15m', '30m', '90m') and period not in ('1d', '5d', '1mo'):
+        if 'y' in period or 'max' in period:
+            period = '1mo'
+    
     try:
         history = get_crypto_history(symbol, period=period, interval=interval)
         
