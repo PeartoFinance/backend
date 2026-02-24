@@ -425,6 +425,14 @@ def get_history(symbol):
         period = request.args.get('period', '1mo')
         interval = request.args.get('interval', '1d')
         
+        # SMART VALIDATION: Yahoo Finance limits 1m data to 7 days, and 2m-90m data to 60 days.
+        # If the frontend asks for a period that doesn't exist for that interval, Yahoo returns 404.
+        if interval == '1m' and period not in ('1d', '5d', '7d'):
+            period = '1d' # Auto-adjust to 1 day if 1-minute interval is selected
+        elif interval in ('2m', '5m', '15m', '30m', '90m') and period not in ('1d', '5d', '1mo'):
+            if 'y' in period or 'max' in period: # If user tried to get years of intraday data
+                period = '1mo' # Max reliable period for these intervals
+        
         # 1. Check In-Memory Cache first (Fastest, handles 1000s of users)
         cache_key = f"{symbol}_{period}_{interval}"
         now = time.time()
