@@ -110,6 +110,7 @@ def update_all_stocks() -> Dict[str, Any]:
 def update_all_crypto() -> Dict[str, Any]:
     """
     Update all cryptocurrency prices from yfinance.
+    Fetches ALL cryptos in the database, plus the default TOP_CRYPTOS list.
     """
     from models import db
     
@@ -117,12 +118,20 @@ def update_all_crypto() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from models import MarketData
         from handlers.market_data import import_cryptos_to_db, TOP_CRYPTOS
         
         app = get_app()
         with app.app_context():
+            # Get all crypto symbols already in the database
+            db_cryptos = MarketData.query.filter_by(asset_type='crypto').all()
+            db_symbols = [c.symbol for c in db_cryptos]
+            
+            # Merge DB cryptos with default TOP_CRYPTOS (dedup)
+            all_cryptos = list(set(db_symbols + TOP_CRYPTOS))
+            
             # Crypto is always GLOBAL
-            result = import_cryptos_to_db(TOP_CRYPTOS)
+            result = import_cryptos_to_db(all_cryptos)
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Crypto update complete: {result.get('updated', 0)} updated in {elapsed:.1f}s")
@@ -145,6 +154,7 @@ def update_all_crypto() -> Dict[str, Any]:
 def update_all_indices() -> Dict[str, Any]:
     """
     Update all market indices from yfinance.
+    Fetches ALL indices in the database, plus the default MAJOR_INDICES list.
     """
     from models import db
     
@@ -152,11 +162,18 @@ def update_all_indices() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from models import MarketData
         from handlers.market_data import import_indices_to_db, MAJOR_INDICES
         
         app = get_app()
         with app.app_context():
-            symbols = list(MAJOR_INDICES.keys())
+            # Get all index symbols already in the database
+            db_indices = MarketData.query.filter_by(asset_type='index').all()
+            db_symbols = [i.symbol for i in db_indices]
+            
+            # Merge DB indices with default MAJOR_INDICES (dedup)
+            symbols = list(set(db_symbols + list(MAJOR_INDICES.keys())))
+            
             result = import_indices_to_db(symbols, country_code='GLOBAL')
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
@@ -180,6 +197,7 @@ def update_all_indices() -> Dict[str, Any]:
 def update_all_commodities() -> Dict[str, Any]:
     """
     Update all commodity prices from yfinance.
+    Fetches ALL commodities in the database, plus the default COMMODITIES list.
     """
     from models import db
     
@@ -187,11 +205,18 @@ def update_all_commodities() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from models import MarketData
         from handlers.market_data import import_commodities_to_db, COMMODITIES
         
         app = get_app()
         with app.app_context():
-            symbols = list(COMMODITIES.keys())
+            # Get all commodity symbols already in the database
+            db_commodities = MarketData.query.filter_by(asset_type='commodity').all()
+            db_symbols = [c.symbol for c in db_commodities]
+            
+            # Merge DB commodities with default COMMODITIES (dedup)
+            symbols = list(set(db_symbols + list(COMMODITIES.keys())))
+            
             result = import_commodities_to_db(symbols, country_code='GLOBAL')
             
             elapsed = (datetime.utcnow() - start_time).total_seconds()
@@ -249,11 +274,19 @@ def update_dividends() -> Dict[str, Any]:
     logger.info("Starting dividends update job")
     
     try:
+        from models import MarketData
         from handlers.market_data import import_dividends_to_db, DIVIDEND_STOCKS
         
         app = get_app()
         with app.app_context():
-            result = import_dividends_to_db(DIVIDEND_STOCKS)
+            # Get all stock symbols in the database
+            db_stocks = MarketData.query.filter_by(asset_type='stock').all()
+            db_symbols = [s.symbol for s in db_stocks]
+            
+            # Merge DB stocks with default DIVIDEND_STOCKS (dedup)
+            all_symbols = list(set(db_symbols + DIVIDEND_STOCKS))
+            
+            result = import_dividends_to_db(all_symbols)
             logger.info(f"Dividends update complete: {result}")
             return {'status': 'ok', **result}
     except Exception as e:
@@ -284,8 +317,8 @@ def update_business_profiles() -> Dict[str, Any]:
         
         app = get_app()
         with app.app_context():
-            # Only update stocks that are approved for the public directory
-            listed_stocks = MarketData.query.filter_by(is_listed=True, asset_type='stock').all()
+            # Update ALL stocks in the database (not just is_listed)
+            listed_stocks = MarketData.query.filter_by(asset_type='stock').all()
             symbols = [s.symbol for s in listed_stocks]
             
             if not symbols:
@@ -346,12 +379,12 @@ def update_financials() -> Dict[str, Any]:
         
         app = get_app()
         with app.app_context():
-            # Get all listed stocks
-            listed_stocks = MarketData.query.filter_by(is_listed=True, asset_type='stock').all()
+            # Get ALL stocks in the database (not just is_listed)
+            listed_stocks = MarketData.query.filter_by(asset_type='stock').all()
             symbols = [s.symbol for s in listed_stocks]
             
             if not symbols:
-                logger.info("No listed stocks to update financials")
+                logger.info("No stocks to update financials")
                 return {'status': 'ok', 'updated': 0}
             
             success_count = 0
@@ -440,10 +473,8 @@ def update_all_forecasts() -> Dict[str, Any]:
         
         app = get_app()
         with app.app_context():
-            # Original route logic limited to 50, keeping that for now or removing limit? 
-            # Route said: stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all()
-            # Let's keep consistency but maybe we should update ALL eventually.
-            listed_stocks = MarketData.query.filter_by(asset_type='stock').limit(50).all() 
+            # Fetch ALL stocks — no limit, so every stock gets forecast data
+            listed_stocks = MarketData.query.filter_by(asset_type='stock').all()
             symbols = [s.symbol for s in listed_stocks]
             
             if not symbols:

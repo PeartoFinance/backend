@@ -215,6 +215,7 @@ def cron_all_market():
             update_all_commodities,
             update_business_profiles,
             update_all_forex,
+            update_all_forecasts,
         )
         
         # Enqueue individual jobs so they run sequentially in the worker
@@ -225,6 +226,7 @@ def cron_all_market():
         queue_job(update_earnings_calendar, 'update_earnings_calendar')
         queue_job(update_business_profiles, 'update_business_profiles')
         queue_job(update_all_forex, 'update_all_forex')
+        queue_job(update_all_forecasts, 'update_all_forecasts')
         
         return jsonify({'ok': True, 'message': 'All market jobs triggered/queued'})
     except Exception as e:

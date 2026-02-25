@@ -231,13 +231,25 @@ def get_stock_forecast(symbol):
     - Analyst consensus (Strong Buy/Buy/Hold/Sell counts)
     - Earnings estimates (Revenue & EPS projections)
     - Recommendation trends (historical ratings by month)
+    
+    If no forecast data exists in the DB, auto-syncs from Yahoo Finance.
     """
     symbol = symbol.upper()
-    from handlers.market_data.forecast_handler import get_detailed_forecast
+    from handlers.market_data.forecast_handler import get_detailed_forecast, sync_forecast_data
     
     forecast = get_detailed_forecast(symbol)
     if not forecast or (not forecast.get('priceTarget', {}).get('mean') and not forecast.get('earningsEstimates', {}).get('annual')):
-        return jsonify({'error': 'Forecast data not found. Try syncing from admin panel.'}), 404
+        # No data in DB — try to fetch from Yahoo Finance on-demand
+        try:
+            sync_result = sync_forecast_data(symbol)
+            if sync_result.get('status') == 'success':
+                forecast = get_detailed_forecast(symbol)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"On-demand forecast sync failed for {symbol}: {e}")
+    
+    if not forecast or (not forecast.get('priceTarget', {}).get('mean') and not forecast.get('earningsEstimates', {}).get('annual')):
+        return jsonify({'error': 'No forecast data available for this symbol. Analyst coverage may not exist.'}), 404
         
     return jsonify(forecast)
 

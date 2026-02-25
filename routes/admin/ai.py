@@ -419,3 +419,281 @@ Content: {content[:2000]}"""
         return jsonify({'error': str(e)}), 500
     finally:
         loop.close()
+
+
+# ============================================================================
+# BOOYAH AI PREDICTION
+# ============================================================================
+
+@ai_bp.route('/booyah/predict', methods=['POST'])
+@admin_required
+def booyah_predict():
+    """
+    Generate AI-powered stock/crypto prediction.
+    Gathers market data, analyst forecasts, and news,
+    then sends to AI for comprehensive prediction analysis.
+    """
+    import asyncio
+    from services.ai_service import ai_service
+    from models import MarketData, News
+
+    data = request.get_json() or {}
+    symbol = (data.get('symbol') or '').strip().upper()
+    timeframe = data.get('timeframe', '1month')  # 1week, 1month, 3months, 6months, 1year
+
+    if not symbol:
+        return jsonify({'error': 'Symbol is required'}), 400
+
+    try:
+        # 1. Fetch market data
+        stock = MarketData.query.filter(
+            MarketData.symbol == symbol
+        ).first()
+
+        if not stock:
+            return jsonify({'error': f'Symbol {symbol} not found in database. Import it first from Market Data.'}), 404
+
+        market_data = {
+            'symbol': stock.symbol,
+            'name': stock.name,
+            'price': float(stock.price) if stock.price else 0,
+            'change': float(stock.change) if stock.change else 0,
+            'changePercent': float(stock.change_percent) if stock.change_percent else 0,
+            'volume': stock.volume,
+            'marketCap': stock.market_cap,
+            'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
+            'eps': float(stock.eps) if stock.eps else None,
+            'beta': float(stock.beta) if stock.beta else None,
+            'high52w': float(stock._52_week_high) if stock._52_week_high else None,
+            'low52w': float(stock._52_week_low) if stock._52_week_low else None,
+            'dividendYield': float(stock.dividend_yield) if stock.dividend_yield else None,
+            'sector': stock.sector,
+            'industry': stock.industry,
+            'assetType': stock.asset_type,
+        }
+
+        # 2. Fetch analyst forecasts if available
+        forecast_data = {}
+        try:
+            from models.market import AnalystRecommendation
+            rec = AnalystRecommendation.query.filter_by(symbol=symbol).order_by(
+                AnalystRecommendation.date.desc()
+            ).first()
+            if rec:
+                forecast_data = {
+                    'targetHigh': float(rec.target_high) if rec.target_high else None,
+                    'targetLow': float(rec.target_low) if rec.target_low else None,
+                    'targetMean': float(rec.target_mean) if rec.target_mean else None,
+                    'strongBuy': rec.strong_buy,
+                    'buy': rec.buy,
+                    'hold': rec.hold,
+                    'sell': rec.sell,
+                    'strongSell': rec.strong_sell,
+                    'latestFirm': rec.firm,
+                    'latestAction': rec.action,
+                    'latestGrade': rec.to_grade,
+                }
+        except Exception:
+            pass
+
+        # 3. Fetch recent news
+        recent_news = []
+        try:
+            news_items = News.query.filter(
+                News.title.ilike(f'%{symbol}%') | News.title.ilike(f'%{stock.name}%')
+            ).order_by(News.published_at.desc()).limit(5).all()
+            recent_news = [
+                {'title': n.title, 'source': n.source, 'date': n.published_at.isoformat() if n.published_at else None}
+                for n in news_items
+            ]
+        except Exception:
+            pass
+
+        # 4. Build comprehensive AI prompt
+        prompt = f"""You are Pearto AI's Booyah Prediction Engine. Analyze {symbol} ({stock.name}) and provide a STRUCTURED prediction.
+
+MARKET DATA:
+- Current Price: ${market_data['price']:.2f}
+- Change Today: {market_data['changePercent']:.2f}%
+- Volume: {market_data['volume'] or 'N/A'}
+- Market Cap: {market_data['marketCap'] or 'N/A'}
+- P/E Ratio: {market_data['peRatio'] or 'N/A'}
+- EPS: {market_data['eps'] or 'N/A'}
+- Beta: {market_data['beta'] or 'N/A'}
+- 52W High: {market_data['high52w'] or 'N/A'}
+- 52W Low: {market_data['low52w'] or 'N/A'}
+- Sector: {market_data['sector'] or 'N/A'}
+- Asset Type: {market_data['assetType'] or 'stock'}
+
+ANALYST DATA: {json.dumps(forecast_data) if forecast_data else 'Not available'}
+
+RECENT NEWS: {json.dumps(recent_news) if recent_news else 'No recent news'}
+
+TIMEFRAME: {timeframe}
+
+Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact structure:
+{{
+    "signal": "STRONG_BUY" or "BUY" or "HOLD" or "SELL" or "STRONG_SELL",
+    "confidence": 0-100,
+    "sentiment": "BULLISH" or "BEARISH" or "NEUTRAL",
+    "sentimentScore": -100 to 100,
+    "riskLevel": "LOW" or "MEDIUM" or "HIGH" or "VERY_HIGH",
+    "riskScore": 0-100,
+    "priceTargets": {{
+        "shortTerm": {{"price": number, "label": "1 Week"}},
+        "midTerm": {{"price": number, "label": "1 Month"}},
+        "longTerm": {{"price": number, "label": "3 Months"}}
+    }},
+    "technicalIndicators": [
+        {{"name": "RSI", "value": "number or text", "signal": "BUY" or "SELL" or "NEUTRAL"}},
+        {{"name": "MACD", "value": "text", "signal": "BUY" or "SELL" or "NEUTRAL"}},
+        {{"name": "Moving Avg (50)", "value": "text", "signal": "BUY" or "SELL" or "NEUTRAL"}},
+        {{"name": "Moving Avg (200)", "value": "text", "signal": "BUY" or "SELL" or "NEUTRAL"}},
+        {{"name": "Bollinger Bands", "value": "text", "signal": "BUY" or "SELL" or "NEUTRAL"}}
+    ],
+    "keyFactors": [
+        {{"factor": "short description", "impact": "POSITIVE" or "NEGATIVE" or "NEUTRAL"}}
+    ],
+    "summary": "2-3 sentence prediction summary",
+    "detailedAnalysis": "4-6 sentence detailed analysis with reasoning"
+}}"""
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                ai_service.chat(prompt, {'page_type': 'prediction'}, {'max_tokens': 1500, 'temperature': 0.3})
+            )
+            ai_response = result.get('response', '')
+
+            # Parse JSON from AI response
+            prediction = None
+            try:
+                # Try direct parse
+                prediction = json.loads(ai_response)
+            except json.JSONDecodeError:
+                # Try extracting JSON from response
+                import re
+                json_match = re.search(r'\{[\s\S]*\}', ai_response)
+                if json_match:
+                    try:
+                        prediction = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass
+
+            if not prediction:
+                return jsonify({
+                    'error': 'AI returned invalid prediction format',
+                    'rawResponse': ai_response[:500]
+                }), 500
+
+            # Add metadata
+            prediction['symbol'] = symbol
+            prediction['name'] = stock.name
+            prediction['assetType'] = stock.asset_type
+            prediction['currentPrice'] = market_data['price']
+            prediction['marketData'] = market_data
+            prediction['analystData'] = forecast_data
+            prediction['recentNews'] = recent_news
+            prediction['timeframe'] = timeframe
+            prediction['generatedAt'] = datetime.utcnow().isoformat()
+            prediction['provider'] = result.get('provider', 'SathiAI')
+
+            log_audit('BOOYAH_PREDICT', 'prediction', symbol, {
+                'signal': prediction.get('signal'),
+                'confidence': prediction.get('confidence'),
+                'timeframe': timeframe
+            })
+
+            return jsonify(prediction)
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ai_bp.route('/booyah/quick-scan', methods=['POST'])
+@admin_required
+def booyah_quick_scan():
+    """
+    Quick AI scan of multiple symbols for rapid signal overview.
+    """
+    import asyncio
+    from services.ai_service import ai_service
+    from models import MarketData
+
+    data = request.get_json() or {}
+    symbols = data.get('symbols', [])
+
+    if not symbols or len(symbols) > 20:
+        return jsonify({'error': 'Provide 1-20 symbols'}), 400
+
+    results = []
+    for sym in symbols:
+        sym = sym.strip().upper()
+        stock = MarketData.query.filter(MarketData.symbol == sym).first()
+        if stock:
+            results.append({
+                'symbol': stock.symbol,
+                'name': stock.name,
+                'price': float(stock.price) if stock.price else 0,
+                'change': float(stock.change) if stock.change else 0,
+                'changePercent': float(stock.change_percent) if stock.change_percent else 0,
+                'volume': stock.volume,
+                'marketCap': stock.market_cap,
+                'sector': stock.sector,
+            })
+
+    if not results:
+        return jsonify({'error': 'No matching symbols found'}), 404
+
+    # Build AI prompt for quick scan
+    symbols_text = '\n'.join([
+        f"- {r['symbol']}: ${r['price']:.2f} ({r['changePercent']:+.2f}%), Vol: {r['volume'] or 'N/A'}"
+        for r in results
+    ])
+
+    prompt = f"""Quick market scan. For each symbol, give a 1-word signal and confidence.
+
+{symbols_text}
+
+Respond ONLY with valid JSON array (no markdown):
+[{{"symbol": "AAPL", "signal": "BUY", "confidence": 75, "reason": "short reason"}}]"""
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(
+            ai_service.chat(prompt, {'page_type': 'prediction'}, {'max_tokens': 800, 'temperature': 0.3})
+        )
+        ai_response = result.get('response', '')
+
+        try:
+            import re
+            json_match = re.search(r'\[[\s\S]*\]', ai_response)
+            if json_match:
+                signals = json.loads(json_match.group())
+            else:
+                signals = json.loads(ai_response)
+        except json.JSONDecodeError:
+            signals = []
+
+        # Merge AI signals with market data
+        for r in results:
+            ai_sig = next((s for s in signals if s.get('symbol', '').upper() == r['symbol']), None)
+            if ai_sig:
+                r['signal'] = ai_sig.get('signal', 'HOLD')
+                r['confidence'] = ai_sig.get('confidence', 50)
+                r['reason'] = ai_sig.get('reason', '')
+            else:
+                r['signal'] = 'HOLD'
+                r['confidence'] = 50
+                r['reason'] = 'Insufficient data'
+
+        return jsonify({'results': results, 'generatedAt': datetime.utcnow().isoformat()})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        loop.close()

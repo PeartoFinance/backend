@@ -298,7 +298,7 @@ def _register_market_jobs():
     from .market_jobs import (
         update_all_stocks, update_all_crypto, update_all_indices,
         update_all_commodities, update_earnings_calendar, update_dividends,
-        update_business_profiles, update_ytd_returns
+        update_business_profiles, update_ytd_returns, update_all_forecasts
     )
     
     # Calculate a small delay (2 mins) to allow server to settle after push/restart
@@ -389,6 +389,16 @@ def _register_market_jobs():
         hour=2,
         id='update_business_profiles',
         name='Sync Business Profiles',
+        replace_existing=True
+    )
+    
+    # Forecasts (daily at 3 AM)
+    scheduler.add_job(
+        lambda: queue_job(update_all_forecasts, 'update_all_forecasts'),
+        'cron',
+        hour=3,
+        id='update_forecasts',
+        name='Update Analyst Forecasts',
         replace_existing=True
     )
     
