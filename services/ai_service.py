@@ -1,21 +1,18 @@
 """
-AI Service - OpenAI-compatible client for SathiAI
+AI Service - Central AI client using pluggable providers (openai / g4f)
+Provider is selected via DB setting 'AI_PROVIDER' or env var AI_PROVIDER.
 """
-import httpx
-from services.settings_service import get_setting_secure
+from services import ai_provider
 from typing import Optional, List, Dict, Any
 
 
 class AIService:
-    """AI Service using OpenAI-compatible API"""
+    """AI Service using pluggable provider backend"""
     
     def __init__(self):
-        self.api_key = get_setting_secure('SATHI_AI_API_KEY', 'sk-0mw9OdrHDBiYOE5VeEDyieB1IAk9imlBF3uQMXXCIh8Chmug')
-        self.base_url = get_setting_secure('SATHI_AI_BASE_URL', 'https://sathiaiapi.ashlya.com/v1')
-        self.default_model = 'gpt-4'
+        self.default_model = None   # resolved by ai_provider from DB/env
         self.max_tokens = 500
         self.temperature = 0.7
-        self.timeout = 60.0
         
     def build_system_prompt(self, page_type: str = 'general', page_data: Dict = None) -> str:
         """Build context-aware system prompt with actual data"""
@@ -66,7 +63,7 @@ Format your response with clean, readable markdown:
         options: Dict = None
     ) -> Dict[str, Any]:
         """
-        Chat with AI service
+        Chat with AI service via the central provider
         """
         context = context or {}
         options = options or {}
@@ -84,73 +81,26 @@ Format your response with clean, readable markdown:
             {"role": "user", "content": message}
         ]
         
-        max_retries = 2
-        for attempt in range(1, max_retries + 1):
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(
-                        f"{self.base_url}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "model": options.get('model', self.default_model),
-                            "messages": messages,
-                            "temperature": options.get('temperature', self.temperature),
-                            "max_tokens": options.get('max_tokens', self.max_tokens),
-                            "stream": False
-                        }
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        ai_message = data['choices'][0]['message']['content']
-                        return {
-                            "success": True,
-                            "response": ai_message,
-                            "provider": "SathiAI",
-                            "model": data.get('model', self.default_model),
-                            "attempt": attempt
-                        }
-                    else:
-                        raise Exception(f"API returned {response.status_code}")
-                        
-            except Exception as e:
-                print(f"[AI Service] Attempt {attempt}/{max_retries} failed: {e}")
-                if attempt == max_retries:
-                    return {
-                        "success": False,
-                        "response": "I apologize, but I'm having connection issues. Please try again.",
-                        "error": str(e),
-                        "provider": "SathiAI (error)"
-                    }
-        
+        result = await ai_provider.chat_completion(
+            messages=messages,
+            model=options.get('model', self.default_model),
+            temperature=options.get('temperature', self.temperature),
+            max_tokens=options.get('max_tokens', self.max_tokens),
+        )
+
+        # Map to the response format the rest of the app expects
         return {
-            "success": False,
-            "response": "Service unavailable.",
-            "provider": "fallback"
+            "success": result.get("success", False),
+            "response": result.get("content", ""),
+            "provider": result.get("provider", "unknown"),
+            "model": result.get("model", ""),
+            "attempt": result.get("attempt", 1),
+            **({"error": result["error"]} if "error" in result else {}),
         }
     
     async def get_status(self) -> Dict[str, Any]:
-        """Check AI service status"""
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"}
-                )
-                return {
-                    "status": "operational" if response.status_code == 200 else "error",
-                    "provider": "SathiAI",
-                    "endpoint": self.base_url
-                }
-        except Exception as e:
-            return {
-                "status": "error",
-                "provider": "SathiAI",
-                "error": str(e)
-            }
+        """Check AI service status via the active provider"""
+        return await ai_provider.health_check()
 
 
 # Singleton instance

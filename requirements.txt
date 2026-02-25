@@ -23,3 +23,8 @@ Flask-Caching==2.3.1
 Flask-Compress==1.23
 Flask-Limiter==3.5.0
 redis>=3.0  # Required for Flask-Limiter Redis storage
+
+# AI providers
+httpx>=0.25.0  # For OpenAI-compatible HTTP calls
+openai>=1.0.0  # Optional: official OpenAI SDK (unused but available)
+g4f>=0.3.0.0   # GPT4Free provider support

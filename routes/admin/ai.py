@@ -432,10 +432,12 @@ def booyah_predict():
     Generate AI-powered stock/crypto prediction.
     Gathers market data, analyst forecasts, and news,
     then sends to AI for comprehensive prediction analysis.
+    Results are cached for 30 minutes per symbol+timeframe.
     """
     import asyncio
     from services.ai_service import ai_service
     from models import MarketData, News
+    from extensions import cache
 
     data = request.get_json() or {}
     symbol = (data.get('symbol') or '').strip().upper()
@@ -443,6 +445,13 @@ def booyah_predict():
 
     if not symbol:
         return jsonify({'error': 'Symbol is required'}), 400
+
+    # Check cache first
+    cache_key = f"booyah_predict:{symbol}:{timeframe}"
+    cached = cache.get(cache_key)
+    if cached:
+        cached['cached'] = True
+        return jsonify(cached)
 
     try:
         # 1. Fetch market data
@@ -605,6 +614,9 @@ Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact struc
                 'timeframe': timeframe
             })
 
+            # Cache successful prediction for 30 minutes
+            cache.set(cache_key, prediction, timeout=1800)
+
             return jsonify(prediction)
 
         finally:
@@ -619,16 +631,26 @@ Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact struc
 def booyah_quick_scan():
     """
     Quick AI scan of multiple symbols for rapid signal overview.
+    Results cached for 15 minutes per symbol set.
     """
     import asyncio
     from services.ai_service import ai_service
     from models import MarketData
+    from extensions import cache
 
     data = request.get_json() or {}
     symbols = data.get('symbols', [])
 
     if not symbols or len(symbols) > 20:
         return jsonify({'error': 'Provide 1-20 symbols'}), 400
+
+    # Cache key based on sorted symbols
+    sorted_syms = sorted([s.strip().upper() for s in symbols])
+    cache_key = f"booyah_scan:{'_'.join(sorted_syms)}"
+    cached = cache.get(cache_key)
+    if cached:
+        cached['cached'] = True
+        return jsonify(cached)
 
     results = []
     for sym in symbols:
@@ -692,8 +714,144 @@ Respond ONLY with valid JSON array (no markdown):
                 r['confidence'] = 50
                 r['reason'] = 'Insufficient data'
 
-        return jsonify({'results': results, 'generatedAt': datetime.utcnow().isoformat()})
+        response_data = {'results': results, 'generatedAt': datetime.utcnow().isoformat()}
+        cache.set(cache_key, response_data, timeout=900)  # 15 min
+        return jsonify(response_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        loop.close()
+
+
+# ============================================================================
+# AI PROVIDER MANAGEMENT
+# ============================================================================
+
+@ai_bp.route('/provider', methods=['GET'])
+@admin_required
+def get_ai_provider():
+    """Get current AI provider configuration"""
+    from services.ai_provider import get_active_provider_name
+    from services.settings_service import get_setting_secure
+    import os
+
+    provider = get_active_provider_name()
+    model = get_setting_secure('AI_MODEL', os.getenv('AI_MODEL', 'gpt-4'))
+    base_url = get_setting_secure('SATHI_AI_BASE_URL', os.getenv('OPENAI_BASE_URL', ''))
+
+    # Check if API key is set (don't return actual key)
+    api_key = get_setting_secure('SATHI_AI_API_KEY', os.getenv('OPENAI_API_KEY', ''))
+    has_api_key = bool(api_key and len(api_key) > 5)
+
+    return jsonify({
+        'provider': provider,
+        'model': model,
+        'baseUrl': base_url if provider == 'openai' else None,
+        'hasApiKey': has_api_key,
+        'availableProviders': ['openai', 'g4f'],
+    })
+
+
+@ai_bp.route('/provider', methods=['PUT'])
+@admin_required
+def update_ai_provider():
+    """Switch AI provider or update AI settings"""
+    from models.settings import Settings
+    from services.settings_service import get_setting_secure
+
+    data = request.get_json() or {}
+    provider = data.get('provider')
+    model = data.get('model')
+    base_url = data.get('baseUrl')
+    api_key = data.get('apiKey')
+
+    if provider and provider not in ('openai', 'g4f'):
+        return jsonify({'error': 'Invalid provider. Use "openai" or "g4f".'}), 400
+
+    updated = []
+
+    def _upsert_setting(key, value, category='ai', desc=''):
+        setting = Settings.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = Settings(
+                id=str(uuid.uuid4()),
+                key=key,
+                value=value,
+                type='string',
+                category=category,
+                description=desc,
+                is_public=False,
+                is_encrypted=False,
+            )
+            db.session.add(setting)
+        updated.append(key)
+
+    try:
+        if provider:
+            _upsert_setting('AI_PROVIDER', provider, desc='Active AI provider (openai or g4f)')
+        if model:
+            _upsert_setting('AI_MODEL', model, desc='AI model name')
+        if base_url is not None:
+            _upsert_setting('SATHI_AI_BASE_URL', base_url, desc='OpenAI-compatible API base URL')
+        if api_key is not None:
+            _upsert_setting('SATHI_AI_API_KEY', api_key, desc='OpenAI-compatible API key')
+
+        db.session.commit()
+
+        log_audit('AI_PROVIDER_UPDATE', 'settings', 'ai', {
+            'provider': provider,
+            'model': model,
+            'updated_keys': updated,
+        })
+
+        return jsonify({
+            'ok': True,
+            'message': f'AI settings updated: {", ".join(updated)}',
+            'provider': provider or get_setting_secure('AI_PROVIDER', 'openai'),
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@ai_bp.route('/provider/test', methods=['POST'])
+@admin_required
+def test_ai_provider():
+    """Test the active (or specified) AI provider with a quick chat"""
+    import asyncio
+    from services.ai_provider import chat_completion, health_check
+
+    data = request.get_json() or {}
+    provider_name = data.get('provider')  # optional override
+    test_message = data.get('message', 'Say hello in one sentence.')
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        # Health check
+        status = loop.run_until_complete(health_check(provider_name))
+
+        # Quick chat test
+        result = loop.run_until_complete(chat_completion(
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Answer briefly."},
+                {"role": "user", "content": test_message},
+            ],
+            max_tokens=100,
+            provider_name=provider_name,
+        ))
+
+        return jsonify({
+            'ok': result.get('success', False),
+            'health': status,
+            'response': result.get('content', ''),
+            'provider': result.get('provider', 'unknown'),
+            'model': result.get('model', ''),
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
     finally:
         loop.close()

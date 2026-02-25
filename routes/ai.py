@@ -23,8 +23,9 @@ def _run_async(coro):
 
 @ai_bp.route('/chat', methods=['POST'])
 def chat():
-    """Basic chat endpoint"""
+    """Basic chat endpoint with caching for booyah predictions"""
     from services.ai_service import ai_service
+    from extensions import cache
     
     data = request.get_json() or {}
     message = data.get('message', '')
@@ -34,13 +35,32 @@ def chat():
         return jsonify({'error': 'Message is required'}), 400
     
     try:
+        # Cache booyah prediction requests by symbol (30 min)
+        cache_key = None
+        page_type = context.get('pageType', '') if isinstance(context, dict) else ''
+        if page_type == 'booyah-prediction':
+            page_data = context.get('pageData', {}) if isinstance(context, dict) else {}
+            symbol = page_data.get('symbol', '')
+            if symbol:
+                cache_key = f"booyah_chat:{symbol.upper()}"
+                cached = cache.get(cache_key)
+                if cached:
+                    cached['cached'] = True
+                    return jsonify(cached)
+
         result = _run_async(ai_service.chat(message, context))
-        return jsonify({
+        response_data = {
             'success': result.get('success', False),
             'response': result.get('response', ''),
             'provider': result.get('provider', 'unknown'),
             'timestamp': datetime.utcnow().isoformat()
-        })
+        }
+
+        # Store in cache if booyah prediction succeeded
+        if cache_key and result.get('success'):
+            cache.set(cache_key, response_data, timeout=1800)  # 30 min
+
+        return jsonify(response_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
