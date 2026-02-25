@@ -336,7 +336,6 @@ def get_ai_stats():
 @admin_required
 def generate_content():
     """Generate AI content for various admin forms"""
-    import asyncio
     from services.ai_service import ai_service
     
     data = request.get_json() or {}
@@ -366,25 +365,20 @@ Provide title, 4-6 sections with sub-points.""",
     
     system_prompt = prompts.get(content_type, prompts['article'])
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        result = loop.run_until_complete(
+        result = _run_async(
             ai_service.chat(system_prompt, {'page_type': 'admin'}, {'max_tokens': 1500})
         )
         log_audit('AI_GENERATE', 'ai_content', content_type, {'prompt': prompt[:100]})
         return jsonify({'ok': True, 'content': result.get('response', ''), 'type': content_type})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        loop.close()
 
 
 @ai_bp.route('/enhance', methods=['POST'])
 @admin_required
 def enhance_content():
     """Enhance/improve existing content"""
-    import asyncio
     from services.ai_service import ai_service
     
     data = request.get_json() or {}
@@ -403,24 +397,19 @@ def enhance_content():
         'tone': f"Rewrite in {tone} tone:\n\n{content}",
     }
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        result = loop.run_until_complete(
+        result = _run_async(
             ai_service.chat(actions.get(action, actions['improve']), {'page_type': 'admin'}, {'max_tokens': 1000})
         )
         return jsonify({'ok': True, 'content': result.get('response', ''), 'action': action})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        loop.close()
 
 
 @ai_bp.route('/analyze-content', methods=['POST'])
 @admin_required
 def analyze_content():
     """Analyze content for improvements"""
-    import asyncio
     from services.ai_service import ai_service
     
     data = request.get_json() or {}
@@ -433,15 +422,11 @@ def analyze_content():
 
 Content: {content[:2000]}"""
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        result = loop.run_until_complete(ai_service.chat(prompt, {'page_type': 'admin'}, {'max_tokens': 600}))
+        result = _run_async(ai_service.chat(prompt, {'page_type': 'admin'}, {'max_tokens': 600}))
         return jsonify({'ok': True, 'analysis': result.get('response', '')})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        loop.close()
 
 
 # ============================================================================
@@ -457,7 +442,6 @@ def booyah_predict():
     then sends to AI for comprehensive prediction analysis.
     Results are cached for 30 minutes per symbol+timeframe.
     """
-    import asyncio
     from services.ai_service import ai_service
     from models import MarketData, News
     from extensions import cache
@@ -590,60 +574,54 @@ Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact struc
     "detailedAnalysis": "4-6 sentence detailed analysis with reasoning"
 }}"""
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        result = _run_async(
+            ai_service.chat(prompt, {'page_type': 'prediction'}, {'max_tokens': 1500, 'temperature': 0.3})
+        )
+        ai_response = result.get('response', '')
+
+        # Parse JSON from AI response
+        prediction = None
         try:
-            result = loop.run_until_complete(
-                ai_service.chat(prompt, {'page_type': 'prediction'}, {'max_tokens': 1500, 'temperature': 0.3})
-            )
-            ai_response = result.get('response', '')
+            # Try direct parse
+            prediction = json.loads(ai_response)
+        except json.JSONDecodeError:
+            # Try extracting JSON from response
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', ai_response)
+            if json_match:
+                try:
+                    prediction = json.loads(json_match.group())
+                except json.JSONDecodeError:
+                    pass
 
-            # Parse JSON from AI response
-            prediction = None
-            try:
-                # Try direct parse
-                prediction = json.loads(ai_response)
-            except json.JSONDecodeError:
-                # Try extracting JSON from response
-                import re
-                json_match = re.search(r'\{[\s\S]*\}', ai_response)
-                if json_match:
-                    try:
-                        prediction = json.loads(json_match.group())
-                    except json.JSONDecodeError:
-                        pass
+        if not prediction:
+            return jsonify({
+                'error': 'AI returned invalid prediction format',
+                'rawResponse': ai_response[:500]
+            }), 500
 
-            if not prediction:
-                return jsonify({
-                    'error': 'AI returned invalid prediction format',
-                    'rawResponse': ai_response[:500]
-                }), 500
+        # Add metadata
+        prediction['symbol'] = symbol
+        prediction['name'] = stock.name
+        prediction['assetType'] = stock.asset_type
+        prediction['currentPrice'] = market_data['price']
+        prediction['marketData'] = market_data
+        prediction['analystData'] = forecast_data
+        prediction['recentNews'] = recent_news
+        prediction['timeframe'] = timeframe
+        prediction['generatedAt'] = datetime.utcnow().isoformat()
+        prediction['provider'] = result.get('provider', 'SathiAI')
 
-            # Add metadata
-            prediction['symbol'] = symbol
-            prediction['name'] = stock.name
-            prediction['assetType'] = stock.asset_type
-            prediction['currentPrice'] = market_data['price']
-            prediction['marketData'] = market_data
-            prediction['analystData'] = forecast_data
-            prediction['recentNews'] = recent_news
-            prediction['timeframe'] = timeframe
-            prediction['generatedAt'] = datetime.utcnow().isoformat()
-            prediction['provider'] = result.get('provider', 'SathiAI')
+        log_audit('BOOYAH_PREDICT', 'prediction', symbol, {
+            'signal': prediction.get('signal'),
+            'confidence': prediction.get('confidence'),
+            'timeframe': timeframe
+        })
 
-            log_audit('BOOYAH_PREDICT', 'prediction', symbol, {
-                'signal': prediction.get('signal'),
-                'confidence': prediction.get('confidence'),
-                'timeframe': timeframe
-            })
+        # Cache successful prediction for 30 minutes
+        cache.set(cache_key, prediction, timeout=1800)
 
-            # Cache successful prediction for 30 minutes
-            cache.set(cache_key, prediction, timeout=1800)
-
-            return jsonify(prediction)
-
-        finally:
-            loop.close()
+        return jsonify(prediction)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -656,7 +634,6 @@ def booyah_quick_scan():
     Quick AI scan of multiple symbols for rapid signal overview.
     Results cached for 15 minutes per symbol set.
     """
-    import asyncio
     from services.ai_service import ai_service
     from models import MarketData
     from extensions import cache
@@ -707,10 +684,8 @@ def booyah_quick_scan():
 Respond ONLY with valid JSON array (no markdown):
 [{{"symbol": "AAPL", "signal": "BUY", "confidence": 75, "reason": "short reason"}}]"""
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        result = loop.run_until_complete(
+        result = _run_async(
             ai_service.chat(prompt, {'page_type': 'prediction'}, {'max_tokens': 800, 'temperature': 0.3})
         )
         ai_response = result.get('response', '')
@@ -742,8 +717,6 @@ Respond ONLY with valid JSON array (no markdown):
         return jsonify(response_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        loop.close()
 
 
 # ============================================================================
@@ -844,21 +817,18 @@ def update_ai_provider():
 @admin_required
 def test_ai_provider():
     """Test the active (or specified) AI provider with a quick chat"""
-    import asyncio
     from services.ai_provider import chat_completion, health_check
 
     data = request.get_json() or {}
     provider_name = data.get('provider')  # optional override
     test_message = data.get('message', 'Say hello in one sentence.')
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
         # Health check
-        status = loop.run_until_complete(health_check(provider_name))
+        status = _run_async(health_check(provider_name))
 
         # Quick chat test
-        result = loop.run_until_complete(chat_completion(
+        result = _run_async(chat_completion(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant. Answer briefly."},
                 {"role": "user", "content": test_message},
@@ -876,5 +846,3 @@ def test_ai_provider():
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        loop.close()
