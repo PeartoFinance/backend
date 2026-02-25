@@ -4,12 +4,35 @@ Manage AI agent runs and content generation
 """
 import json
 import uuid
+import asyncio
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, AgentRun, AIGenerationRun, AIPostDraft, AuditEvent
 from ..decorators import admin_required
 
 ai_bp = Blueprint('admin_ai', __name__, url_prefix='/ai')
+
+
+def _run_async(coro):
+    """Helper to run async functions in sync Flask routes"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        except Exception:
+            pass
+        try:
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                for task in pending:
+                    task.cancel()
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+        loop.close()
 
 
 def log_audit(action, entity, entity_id, meta=None):

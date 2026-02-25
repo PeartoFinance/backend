@@ -18,6 +18,19 @@ def _run_async(coro):
     try:
         return loop.run_until_complete(coro)
     finally:
+        # Gracefully shut down pending async generators and tasks
+        try:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        except Exception:
+            pass
+        try:
+            pending = asyncio.all_tasks(loop)
+            if pending:
+                for task in pending:
+                    task.cancel()
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
         loop.close()
 
 
