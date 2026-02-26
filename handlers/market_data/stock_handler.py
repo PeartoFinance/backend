@@ -174,8 +174,22 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                                 results.append(single)
                         continue
                     
-                    change = price - open_price
-                    change_pct = (change / open_price * 100) if open_price != 0 else 0
+                    # [SMART FIX] Better Baseline Selection
+                    # If today's Open is missing/zero, fallback to Previous Close from DB
+                    if (open_price <= 0 or pd.isna(open_price)) and stock_md:
+                        if stock_md.previous_close and float(stock_md.previous_close) > 0:
+                            open_price = float(stock_md.previous_close)
+                        elif stock_md.open_price and float(stock_md.open_price) > 0:
+                            open_price = float(stock_md.open_price)
+
+                    # Calculate change based on the best available baseline
+                    if open_price > 0:
+                        change = price - open_price
+                        change_pct = (change / open_price * 100)
+                    else:
+                        # If still 0 baseline, keep change as 0 to avoid misleading 100% gains
+                        change = 0
+                        change_pct = 0
                     
                     # Merge Batch Price with localized metadata
                     results.append({
@@ -462,10 +476,22 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                         logger.debug(f"No valid price for {symbol} from bulk download, skipping update")
                         quote = None
                     else:
+                        # [SMART FIX] Better Baseline Selection for Import
+                        if not prev_close or prev_close == 0:
+                            # Try to find existing baseline in DB
+                            from models import MarketData
+                            existing_baseline = MarketData.query.filter_by(symbol=symbol, country_code=country_code).first()
+                            if existing_baseline:
+                                if existing_baseline.previous_close and float(existing_baseline.previous_close) > 0:
+                                    prev_close = float(existing_baseline.previous_close)
+                                elif existing_baseline.open_price and float(existing_baseline.open_price) > 0:
+                                    prev_close = float(existing_baseline.open_price)
+
                         if prev_close and prev_close != 0:
                             change = latest_price - prev_close
                             change_pct = (change / prev_close * 100)
                         else:
+                            # If still no baseline, set to 0 to avoid recording wrong values
                             change = 0
                             change_pct = 0
                         
