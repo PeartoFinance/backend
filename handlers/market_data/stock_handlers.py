@@ -349,8 +349,23 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                     
                     latest_price = sanitize_float(ticker_df['Close'].iloc[-1])
                     prev_close = sanitize_float(ticker_df['Open'].iloc[0])
-                    change = latest_price - prev_close
-                    change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+
+                    # [SMART FIX] Better Baseline Selection
+                    if not prev_close or prev_close == 0:
+                        # Try to find existing baseline in DB for this symbol
+                        existing_md = MarketData.query.filter_by(symbol=symbol, country_code=country_code).first()
+                        if existing_md:
+                            if existing_md.previous_close and float(existing_md.previous_close) > 0:
+                                prev_close = float(existing_md.previous_close)
+                            elif existing_md.open_price and float(existing_md.open_price) > 0:
+                                prev_close = float(existing_md.open_price)
+
+                    if prev_close and prev_close != 0:
+                        change = latest_price - prev_close
+                        change_pct = (change / prev_close * 100)
+                    else:
+                        change = 0
+                        change_pct = 0
                     
                     # Handle volume safely
                     if 'Volume' in ticker_df.columns:
