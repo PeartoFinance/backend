@@ -14,6 +14,7 @@ from handlers.market_data.screener_handler import get_day_gainers, get_day_loser
 from handlers.market_data.rate_limiter import check_rate_limit, report_yfinance_error, report_yfinance_success
 from models.market import MarketData
 from utils.validators import safe_int, safe_float
+from utils.market_hours import get_market_status_summary
 import time
 import logging
 
@@ -32,9 +33,17 @@ def _format_market_item(item, asset_type='stock'):
     """Unifies market data formatting for live routes"""
     if not item: return None
     
-    price = item.get('price') or item.get('currentPrice') or item.get('regularMarketPrice')
-    change = item.get('change') or item.get('regularMarketChange')
-    change_p = item.get('changePercent') or item.get('regularMarketChangePercent')
+    # Use 'if key in item' to avoid treating 0 as falsy
+    price = item.get('price') if item.get('price') is not None else (item.get('currentPrice') if item.get('currentPrice') is not None else item.get('regularMarketPrice'))
+    change = item.get('change') if item.get('change') is not None else item.get('regularMarketChange')
+    change_p = item.get('changePercent') if item.get('changePercent') is not None else item.get('regularMarketChangePercent')
+    
+    # Sanitize: if price is 0 or None, don't report bogus change values
+    if price is not None and float(price) == 0:
+        price = None
+    if price is None:
+        change = None
+        change_p = None
     
     # Infer asset type if missing
     calculated_asset_type = item.get('assetType') or asset_type
@@ -236,12 +245,13 @@ def get_live_dashboard():
             price = item.get('price')
             change = item.get('change')
             change_p = item.get('changePercent')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('displayName') or item.get('name'), # index handler adds displayName
-                'price': float(price) if price else None,
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
+                'price': _price,
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
                 'assetType': 'index'
             }
 
@@ -249,12 +259,13 @@ def get_live_dashboard():
             price = item.get('price')
             change = item.get('change')
             change_p = item.get('changePercent')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('name'),
-                'price': float(price) if price else None,
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
+                'price': _price,
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
                 'assetType': 'commodity',
                 'unit': item.get('unit')
             }
@@ -264,12 +275,13 @@ def get_live_dashboard():
             change = item.get('change')
             change_p = item.get('changePercent')
             vol = item.get('volume')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('name'),
-                'price': float(price) if price else None,
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
+                'price': _price,
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
                 'assetType': 'stock',
                 'volume': vol
             }
@@ -278,12 +290,13 @@ def get_live_dashboard():
             price = item.get('price')
             change = item.get('change')
             change_p = item.get('changePercent')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('name'),
-                'price': float(price) if price else None,
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
+                'price': _price,
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
                 'assetType': 'crypto'
             }
 
@@ -327,13 +340,14 @@ def get_live_overview():
             price = item.get('price')
             change = item.get('change')
             change_p = item.get('changePercent')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('displayName') or item.get('name'),
-                'value': float(price) if price else None, # Frontend expects 'value' for indices
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
-                'marketStatus': 'REGULAR', # Placeholder
+                'value': _price, # Frontend expects 'value' for indices
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
+                'marketStatus': get_market_status_summary().get('label', 'REGULAR'),
                 'lastUpdated': datetime.utcnow().isoformat()
             }
             
@@ -342,12 +356,13 @@ def get_live_overview():
             change = item.get('change')
             change_p = item.get('changePercent')
             vol = item.get('volume')
+            _price = float(price) if price is not None and float(price) > 0 else None
             return {
                 'symbol': item.get('symbol'),
                 'name': item.get('name'),
-                'price': float(price) if price else None,
-                'change': float(change) if change else None,
-                'changePercent': float(change_p) if change_p else None,
+                'price': _price,
+                'change': float(change) if (_price is not None and change is not None) else None,
+                'changePercent': float(change_p) if (_price is not None and change_p is not None) else None,
                 'volume': int(vol) if vol else None,
                 'assetType': 'stock'
             }
@@ -375,7 +390,8 @@ def get_live_overview():
             'advancers': adv,
             'decliners': dec,
             'unchanged': unch,
-            'totalVolume': sum(s.get('volume', 0) for s in most_active) * 10 # Rough estimate
+            'totalVolume': sum(s.get('volume', 0) for s in most_active) * 10, # Rough estimate
+            'marketStatus': get_market_status_summary(),
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -424,20 +440,24 @@ def get_live_stocks():
         MarketDataModel.symbol.in_(symbols)
     ).all()
     
-    # Check if DB data is fresh (within 15 minutes)
+    # Check if DB data is fresh (within 15 minutes) AND has valid prices
     fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
-    all_fresh = all(s.last_updated and s.last_updated > fresh_cutoff for s in db_stocks) if db_stocks else False
+    all_fresh = all(
+        s.last_updated and s.last_updated > fresh_cutoff and s.price and float(s.price) > 0
+        for s in db_stocks
+    ) if db_stocks else False
     
     quotes = []
     if all_fresh and db_stocks:
         # Use DB data directly
         for stock in db_stocks:
+            _price = float(stock.price) if stock.price is not None and float(stock.price) > 0 else None
             quotes.append({
                 'symbol': stock.symbol,
                 'name': stock.name,
-                'price': float(stock.price) if stock.price else None,
-                'change': float(stock.change) if stock.change else None,
-                'changePercent': float(stock.change_percent) if stock.change_percent else None,
+                'price': _price,
+                'change': float(stock.change) if (_price is not None and stock.change is not None) else None,
+                'changePercent': float(stock.change_percent) if (_price is not None and stock.change_percent is not None) else None,
                 'volume': stock.volume,
                 'marketCap': stock.market_cap,
                 'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
@@ -464,12 +484,13 @@ def get_live_stocks():
                 if stock.symbol in live_map:
                     quotes.append(live_map[stock.symbol])
                 else:
+                    _price = float(stock.price) if stock.price is not None and float(stock.price) > 0 else None
                     quotes.append({
                         'symbol': stock.symbol,
                         'name': stock.name,
-                        'price': float(stock.price) if stock.price else None,
-                        'change': float(stock.change) if stock.change else None,
-                        'changePercent': float(stock.change_percent) if stock.change_percent else None,
+                        'price': _price,
+                        'change': float(stock.change) if (_price is not None and stock.change is not None) else None,
+                        'changePercent': float(stock.change_percent) if (_price is not None and stock.change_percent is not None) else None,
                         'volume': stock.volume,
                         'marketCap': stock.market_cap,
                         'peRatio': float(stock.pe_ratio) if stock.pe_ratio else None,
@@ -514,17 +535,18 @@ def get_live_crypto():
     ).all()
     
     fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
-    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff for c in db_crypto) if db_crypto else False
+    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff and c.price and float(c.price) > 0 for c in db_crypto) if db_crypto else False
     
     quotes = []
     if all_fresh and db_crypto:
         for c in db_crypto:
+            _price = float(c.price) if c.price is not None and float(c.price) > 0 else None
             quotes.append({
                 'symbol': c.symbol,
                 'name': c.name,
-                'price': float(c.price) if c.price else None,
-                'change': float(c.change) if c.change else None,
-                'changePercent': float(c.change_percent) if c.change_percent else None,
+                'price': _price,
+                'change': float(c.change) if (_price is not None and c.change is not None) else None,
+                'changePercent': float(c.change_percent) if (_price is not None and c.change_percent is not None) else None,
                 'volume': c.volume,
                 'marketCap': c.market_cap,
                 'currency': c.currency,
@@ -539,12 +561,13 @@ def get_live_crypto():
         # Fallback to DB if live fetch failed
         if not quotes:
             for c in db_crypto:
+                _price = float(c.price) if c.price is not None and float(c.price) > 0 else None
                 quotes.append({
                     'symbol': c.symbol,
                     'name': c.name,
-                    'price': float(c.price) if c.price else None,
-                    'change': float(c.change) if c.change else None,
-                    'changePercent': float(c.change_percent) if c.change_percent else None,
+                    'price': _price,
+                    'change': float(c.change) if (_price is not None and c.change is not None) else None,
+                    'changePercent': float(c.change_percent) if (_price is not None and c.change_percent is not None) else None,
                     'volume': c.volume,
                     'marketCap': c.market_cap,
                     'currency': c.currency,
@@ -564,17 +587,18 @@ def get_live_commodities():
     # Check DB first
     db_commodities = CommodityData.query.all()
     fresh_cutoff = datetime.utcnow() - timedelta(minutes=15)
-    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff for c in db_commodities) if db_commodities else False
+    all_fresh = all(c.last_updated and c.last_updated > fresh_cutoff and c.price and float(c.price) > 0 for c in db_commodities) if db_commodities else False
     
     commodities = []
     if all_fresh and db_commodities:
         for c in db_commodities:
+            _price = float(c.price) if c.price is not None and float(c.price) > 0 else None
             commodities.append({
                 'symbol': c.symbol,
                 'name': c.name,
-                'price': float(c.price) if c.price else None,
-                'change': float(c.change) if c.change else None,
-                'changePercent': float(c.change_percent) if c.change_percent else None,
+                'price': _price,
+                'change': float(c.change) if (_price is not None and c.change is not None) else None,
+                'changePercent': float(c.change_percent) if (_price is not None and c.change_percent is not None) else None,
                 'dayHigh': float(c.day_high) if c.day_high else None,
                 'dayLow': float(c.day_low) if c.day_low else None,
                 'unit': c.unit,
@@ -588,12 +612,13 @@ def get_live_commodities():
         if not commodities and db_commodities:
             # Fallback
             for c in db_commodities:
+                _price = float(c.price) if c.price is not None and float(c.price) > 0 else None
                 commodities.append({
                     'symbol': c.symbol,
                     'name': c.name,
-                    'price': float(c.price) if c.price else None,
-                    'change': float(c.change) if c.change else None,
-                    'changePercent': float(c.change_percent) if c.change_percent else None,
+                    'price': _price,
+                    'change': float(c.change) if (_price is not None and c.change is not None) else None,
+                    'changePercent': float(c.change_percent) if (_price is not None and c.change_percent is not None) else None,
                     'dayHigh': float(c.day_high) if c.day_high else None,
                     'dayLow': float(c.day_low) if c.day_low else None,
                     'unit': c.unit,
@@ -731,9 +756,9 @@ def get_live_indices():
             'symbol': item.get('symbol'),
             'name': item.get('displayName') or item.get('name'),
             'value': float(price) if price else None,
-            'change': float(change) if change else None,
-            'changePercent': float(change_p) if change_p else None,
-            'marketStatus': 'REGULAR',
+            'change': float(change) if change is not None else None,
+            'changePercent': float(change_p) if change_p is not None else None,
+            'marketStatus': get_market_status_summary().get('label', 'REGULAR'),
             'lastUpdated': datetime.utcnow().isoformat(),
             'assetType': 'index'
         })

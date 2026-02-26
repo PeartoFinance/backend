@@ -144,6 +144,36 @@ def get_multiple_quotes(symbols: List[str]) -> List[Dict[str, Any]]:
                     price = sanitize(latest_row['Close'])
                     # Estimate change since open of the interval
                     open_price = sanitize(first_row['Open'])
+                    
+                    # Skip this ticker if price is 0/NaN (market closed, no data)
+                    if price == 0:
+                        # Fall back to DB record if available (preserves last known good price)
+                        if stock_md and stock_md.price and float(stock_md.price) > 0:
+                            results.append({
+                                'symbol': symbol,
+                                'name': stock_md.name or symbol,
+                                'price': float(stock_md.price),
+                                'change': float(stock_md.change) if stock_md.change is not None else 0,
+                                'changePercent': float(stock_md.change_percent) if stock_md.change_percent is not None else 0,
+                                'volume': stock_md.volume,
+                                'marketCap': stock_md.market_cap,
+                                'peRatio': float(stock_md.pe_ratio) if stock_md.pe_ratio else None,
+                                'high52w': float(stock_md._52_week_high) if stock_md._52_week_high else None,
+                                'low52w': float(stock_md._52_week_low) if stock_md._52_week_low else None,
+                                'sector': stock_md.sector,
+                                'industry': stock_md.industry,
+                                'exchange': stock_md.exchange,
+                                'currency': stock_md.currency or 'USD',
+                                'quoteType': stock_md.asset_type.upper() if stock_md.asset_type else 'EQUITY',
+                                'assetType': stock_md.asset_type or 'stock',
+                            })
+                        else:
+                            # No DB record - try individual .info call as last resort
+                            single = get_stock_quote(symbol)
+                            if single:
+                                results.append(single)
+                        continue
+                    
                     change = price - open_price
                     change_pct = (change / open_price * 100) if open_price != 0 else 0
                     
@@ -423,28 +453,39 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                         except:
                             return default
                     
-                    latest_price = sanitize_float(ticker_df['Close'].iloc[-1])
-                    prev_close = sanitize_float(ticker_df['Open'].iloc[0])
-                    change = latest_price - prev_close
-                    change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+                    latest_price = sanitize_float(ticker_df['Close'].iloc[-1], default=None)
+                    prev_close = sanitize_float(ticker_df['Open'].iloc[0], default=None)
                     
-                    # Handle volume safely
-                    if 'Volume' in ticker_df.columns:
-                        vol_val = ticker_df['Volume'].iloc[-1]
-                        volume = 0 if pd.isna(vol_val) else int(vol_val)
+                    # Skip if we got no valid price (market closed / no data)
+                    # Don't overwrite existing good data — just skip this symbol
+                    if latest_price is None or latest_price == 0:
+                        logger.debug(f"No valid price for {symbol} from bulk download, skipping update")
+                        quote = None
                     else:
-                        volume = 0
+                        if prev_close and prev_close != 0:
+                            change = latest_price - prev_close
+                            change_pct = (change / prev_close * 100)
+                        else:
+                            change = 0
+                            change_pct = 0
+                        
+                        # Handle volume safely
+                        if 'Volume' in ticker_df.columns:
+                            vol_val = ticker_df['Volume'].iloc[-1]
+                            volume = 0 if pd.isna(vol_val) else int(vol_val)
+                        else:
+                            volume = 0
 
-                    quote = {
-                        'symbol': symbol,
-                        'price': latest_price,
-                        'change': sanitize_float(change),
-                        'changePercent': sanitize_float(change_pct),
-                        'volume': volume,
-                        'open': sanitize_float(ticker_df['Open'].iloc[-1]),
-                        'dayHigh': sanitize_float(ticker_df['High'].max()),
-                        'dayLow': sanitize_float(ticker_df['Low'].min()),
-                    }
+                        quote = {
+                            'symbol': symbol,
+                            'price': latest_price,
+                            'change': change,
+                            'changePercent': change_pct,
+                            'volume': volume,
+                            'open': sanitize_float(ticker_df['Open'].iloc[-1]),
+                            'dayHigh': sanitize_float(ticker_df['High'].max()),
+                            'dayLow': sanitize_float(ticker_df['Low'].min()),
+                        }
 
 
                 if not quote or not quote.get('price'):
@@ -458,15 +499,19 @@ def import_stocks_to_db(symbols: List[str], db_session=None, country_code: str =
                 ).first()
                 
                 if existing:
-                    # Update price and basic metrics
-                    existing.price = quote.get('price')
-                    existing.change = quote.get('change')
-                    existing.change_percent = quote.get('changePercent')
-                    existing.volume = quote.get('volume')
-                    existing.open_price = quote.get('open')
-                    existing.day_high = quote.get('dayHigh')
-                    existing.day_low = quote.get('dayLow')
-                    existing.last_updated = datetime.utcnow()
+                    # Only update if we have a valid price (don't overwrite good data with zeros)
+                    new_price = quote.get('price')
+                    if new_price and new_price > 0:
+                        existing.price = new_price
+                        existing.change = quote.get('change')
+                        existing.change_percent = quote.get('changePercent')
+                        existing.volume = quote.get('volume')
+                        existing.open_price = quote.get('open')
+                        existing.day_high = quote.get('dayHigh')
+                        existing.day_low = quote.get('dayLow')
+                        if quote.get('previousClose'):
+                            existing.previous_close = quote.get('previousClose')
+                        existing.last_updated = datetime.utcnow()
                     updated += 1
                 else:
                     # For new symbols, we must fetch full metadata to determine asset type

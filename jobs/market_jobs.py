@@ -49,6 +49,7 @@ def update_all_stocks() -> Dict[str, Any]:
     """
     Update all stocks in the database with latest prices from yfinance.
     Fetches symbols from MarketData table and refreshes each one.
+    Skips update when all markets are closed to avoid writing stale data.
     """
     from models import db
     
@@ -56,11 +57,16 @@ def update_all_stocks() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from utils.market_hours import is_any_major_market_open
         from models import MarketData
         from handlers.market_data import import_stocks_to_db
         
         app = get_app()
         with app.app_context():
+            if not is_any_major_market_open():
+                logger.info("All markets closed — skipping stock update to avoid stale data")
+                return {'status': 'skipped', 'reason': 'markets_closed'}
+            
             # Get all stock symbols currently in database
             stocks = MarketData.query.filter_by(asset_type='stock').all()
             
@@ -155,6 +161,7 @@ def update_all_indices() -> Dict[str, Any]:
     """
     Update all market indices from yfinance.
     Fetches ALL indices in the database, plus the default MAJOR_INDICES list.
+    Skips update when all markets are closed.
     """
     from models import db
     
@@ -162,11 +169,16 @@ def update_all_indices() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from utils.market_hours import is_any_major_market_open
         from models import MarketData
         from handlers.market_data import import_indices_to_db, MAJOR_INDICES
         
         app = get_app()
         with app.app_context():
+            if not is_any_major_market_open():
+                logger.info("All markets closed — skipping indices update to avoid stale data")
+                return {'status': 'skipped', 'reason': 'markets_closed'}
+            
             # Get all index symbols already in the database
             db_indices = MarketData.query.filter_by(asset_type='index').all()
             db_symbols = [i.symbol for i in db_indices]
@@ -198,6 +210,7 @@ def update_all_commodities() -> Dict[str, Any]:
     """
     Update all commodity prices from yfinance.
     Fetches ALL commodities in the database, plus the default COMMODITIES list.
+    Skips update when all markets are closed.
     """
     from models import db
     
@@ -205,11 +218,16 @@ def update_all_commodities() -> Dict[str, Any]:
     start_time = datetime.utcnow()
     
     try:
+        from utils.market_hours import is_any_major_market_open
         from models import MarketData
         from handlers.market_data import import_commodities_to_db, COMMODITIES
         
         app = get_app()
         with app.app_context():
+            if not is_any_major_market_open():
+                logger.info("All markets closed — skipping commodities update to avoid stale data")
+                return {'status': 'skipped', 'reason': 'markets_closed'}
+            
             # Get all commodity symbols already in the database
             db_commodities = MarketData.query.filter_by(asset_type='commodity').all()
             db_symbols = [c.symbol for c in db_commodities]

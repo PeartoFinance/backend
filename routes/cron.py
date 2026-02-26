@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 import os
 from services.settings_service import get_setting_secure
 from jobs import queue_job
+from utils.market_hours import is_any_major_market_open
 
 cron_bp = Blueprint('cron', __name__)
 
@@ -27,6 +28,10 @@ def cron_update_stocks():
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
+    force = request.args.get('force', '').lower() == 'true'
+    if not force and not is_any_major_market_open():
+        return jsonify({'ok': True, 'skipped': True, 'reason': 'All markets closed'})
+    
     try:
         from jobs.market_jobs import update_all_stocks
         queue_job(update_all_stocks, 'update_all_stocks')
@@ -37,7 +42,8 @@ def cron_update_stocks():
 
 @cron_bp.route('/crypto', methods=['GET', 'POST'])
 def cron_update_crypto():
-    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/crypto?token=YOUR_TOKEN"""
+    """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/crypto?token=YOUR_TOKEN
+    Note: Crypto trades 24/7 so no market-hours gate."""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
@@ -55,6 +61,10 @@ def cron_update_indices():
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
+    force = request.args.get('force', '').lower() == 'true'
+    if not force and not is_any_major_market_open():
+        return jsonify({'ok': True, 'skipped': True, 'reason': 'All markets closed'})
+    
     try:
         from jobs.market_jobs import update_all_indices
         queue_job(update_all_indices, 'update_all_indices')
@@ -68,6 +78,10 @@ def cron_update_commodities():
     """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/commodities?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
+    
+    force = request.args.get('force', '').lower() == 'true'
+    if not force and not is_any_major_market_open():
+        return jsonify({'ok': True, 'skipped': True, 'reason': 'All markets closed'})
     
     try:
         from jobs.market_jobs import update_all_commodities
@@ -83,6 +97,10 @@ def cron_update_earnings():
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
+    force = request.args.get('force', '').lower() == 'true'
+    if not force and not is_any_major_market_open():
+        return jsonify({'ok': True, 'skipped': True, 'reason': 'All markets closed'})
+    
     try:
         from jobs.market_jobs import update_earnings_calendar
         queue_job(update_earnings_calendar, 'update_earnings_calendar')
@@ -96,6 +114,10 @@ def cron_update_dividends():
     """cURL: curl -X POST https://apipearto.ashlya.com/api/cron/dividends?token=YOUR_TOKEN"""
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
+    
+    force = request.args.get('force', '').lower() == 'true'
+    if not force and not is_any_major_market_open():
+        return jsonify({'ok': True, 'skipped': True, 'reason': 'All markets closed'})
     
     try:
         from jobs.market_jobs import update_dividends
@@ -207,6 +229,9 @@ def cron_all_market():
     if not verify_cron_token():
         return jsonify({'error': 'Invalid cron token'}), 401
     
+    force = request.args.get('force', '').lower() == 'true'
+    market_open = is_any_major_market_open()
+    
     try:
         from jobs.market_jobs import (
             update_all_stocks,
@@ -218,17 +243,29 @@ def cron_all_market():
             update_all_forecasts,
         )
         
-        # Enqueue individual jobs so they run sequentially in the worker
-        queue_job(update_all_stocks, 'update_all_stocks')
-        queue_job(update_all_crypto, 'update_all_crypto')
-        queue_job(update_all_indices, 'update_all_indices')
-        queue_job(update_all_commodities, 'update_all_commodities')
-        queue_job(update_earnings_calendar, 'update_earnings_calendar')
-        queue_job(update_business_profiles, 'update_business_profiles')
-        queue_job(update_all_forex, 'update_all_forex')
-        queue_job(update_all_forecasts, 'update_all_forecasts')
+        skipped = []
         
-        return jsonify({'ok': True, 'message': 'All market jobs triggered/queued'})
+        # Crypto & forex trade 24/7 – always update
+        queue_job(update_all_crypto, 'update_all_crypto')
+        queue_job(update_all_forex, 'update_all_forex')
+        
+        # Stock-market-dependent jobs – skip when all markets are closed
+        if force or market_open:
+            queue_job(update_all_stocks, 'update_all_stocks')
+            queue_job(update_all_indices, 'update_all_indices')
+            queue_job(update_all_commodities, 'update_all_commodities')
+            queue_job(update_earnings_calendar, 'update_earnings_calendar')
+            queue_job(update_business_profiles, 'update_business_profiles')
+            queue_job(update_all_forecasts, 'update_all_forecasts')
+        else:
+            skipped = ['stocks', 'indices', 'commodities', 'earnings', 'business_profiles', 'forecasts']
+        
+        return jsonify({
+            'ok': True,
+            'message': 'All market jobs triggered/queued',
+            'marketOpen': market_open,
+            'skipped': skipped,
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

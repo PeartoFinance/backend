@@ -86,6 +86,10 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
     Get quotes for all major world indices using BULK FETCH.
     Uses yf.download() to fetch all indices in a single API call instead of 20+ individual calls.
     
+    Change calculation priority:
+      1. ticker.info  previousClose  (most reliable, set by Yahoo per-session)
+      2. 2-day close diff             (fallback when info is unavailable)
+    
     Returns:
         List of index quote dictionaries
     """
@@ -102,8 +106,22 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
     try:
         session = get_yfinance_session()
         
-        # BULK DOWNLOAD - One API call for all indices!
-        # Get last 2 days to calculate change
+        # ── Step 1: Fetch previousClose from ticker.info (batch via Tickers) ──
+        prev_close_map: Dict[str, float] = {}
+        try:
+            tickers = yf.Tickers(' '.join(symbols), session=session)
+            for symbol in symbols:
+                try:
+                    info = tickers.tickers[symbol].info
+                    pc = info.get('previousClose') or info.get('regularMarketPreviousClose')
+                    if pc:
+                        prev_close_map[symbol] = float(pc)
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"[Index Handler] Tickers info batch failed ({e}), will use 2-day diff")
+        
+        # ── Step 2: BULK DOWNLOAD for current prices ──
         data = yf.download(
             symbols,
             period='2d',
@@ -116,7 +134,6 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
         
         if data.empty:
             logger.warning(f"[Index Handler] Bulk download returned empty data. Symbols: {len(symbols)}")
-            # Log session headers to debug potential blocking
             if hasattr(session, 'headers'):
                 logger.debug(f"[Index Handler] Session headers: {session.headers}")
             report_yfinance_error(is_rate_limit=False)
@@ -132,9 +149,7 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
                 
                 symbol_data = data[symbol]
                 
-                # Get latest values
-                # Get latest VALID values
-                # yfinance often returns a row for "today" with NaNs before market open
+                # Get latest VALID close (yfinance may return NaN for today before open)
                 valid_closes = symbol_data['Close'].dropna()
                 if valid_closes.empty:
                     continue
@@ -142,19 +157,20 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
                 last_valid_idx = valid_closes.index[-1]
                 price = float(valid_closes.loc[last_valid_idx])
                 
-                # Calculate change from previous close
-                change = None
-                change_percent = None
-                previous_close = None
+                # ── Determine previousClose ──
+                previous_close = prev_close_map.get(symbol)
                 
-                # Find previous close (the close before the last valid one)
-                if len(valid_closes) >= 2:
+                # Fallback: compute from 2-day close diff
+                if previous_close is None and len(valid_closes) >= 2:
                     prev_valid_idx = valid_closes.index[-2]
                     previous_close = float(valid_closes.loc[prev_valid_idx])
-                    
-                    if previous_close and price:
-                        change = price - previous_close
-                        change_percent = (change / previous_close) * 100
+                
+                # ── Calculate change ──
+                change = None
+                change_percent = None
+                if previous_close and price:
+                    change = price - previous_close
+                    change_percent = (change / previous_close) * 100
                     
                 latest = symbol_data.loc[last_valid_idx]
                 
@@ -163,8 +179,8 @@ def get_all_major_indices() -> List[Dict[str, Any]]:
                     'name': MAJOR_INDICES.get(symbol, symbol),
                     'displayName': MAJOR_INDICES.get(symbol, symbol),
                     'price': price,
-                    'change': round(change, 4) if change else None,
-                    'changePercent': round(change_percent, 2) if change_percent else None,
+                    'change': round(change, 4) if change is not None else None,
+                    'changePercent': round(change_percent, 2) if change_percent is not None else None,
                     'previousClose': previous_close,
                     'dayHigh': float(latest['High']) if not pd.isna(latest.get('High')) else None,
                     'dayLow': float(latest['Low']) if not pd.isna(latest.get('Low')) else None,
