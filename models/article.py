@@ -68,6 +68,20 @@ class Post(db.Model):
             'publishedAt': self.published_at.isoformat() if self.published_at else None
         }
 
+    def to_public_dict(self):
+        """Extended dict for public blog API"""
+        data = self.to_dict()
+        data.update({
+            'tags': self.tags or [],
+            'categoryId': self.category_id,
+            'authorId': self.author_id,
+            'metaTitle': self.meta_title,
+            'metaDescription': self.meta_description,
+            'countryCode': self.country_code,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+        })
+        return data
+
 
 class PostCategory(db.Model):
     """Post categories"""

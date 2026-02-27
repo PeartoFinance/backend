@@ -347,20 +347,28 @@ def generate_content():
         return jsonify({'error': 'Prompt is required'}), 400
     
     prompts = {
-        'article': f"""You are a financial content writer. Generate a professional article about: {prompt}
-Write with: title, introduction, 3-4 sections with ## headers, conclusion. 500-800 words.""",
-        'product_description': f"""Write a compelling product description for: {prompt}
-Include key features, benefits, target audience. 150-250 words.""",
-        'help_article': f"""Write help documentation for: {prompt}
-Include intro, steps if applicable, tips. User-friendly, 300-500 words.""",
-        'email': f"""Write a professional email for: {prompt}
-Include subject line (prefix Subject:), greeting, body, CTA.""",
-        'news': f"""Write a financial news article about: {prompt}
-Include headline, lead, context, implications. 400-600 words.""",
-        'outline': f"""Create content outline for: {prompt}
-Provide title, 4-6 sections with sub-points.""",
-        'rewrite': f"""Rewrite to be more engaging and professional: {prompt}""",
-        'summary': f"""Summarize in 2-3 paragraphs: {prompt}""",
+        'article': f"""You are a financial content writer. Generate a professional article about: {{prompt}}
+Write with: title, introduction, 3-4 sections with ## headers, conclusion. 500-800 words.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'product_description': f"""Write a compelling product description for: {{prompt}}
+Include key features, benefits, target audience. 150-250 words.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'help_article': f"""Write help documentation for: {{prompt}}
+Include intro, steps if applicable, tips. User-friendly, 300-500 words.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'email': f"""Write a professional email for: {{prompt}}
+Include subject line (prefix Subject:), greeting, body, CTA.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'news': f"""Write a financial news article about: {{prompt}}
+Include headline, lead, context, implications. 400-600 words.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'outline': f"""Create content outline for: {{prompt}}
+Provide title, 4-6 sections with sub-points.
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'rewrite': f"""Rewrite to be more engaging and professional: {{prompt}}
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
+        'summary': f"""Summarize in 2-3 paragraphs: {{prompt}}
+INSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.""",
     }
     
     system_prompt = prompts.get(content_type, prompts['article'])
@@ -390,11 +398,11 @@ def enhance_content():
         return jsonify({'error': 'Content is required'}), 400
     
     actions = {
-        'improve': f"Improve and polish while maintaining meaning:\n\n{content}",
-        'expand': f"Expand with more details:\n\n{content}",
-        'shorten': f"Make more concise:\n\n{content}",
-        'proofread': f"Fix grammar/spelling:\n\n{content}",
-        'tone': f"Rewrite in {tone} tone:\n\n{content}",
+        'improve': f"Improve and polish while maintaining meaning:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
+        'expand': f"Expand with more details:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
+        'shorten': f"Make more concise:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
+        'proofread': f"Fix grammar/spelling:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
+        'tone': f"Rewrite in {{tone}} tone:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
     }
     
     try:

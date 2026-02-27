@@ -171,12 +171,19 @@ def create_post():
     try:
         data = request.get_json()
         post = Post(
+            id=str(uuid.uuid4()),
             title=data.get('title'),
             slug=data.get('slug'),
             content=data.get('content'),
             excerpt=data.get('excerpt'),
             status=data.get('status', 'draft'),
             featured_image=data.get('featured_image'),
+            category_id=data.get('category_id'),
+            is_featured=data.get('is_featured', False),
+            tags=data.get('tags'),
+            meta_title=data.get('meta_title'),
+            meta_description=data.get('meta_description'),
+            published_at=datetime.utcnow() if data.get('status') == 'published' else None,
             created_at=datetime.utcnow(),
             country_code=data.get('country_code', getattr(request, 'user_country', 'US'))
         )
@@ -188,7 +195,7 @@ def create_post():
         return jsonify({'error': str(e)}), 500
 
 
-@content_bp.route('/posts/<int:post_id>', methods=['PUT'])
+@content_bp.route('/posts/<post_id>', methods=['PUT'])
 @admin_required
 def update_post(post_id):
     """Update post"""
@@ -196,10 +203,14 @@ def update_post(post_id):
         post = Post.query.get_or_404(post_id)
         data = request.get_json()
         
-        for field in ['title', 'slug', 'content', 'excerpt', 'status', 'featured_image', 'country_code']:
+        for field in ['title', 'slug', 'content', 'excerpt', 'status', 'featured_image',
+                     'country_code', 'category_id', 'is_featured', 'tags', 'meta_title', 'meta_description']:
             if field in data:
                 setattr(post, field, data[field])
         
+        # Set published_at when first published
+        if data.get('status') == 'published' and not post.published_at:
+            post.published_at = datetime.utcnow()
         post.updated_at = datetime.utcnow()
         db.session.commit()
         return jsonify({'ok': True})
@@ -208,7 +219,7 @@ def update_post(post_id):
         return jsonify({'error': str(e)}), 500
 
 
-@content_bp.route('/posts/<int:post_id>', methods=['DELETE'])
+@content_bp.route('/posts/<post_id>', methods=['DELETE'])
 @admin_required
 def delete_post(post_id):
     """Delete post"""
@@ -239,4 +250,62 @@ def get_categories():
             } for c in categories]
         })
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@content_bp.route('/categories', methods=['POST'])
+@admin_required
+def create_category():
+    """Create category"""
+    try:
+        data = request.get_json()
+        if not data.get('name'):
+            return jsonify({'error': 'Category name is required'}), 400
+
+        category = PostCategory(
+            name=data['name'],
+            slug=data.get('slug', data['name'].lower().replace(' ', '-')),
+            description=data.get('description', '')
+        )
+        db.session.add(category)
+        db.session.commit()
+        return jsonify({'ok': True, 'id': category.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@content_bp.route('/categories/<int:category_id>', methods=['PUT'])
+@admin_required
+def update_category(category_id):
+    """Update category"""
+    try:
+        category = PostCategory.query.get_or_404(category_id)
+        data = request.get_json()
+
+        if 'name' in data:
+            category.name = data['name']
+        if 'slug' in data:
+            category.slug = data['slug']
+        if 'description' in data:
+            category.description = data['description']
+
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@content_bp.route('/categories/<int:category_id>', methods=['DELETE'])
+@admin_required
+def delete_category(category_id):
+    """Delete category"""
+    try:
+        category = PostCategory.query.get_or_404(category_id)
+        db.session.delete(category)
+        db.session.commit()
+        return jsonify({'ok': True})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500

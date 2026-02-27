@@ -197,6 +197,10 @@ app.register_blueprint(public_vendors_bp)
 from routes.chart import chart_bp
 app.register_blueprint(chart_bp, url_prefix='/api/chart')
 
+# Blog routes (public blog posts)
+from routes.blog import blog_bp
+app.register_blueprint(blog_bp, url_prefix='/api/blog')
+
 # Cron routes for external cURL calls (cPanel)
 from routes.cron import cron_bp
 app.register_blueprint(cron_bp, url_prefix='/api/cron')
