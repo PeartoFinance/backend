@@ -15,6 +15,9 @@ from models.user import UserSession
 from utils.device import parse_user_agent
 from .decorators import auth_required
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 from services.settings_service import get_setting_secure
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -56,8 +59,16 @@ def login():
     if user.account_status == 'deleted':
         return jsonify({'error': 'This account has been permanently deleted.'}), 403
     
+    # [PEARTO FIX] Facebook-style Auto-Reactivation
+    # If a user's account is deactivated but they provide correct credentials, 
+    # we automatically reactivate it instead of showing an error.
+    account_was_reactivated = False
     if user.account_status == 'deactivated':
-        return jsonify({'error': 'Account is deactivated. Please reactivate to login.'}), 403
+        user.account_status = 'active'
+        user.deactivated_at = None
+        user.deactivation_reason = None
+        account_was_reactivated = True
+        logger.info(f"Account {user.email} automatically reactivated upon login")
     
     if user.account_status == 'suspended':
         return jsonify({'error': 'Account is suspended. Please contact support.'}), 403
@@ -119,10 +130,16 @@ def login():
     except Exception as e:
         print(f'[Auth] Login notification failed: {e}')
     
-    return jsonify({
+    response_data = {
         'user': user.to_dict(),
         'token': token
-    })
+    }
+    
+    # Add reactivation message for the frontend to display
+    if account_was_reactivated:
+        response_data['message'] = 'Your account has been reactivated. Welcome back!'
+        
+    return jsonify(response_data)
 
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -325,8 +342,16 @@ def google_signin():
         if user.account_status == 'deleted':
             return jsonify({'error': 'This account has been permanently deleted.'}), 403
         
+        # [PEARTO FIX] Facebook-style Auto-Reactivation for Google Sign-in
+        # If a user's account is deactivated but they sign in via Google, 
+        # we automatically reactivate it for them.
+        google_account_was_reactivated = False
         if user.account_status == 'deactivated':
-            return jsonify({'error': 'Account is deactivated. Please reactivate to login.'}), 403
+            user.account_status = 'active'
+            user.deactivated_at = None
+            user.deactivation_reason = None
+            google_account_was_reactivated = True
+            logger.info(f"Google Account {user.email} automatically reactivated upon login")
         
         if user.account_status == 'suspended':
             return jsonify({'error': 'Account is suspended. Please contact support.'}), 403
@@ -447,10 +472,16 @@ def google_signin():
     except Exception as e:
         print(f'[Auth] Google login email failed: {e}')
     
-    return jsonify({
+    response_data = {
         'user': user.to_dict(),
         'token': token
-    })
+    }
+    
+    # Add reactivation message for the frontend to display
+    if locals().get('google_account_was_reactivated'):
+        response_data['message'] = 'Your account has been reactivated. Welcome back!'
+        
+    return jsonify(response_data)
 
 
 @auth_bp.route('/logout', methods=['POST'])
