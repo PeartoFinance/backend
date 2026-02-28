@@ -7,7 +7,7 @@ from sqlalchemy import desc
 from models.base import db
 from models.media import TVChannel, RadioStation, TrendingTopic, ForexRate
 from models.article import NewsItem
-from models.misc import Testimonial, FAQ
+from models.misc import Testimonial, FAQ, TeamMember
 from extensions import cache
 
 content_bp = Blueprint('content', __name__)
@@ -223,3 +223,32 @@ def get_faqs():
         'orderIndex': f.order_index,
         'countryCode': f.country_code
     } for f in faqs])
+
+
+@content_bp.route('/teams', methods=['GET'])
+@cache.cached(timeout=300, query_string=True)
+def get_teams():
+    """Get active team members"""
+    limit = min(int(request.args.get('limit', 50)), 100)
+    header_country = request.headers.get('X-User-Country')
+    
+    query = TeamMember.query.filter(TeamMember.is_active == True)
+        
+    if header_country:
+        hc = header_country.strip().upper()
+        query = query.filter(TeamMember.country_code.in_([hc, 'GLOBAL']))
+    else:
+        query = query.filter(TeamMember.country_code == 'GLOBAL')
+    
+    # Order by sort_order asc, then created_at desc
+    members = query.order_by(TeamMember.sort_order.asc(), TeamMember.created_at.desc()).limit(limit).all()
+        
+    return jsonify([m.to_dict() for m in members])
+
+
+@content_bp.route('/teams/<int:member_id>', methods=['GET'])
+@cache.cached(timeout=300)
+def get_team_member(member_id):
+    """Get single active team member detail"""
+    member = TeamMember.query.filter_by(id=member_id, is_active=True).first_or_404()
+    return jsonify(member.to_dict())

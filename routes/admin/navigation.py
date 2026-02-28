@@ -21,7 +21,10 @@ SECTIONS = [
     'header_tools',
     'header_resources',
     'header_featured',
-    'footer',
+    'footer_markets',
+    'footer_resources',
+    'footer_company',
+    'footer_legal',
     'mobile'
 ]
 
@@ -250,6 +253,30 @@ def seed_navigation():
             {'label': 'Discover Investors', 'url': '/investors', 'icon': 'User', 'section': 'sidebar_community', 'order_index': 3},
             {'label': 'Badges', 'url': '/badges', 'icon': 'Award', 'section': 'sidebar_community', 'order_index': 4},
             {'label': 'Messages', 'url': '/messages', 'icon': 'MessageCircle', 'section': 'sidebar_community', 'order_index': 5, 'requires_auth': True},
+            
+            # Footer Markets
+            {'label': 'Stocks', 'url': '/stocks', 'icon': '', 'section': 'footer_markets', 'order_index': 1},
+            {'label': 'Cryptocurrency', 'url': '/crypto', 'icon': '', 'section': 'footer_markets', 'order_index': 2},
+            {'label': 'Forex', 'url': '/forex', 'icon': '', 'section': 'footer_markets', 'order_index': 3},
+            {'label': 'Market Overview', 'url': '/markets', 'icon': '', 'section': 'footer_markets', 'order_index': 4},
+            
+            # Footer Resources
+            {'label': 'Financial Tools', 'url': '/tools', 'icon': '', 'section': 'footer_resources', 'order_index': 1},
+            {'label': 'Learn Investing', 'url': '/learn', 'icon': '', 'section': 'footer_resources', 'order_index': 2},
+            {'label': 'Market News', 'url': '/news', 'icon': '', 'section': 'footer_resources', 'order_index': 3},
+            {'label': 'Glossary', 'url': '/glossary', 'icon': '', 'section': 'footer_resources', 'order_index': 4},
+            
+            # Footer Company
+            {'label': 'About Us', 'url': '/p/about', 'icon': '', 'section': 'footer_company', 'order_index': 1},
+            {'label': 'Contact', 'url': '/p/contact', 'icon': '', 'section': 'footer_company', 'order_index': 2},
+            {'label': 'Careers', 'url': '/p/careers', 'icon': '', 'section': 'footer_company', 'order_index': 3},
+            {'label': 'Press', 'url': '/p/press', 'icon': '', 'section': 'footer_company', 'order_index': 4},
+            
+            # Footer Legal
+            {'label': 'Privacy Policy', 'url': '/p/privacy', 'icon': '', 'section': 'footer_legal', 'order_index': 1},
+            {'label': 'Terms of Service', 'url': '/p/terms', 'icon': '', 'section': 'footer_legal', 'order_index': 2},
+            {'label': 'Disclaimer', 'url': '/p/disclaimer', 'icon': '', 'section': 'footer_legal', 'order_index': 3},
+            {'label': 'Cookie Policy', 'url': '/p/cookies', 'icon': '', 'section': 'footer_legal', 'order_index': 4},
         ]
         
         for item_data in default_items:
