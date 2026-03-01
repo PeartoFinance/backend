@@ -868,3 +868,34 @@ def test_ai_provider():
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@ai_bp.route('/provider/models', methods=['GET'])
+@admin_required
+def get_ai_models():
+    """Return available models per provider for the admin UI"""
+    from services.g4f_models import G4F_TEXT_MODELS
+
+    groq_models = [
+        {"id": "meta-llama/llama-4-scout-17b-16e-instruct", "label": "Llama 4 Scout 17B (Vision)"},
+        {"id": "meta-llama/llama-4-maverick-17b-128e-instruct", "label": "Llama 4 Maverick 17B"},
+        {"id": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B Versatile"},
+        {"id": "llama-3.1-8b-instant", "label": "Llama 3.1 8B Instant"},
+        {"id": "gemma2-9b-it", "label": "Gemma 2 9B"},
+        {"id": "mixtral-8x7b-32768", "label": "Mixtral 8x7B"},
+        {"id": "deepseek-r1-distill-llama-70b", "label": "DeepSeek R1 Distill 70B"},
+        {"id": "qwen-qwq-32b", "label": "Qwen QWQ 32B"},
+    ]
+
+    openai_models = [
+        {"id": "gpt-4", "label": "GPT-4"},
+        {"id": "gpt-4o", "label": "GPT-4o"},
+        {"id": "gpt-4o-mini", "label": "GPT-4o Mini"},
+        {"id": "gpt-3.5-turbo", "label": "GPT-3.5 Turbo"},
+    ]
+
+    return jsonify({
+        'openai': openai_models,
+        'g4f': G4F_TEXT_MODELS,
+        'groq': groq_models,
+    })
