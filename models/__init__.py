@@ -105,6 +105,8 @@ from .chart import (
     ChartTemplate,
     ChartIndicatorSettings,
     DetectedPattern,
+    TradeJournal,
+    TradeReview,
 )
 
 # Settings/Config models

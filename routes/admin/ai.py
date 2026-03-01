@@ -747,12 +747,19 @@ def get_ai_provider():
     api_key = get_setting_secure('SATHI_AI_API_KEY', os.getenv('OPENAI_API_KEY', ''))
     has_api_key = bool(api_key and len(api_key) > 5)
 
+    # Groq config
+    groq_api_key = get_setting_secure('GROQ_API_KEY', os.getenv('GROQ_API_KEY', ''))
+    has_groq_key = bool(groq_api_key and len(groq_api_key) > 5)
+    groq_model = get_setting_secure('GROQ_MODEL', os.getenv('GROQ_MODEL', 'meta-llama/llama-4-scout-17b-16e-instruct'))
+
     return jsonify({
         'provider': provider,
         'model': model,
         'baseUrl': base_url if provider == 'openai' else None,
         'hasApiKey': has_api_key,
-        'availableProviders': ['openai', 'g4f'],
+        'groqModel': groq_model,
+        'hasGroqKey': has_groq_key,
+        'availableProviders': ['openai', 'g4f', 'groq'],
     })
 
 
@@ -769,8 +776,11 @@ def update_ai_provider():
     base_url = data.get('baseUrl')
     api_key = data.get('apiKey')
 
-    if provider and provider not in ('openai', 'g4f'):
-        return jsonify({'error': 'Invalid provider. Use "openai" or "g4f".'}), 400
+    groq_api_key = data.get('groqApiKey')
+    groq_model = data.get('groqModel')
+
+    if provider and provider not in ('openai', 'g4f', 'groq'):
+        return jsonify({'error': 'Invalid provider. Use "openai", "g4f", or "groq".'}), 400
 
     updated = []
 
@@ -802,6 +812,10 @@ def update_ai_provider():
             _upsert_setting('SATHI_AI_BASE_URL', base_url, desc='OpenAI-compatible API base URL')
         if api_key is not None:
             _upsert_setting('SATHI_AI_API_KEY', api_key, desc='OpenAI-compatible API key')
+        if groq_api_key is not None:
+            _upsert_setting('GROQ_API_KEY', groq_api_key, desc='Groq API key for vision/chart analysis')
+        if groq_model is not None:
+            _upsert_setting('GROQ_MODEL', groq_model, desc='Groq model for vision analysis')
 
         db.session.commit()
 

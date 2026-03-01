@@ -1,5 +1,5 @@
 """
-Chart Models - ChartDrawing, ChartTemplate, etc.
+Chart Models - ChartDrawing, ChartTemplate, TradeJournal, TradeReview, etc.
 PeartoFinance Backend
 """
 from datetime import datetime, timezone
@@ -103,4 +103,86 @@ class DetectedPattern(db.Model):
             'confidence': float(self.confidence) if self.confidence else None,
             'direction': self.direction,
             'detectedAt': self.detected_at.isoformat() if self.detected_at else None
+        }
+
+
+class TradeJournal(db.Model):
+    """User trade journal entries for tracking trades"""
+    __tablename__ = 'trade_journal'
+
+    id = db.Column(db.String(255), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    symbol = db.Column(db.String(20), nullable=False)
+    market_type = db.Column(db.String(20), default='stock')  # stock, crypto, forex
+    direction = db.Column(db.String(10), default='long')  # long, short
+    entry_price = db.Column(db.Numeric(18, 6))
+    exit_price = db.Column(db.Numeric(18, 6))
+    stop_loss = db.Column(db.Numeric(18, 6))
+    take_profit = db.Column(db.Numeric(18, 6))
+    quantity = db.Column(db.Numeric(18, 6))
+    timeframe = db.Column(db.String(20))  # 1m, 5m, 15m, 1H, 4H, 1D, 1W
+    strategy = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+    chart_image_url = db.Column(db.Text)
+    analysis_result = db.Column(db.Text)
+    pnl = db.Column(db.Numeric(18, 6))
+    pnl_percent = db.Column(db.Numeric(10, 4))
+    status = db.Column(db.String(20), default='planned')  # planned, active, closed
+    tags = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    closed_at = db.Column(db.DateTime)
+
+    reviews = db.relationship('TradeReview', backref='journal', lazy='dynamic', cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'marketType': self.market_type,
+            'direction': self.direction,
+            'entryPrice': float(self.entry_price) if self.entry_price else None,
+            'exitPrice': float(self.exit_price) if self.exit_price else None,
+            'stopLoss': float(self.stop_loss) if self.stop_loss else None,
+            'takeProfit': float(self.take_profit) if self.take_profit else None,
+            'quantity': float(self.quantity) if self.quantity else None,
+            'timeframe': self.timeframe,
+            'strategy': self.strategy,
+            'notes': self.notes,
+            'chartImageUrl': self.chart_image_url,
+            'analysisResult': self.analysis_result,
+            'pnl': float(self.pnl) if self.pnl else None,
+            'pnlPercent': float(self.pnl_percent) if self.pnl_percent else None,
+            'status': self.status,
+            'tags': self.tags,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None,
+            'closedAt': self.closed_at.isoformat() if self.closed_at else None,
+        }
+
+
+class TradeReview(db.Model):
+    """AI-generated or user-written trade reviews"""
+    __tablename__ = 'trade_reviews'
+
+    id = db.Column(db.String(255), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    journal_id = db.Column(db.String(255), db.ForeignKey('trade_journal.id'), nullable=False)
+    review_type = db.Column(db.String(20), default='pre-trade')  # pre-trade, post-trade
+    ai_analysis = db.Column(db.Text)
+    user_notes = db.Column(db.Text)
+    rating = db.Column(db.Integer)  # 1-5
+    lessons_learned = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'journalId': self.journal_id,
+            'reviewType': self.review_type,
+            'aiAnalysis': self.ai_analysis,
+            'userNotes': self.user_notes,
+            'rating': self.rating,
+            'lessonsLearned': self.lessons_learned,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
         }

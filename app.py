@@ -197,6 +197,10 @@ app.register_blueprint(public_vendors_bp)
 from routes.chart import chart_bp
 app.register_blueprint(chart_bp, url_prefix='/api/chart')
 
+# Chart Analysis routes (AI vision analysis, trade journal)
+from routes.chart_analysis import chart_analysis_bp
+app.register_blueprint(chart_analysis_bp, url_prefix='/api/chart-analysis')
+
 # Blog routes (public blog posts)
 from routes.blog import blog_bp
 app.register_blueprint(blog_bp, url_prefix='/api/blog')
