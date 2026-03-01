@@ -33,8 +33,10 @@ IMPORTANT:
 from flask import Blueprint, jsonify, request, g
 from models import Course, Instructor, CourseModule, UserEnrollment
 from models.base import db
-from routes.decorators import auth_required
+from routes.decorators import auth_required, course_purchase_required
 from extensions import cache
+from services.subscription.gateways import get_payment_gateway
+from services.course_service import CourseManager
 
 education_bp = Blueprint("education", __name__)
 
@@ -43,6 +45,124 @@ def is_course_visible_to_user(course, user_country):
     if course.country_code == "GLOBAL":
         return True
     return course.country_code == user_country
+
+
+@education_bp.route("/courses/<int:course_id>/purchase-manual", methods=["POST"])
+@auth_required
+def manual_course_purchase(course_id):
+    """
+    Manually confirm a purchase for testing purposes.
+    In production, this would be replaced by a proper Stripe/PayPal capture route.
+    """
+    from services.course_service import CourseManager
+    user_id = g.user_id
+    
+    course = Course.query.get(course_id)
+    if not course:
+        return jsonify({"error": "Course not found"}), 404
+        
+    success, message = CourseManager.record_purchase(
+        user_id=user_id,
+        course_id=course_id,
+        amount=course.price or 0,
+        gateway="manual",
+        transaction_id="MANUAL-" + str(id(course_id))
+    )
+    
+    if success:
+        return jsonify({"message": message, "courseId": course_id}), 200
+    else:
+        return jsonify({"error": message}), 500
+
+
+@education_bp.route("/courses/<int:course_id>/checkout", methods=["POST"])
+@auth_required
+def course_checkout(course_id):
+    """
+    Initiates payment for a course using PayPal/Stripe.
+    """
+    data = request.json
+    user_id = g.user_id
+    gateway_type = data.get('gateway', 'stripe')
+
+    # 1. Fetch course
+    course = Course.query.get(course_id)
+    if not course or not course.is_published:
+        return jsonify({'error': 'Course not found'}), 404
+
+    if course.is_free:
+        return jsonify({'error': 'This course is free. Just enroll directly.'}), 400
+
+    # 2. Check if already purchased
+    if CourseManager.check_purchase(user_id, course_id):
+        return jsonify({'message': 'You already own this course. Just enroll.'}), 200
+
+    # 3. Get gateway and create order
+    try:
+        gateway = get_payment_gateway(gateway_type)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+    provider_result, error = gateway.create_order(
+        plan_name=f"Course: {course.title}",
+        final_price=course.price,
+        currency=course.country_code if course.country_code != 'GLOBAL' else 'USD',
+        plan_id=course.id # Use as course_id in return URL
+    )
+
+    if error:
+        return jsonify({'error': 'Payment provider error', 'details': error}), 502
+
+    return jsonify({
+        'order_id': provider_result['order_id'],
+        'approval_url': provider_result['approval_url'],
+        'price': float(course.price),
+        'course_id': course.id
+    })
+
+
+@education_bp.route("/courses/<int:course_id>/capture", methods=["POST"])
+@auth_required
+def course_capture(course_id):
+    """
+    Finalizes course purchase after user confirmation.
+    """
+    data = request.json
+    user_id = g.user_id
+    order_id = data.get('order_id')
+    gateway_type = data.get('gateway', 'stripe')
+
+    if not order_id:
+        return jsonify({'error': 'order_id is required'}), 400
+
+    # 1. Capture payment via gateway
+    try:
+        gateway = get_payment_gateway(gateway_type)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+    capture_result, error = gateway.capture_payment(order_id)
+    if error:
+        return jsonify({'error': 'Capture failed', 'details': error}), 400
+
+    # 2. Record purchase and enroll user (idempotent)
+    course = Course.query.get(course_id)
+    success, message = CourseManager.record_purchase(
+        user_id=user_id,
+        course_id=course_id,
+        amount=capture_result.get('amount', course.price if course else 0),
+        gateway=gateway_type,
+        transaction_id=capture_result.get('transaction_id')
+    )
+
+    if not success:
+        return jsonify({'error': message}), 500
+
+    return jsonify({
+        'success': True,
+        'message': message,
+        'courseId': course_id
+    })
 
 
 @education_bp.route("/courses", methods=["GET"])
@@ -325,6 +445,7 @@ def get_my_courses():
 # user enroll in course
 @education_bp.route("/courses/<int:course_id>/enroll", methods=["POST"])
 @auth_required
+@course_purchase_required
 def enroll_in_course(course_id):
     try:
         user_id = g.user_id
@@ -550,6 +671,7 @@ def complete_module(module_id):
 #  get my-course detail by course_id
 @education_bp.route("/my-courses/<int:course_id>", methods=["GET"])
 @auth_required
+@course_purchase_required
 def get_my_course(course_id):
     try:
         user_id = g.user_id

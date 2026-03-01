@@ -255,3 +255,27 @@ class UserEnrollment(db.Model):
             'lastActivityAt': self.last_activity_at.isoformat() if self.last_activity_at else None,
             'completedAt': self.completed_at.isoformat() if self.completed_at else None
         }
+
+
+class CoursePurchase(db.Model):
+    """Tracks one-time course purchases"""
+    __tablename__ = 'course_purchases'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    
+    # Financial info
+    amount_paid = db.Column(db.Numeric(10, 2), nullable=False)
+    currency = db.Column(db.String(10), default='USD')
+    payment_status = db.Column(db.Enum('pending', 'completed', 'failed', 'refunded'), default='completed')
+    
+    # Reference to gateway transaction
+    gateway = db.Column(db.String(50))
+    transaction_id = db.Column(db.String(255))
+    
+    purchased_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        db.Index('idx_user_course_purchase', 'user_id', 'course_id'),
+    )

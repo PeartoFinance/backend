@@ -76,6 +76,7 @@ from .education import (
     HelpCategory,
     HelpArticle,
     UserEnrollment,
+    CoursePurchase,
 )
 
 # Portfolio/Trading models
@@ -226,7 +227,7 @@ __all__ = [
     # Education
     'Instructor', 'Course', 'CourseModule', 'Quiz', 'QuizQuestion',
     'QuizAnswer', 'QuizAttempt', 'Webinar', 'WebinarAttendance', 'HelpCategory', 'HelpArticle',
-    'UserEnrollment',
+    'UserEnrollment', 'CoursePurchase',
     # Portfolio
     'UserPortfolio', 'PortfolioHolding', 'PortfolioTransaction', 'Watchlist',
     'WatchlistItem', 'UserWatchlist', 'PaperTradingAccount', 'PaperHolding',
