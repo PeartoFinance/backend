@@ -136,7 +136,7 @@ def course_purchase_required(f):
             price_str = f"{course.price} {course.country_code if course.country_code != 'GLOBAL' else 'USD'}"
             return jsonify({
                 "error": "Payment Required",
-                "paymentRequired": true,
+                "paymentRequired": True,
                 "price": float(course.price) if course.price else 0,
                 "message": f"Please purchase this course ({price_str}) to access this content."
             }), 402
