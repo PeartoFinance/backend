@@ -8,6 +8,7 @@ from models.user import UserSession
 import bcrypt
 import time
 from datetime import datetime, timezone
+from models.education import Course, CoursePurchase
 
 def auth_required(f):
     @wraps(f)
@@ -97,6 +98,51 @@ def _get_client_ip() -> str:
         or 'Unknown'
     )
     return ip[:45]
+
+
+def course_purchase_required(f):
+    """
+    Decorator to ensure the user has purchased the course or it is free.
+    Requires @auth_required to be present or for 'g.user_id' to be set.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Extract course_id from URL arguments
+        course_id = kwargs.get('course_id')
+        if not course_id:
+            return jsonify({'error': 'course_id is missing from request'}), 400
+            
+        user_id = g.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'User authentication required'}), 401
+            
+        # 1. Check if course exists and its pricing status
+        course = Course.query.get(course_id)
+        if not course:
+            return jsonify({'error': 'Course not found'}), 404
+            
+        # 2. If free, let them pass
+        if course.is_free:
+            return f(*args, **kwargs)
+            
+        # 3. If paid, check purchase record
+        purchase = CoursePurchase.query.filter_by(
+            user_id=user_id,
+            course_id=course_id,
+            payment_status='completed'
+        ).first()
+        
+        if not purchase:
+            price_str = f"{course.price} {course.country_code if course.country_code != 'GLOBAL' else 'USD'}"
+            return jsonify({
+                "error": "Payment Required",
+                "paymentRequired": true,
+                "price": float(course.price) if course.price else 0,
+                "message": f"Please purchase this course ({price_str}) to access this content."
+            }), 402
+            
+        return f(*args, **kwargs)
+    return decorated
 
 def api_key_required(f):
     @wraps(f)
