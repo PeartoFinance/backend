@@ -153,6 +153,10 @@ def update_news(news_id):
             article.author = data['author']
         if 'full_content' in data:
             article.full_content = data['full_content']
+        if 'curated_status' in data and data['curated_status'] in ('draft', 'published', 'archived'):
+            article.curated_status = data['curated_status']
+            if data['curated_status'] == 'published' and not article.published_at:
+                article.published_at = datetime.utcnow()
         if 'is_published' in data:
             article.is_published = data['is_published']
             if data['is_published'] and not article.published_at:
@@ -410,3 +414,14 @@ def bulk_action_news():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+@news_bp.route('/news/cleanup-old', methods=['POST'])
+@admin_required
+def manual_cleanup_old_articles():
+    """Manually trigger deletion of articles older than 20 days"""
+    try:
+        from jobs.news_jobs import cleanup_old_articles
+        result = cleanup_old_articles()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -330,6 +330,23 @@ def admin_update_plan(plan_id):
     db.session.commit()
     return jsonify({'message': 'Plan updated successfully'})
 
+@subscription_bp.route('/admin/coupons', methods=['GET'])
+@admin_required
+def admin_list_coupons():
+    """Admin only: List all discount coupons"""
+    coupons = SubscriptionCoupon.query.order_by(SubscriptionCoupon.created_at.desc()).all()
+    return jsonify([{
+        'id': c.id,
+        'code': c.code,
+        'discount_type': c.discount_type,
+        'discount_value': float(c.discount_value),
+        'valid_until': c.valid_until.isoformat() if c.valid_until else None,
+        'max_redemptions': c.max_redemptions,
+        'times_redeemed': c.times_redeemed,
+        'is_active': c.is_active,
+        'created_at': c.created_at.isoformat()
+    } for c in coupons])
+
 @subscription_bp.route('/admin/coupons', methods=['POST'])
 @admin_required
 def admin_create_coupon():

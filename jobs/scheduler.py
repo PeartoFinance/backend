@@ -241,7 +241,7 @@ def _execute_job_by_name(job_name, params_json):
         send_daily_pl_summaries, check_financial_goals, process_news_notifications
     )
     from .system_jobs import snapshot_user_wealth, cleanup_deleted_accounts
-    from .news_jobs import import_all_news
+    from .news_jobs import import_all_news, cleanup_old_articles
     from handlers.market_data.forecast_handler import sync_forecast_data
     from services.sports_import_service import SportsImportService
     
@@ -270,6 +270,7 @@ def _execute_job_by_name(job_name, params_json):
         'snapshot_user_wealth': snapshot_user_wealth,
         'cleanup_deleted_accounts': cleanup_deleted_accounts,
         'import_all_news': import_all_news,
+        'cleanup_old_articles': cleanup_old_articles,
         'sync_forecast_data': sync_forecast_data,
         
         # Sports Jobs (Added for sequential processing)
@@ -411,7 +412,7 @@ def _register_notification_jobs():
         check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
         send_daily_pl_summaries, process_news_notifications
     )
-    from .news_jobs import import_all_news
+    from .news_jobs import import_all_news, cleanup_old_articles
     
     start_date = datetime.utcnow() + timedelta(minutes=2)
     
@@ -493,7 +494,18 @@ def _register_notification_jobs():
         name='News Notifications',
         replace_existing=True
     )
-    
+
+    # Old article cleanup (daily at 2 AM UTC)
+    scheduler.add_job(
+        lambda: queue_job(cleanup_old_articles, 'cleanup_old_articles'),
+        'cron',
+        hour=2,
+        minute=0,
+        id='cleanup_old_articles',
+        name='Clean Up Old Articles',
+        replace_existing=True
+    )
+
     logger.info("System jobs registered")
 
 

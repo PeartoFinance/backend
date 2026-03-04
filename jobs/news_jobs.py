@@ -4,7 +4,7 @@ Periodic jobs to fetch news from RSS feeds and external sources
 """
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,44 @@ def import_all_news() -> Dict[str, Any]:
             
     except Exception as e:
         logger.error(f"News import job failed: {e}")
+        return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass
+
+
+def cleanup_old_articles() -> Dict[str, Any]:
+    """
+    Delete news articles older than 20 days.
+    Runs daily at 2 AM UTC via scheduler.
+    """
+    from models import db
+    from models.article import NewsItem
+
+    logger.info("Starting old articles cleanup job")
+    start_time = datetime.utcnow()
+    deleted_count = 0
+
+    try:
+        app = get_app()
+        with app.app_context():
+            cutoff = datetime.utcnow() - timedelta(days=20)
+            deleted_count = NewsItem.query.filter(
+                NewsItem.created_at < cutoff
+            ).delete(synchronize_session=False)
+            db.session.commit()
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"Cleanup complete: {deleted_count} articles deleted (older than {cutoff.date()}) in {elapsed:.1f}s")
+            return {
+                'status': 'ok',
+                'deleted_count': deleted_count,
+                'cutoff_date': cutoff.isoformat(),
+                'elapsed_seconds': elapsed
+            }
+    except Exception as e:
+        logger.error(f"Article cleanup job failed: {e}")
         return {'status': 'error', 'error': str(e)}
     finally:
         try:

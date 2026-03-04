@@ -148,15 +148,21 @@ class NewsItem(db.Model):
             'description': self.summary,
             'link': self.canonical_url or (f'/news/{self.slug}' if self.slug else '#'),
             'url': self.canonical_url,
+            'canonical_url': self.canonical_url,
             'image': self.image or '/placeholder.svg',
             'source': self.source or ('Pearto' if self.source_type == 'admin' else 'News'),
+            'source_type': self.source_type or 'rss',
             'category': self.category or 'general',
             'featured': self.featured,
             'slug': self.slug,
             'author': self.author,
             'publishedAt': self.published_at.isoformat() if self.published_at else None,
+            'published_at': self.published_at.isoformat() if self.published_at else None,
+            'curated_status': self.curated_status or 'draft',
+            'full_content': self.full_content,
             'isInternal': bool(not self.canonical_url and self.slug),
             'country': self.country_code,
+            'related_symbol': self.related_symbol,
             'relatedSymbol': self.related_symbol
         }
 

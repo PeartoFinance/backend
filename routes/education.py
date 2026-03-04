@@ -104,9 +104,9 @@ def course_checkout(course_id):
         return jsonify({'error': str(e)}), 400
 
     # Override success/return URLs to point to the course payment success page
-    from services.settings_service import get_setting_secure as _gss
-    frontend_url = _gss('FRONTEND_URL', 'http://localhost:3000')
-    course_success_url = f"{frontend_url}/learn/payment-success"
+    # Uses APP_URL from DB settings — same key used by email service
+    from notifications.email_service import get_app_url
+    course_success_url = f"{get_app_url()}/learn/payment-success"
     if hasattr(gateway, 'success_url'):
         gateway.success_url = course_success_url
     if hasattr(gateway, 'return_url'):
@@ -115,7 +115,7 @@ def course_checkout(course_id):
     provider_result, error = gateway.create_order(
         plan_name=f"Course: {course.title}",
         final_price=course.price,
-        currency=course.country_code if course.country_code != 'GLOBAL' else 'USD',
+        currency='USD',  # Course prices are stored in USD in the DB
         plan_id=course.id  # Used as course_id in return URL query param
     )
 

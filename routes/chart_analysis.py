@@ -294,8 +294,8 @@ def pre_trade_calculator():
     prompt = f"""Evaluate this trade setup for {symbol} ({direction}):
 - Entry: ${entry}, Stop-Loss: ${stop_loss}, Take-Profit: ${take_profit}
 - Risk/Reward Ratio: {rr_ratio:.2f}
-- Risk Amount: ${risk_amount:.2f if risk_amount else 'N/A'}
-- Account Risk: {risk_percent:.1f}% of balance
+- Risk Amount: ${f'{risk_amount:.2f}' if risk_amount else 'N/A'}
+- Account Risk: {f'{risk_percent:.1f}' if risk_percent else 'N/A'}% of balance
 
 Give a brief (3-4 sentence) assessment: Is this a good R:R? Is the stop too tight/loose?
 Any position sizing advice? Rate the setup: ⭐ Poor / ⭐⭐ Fair / ⭐⭐⭐ Good / ⭐⭐⭐⭐ Very Good / ⭐⭐⭐⭐⭐ Excellent"""
