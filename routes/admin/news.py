@@ -23,7 +23,14 @@ def get_news():
         category = request.args.get('category')
         search = request.args.get('search', '').strip()
         limit = min(int(request.args.get('limit', 100)), 500)
-        offset = int(request.args.get('offset', 0))
+        
+        from utils.validators import safe_pagination
+        limit, offset = safe_pagination(
+            request.args.get('limit', 100),
+            request.args.get('offset'),
+            max_limit=500,
+            max_offset=50000
+        )
         
         # Base query
         query = NewsItem.query

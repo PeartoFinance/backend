@@ -405,11 +405,17 @@ def get_live_stocks():
     """
     from handlers.market_data.stock_handler import get_multiple_quotes
     from models.market import MarketData
+    from utils.validators import safe_pagination
     
     sector = request.args.get('sector')
-    limit = min(safe_int(request.args.get('limit'), 50), 100)
-    page = max(safe_int(request.args.get('page'), 1), 1)
-    offset = (page - 1) * limit
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=100,
+        max_offset=10000
+    )
+    # Calculate page from offset for backward compatibility
+    page = (offset // limit) + 1
     
     header_country = request.headers.get('X-User-Country')
     # Use DB to get relevant symbols
@@ -513,10 +519,16 @@ def get_live_crypto():
     """Get live crypto data with pagination"""
     from handlers.market_data.crypto_handler import get_multiple_crypto_quotes, TOP_CRYPTOS
     from models.market import MarketData
+    from utils.validators import safe_pagination
     
-    limit = min(safe_int(request.args.get('limit', 25)), 50)
-    page = max(safe_int(request.args.get('page'), 1), 1)
-    offset = (page - 1) * limit
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=50,
+        max_offset=5000
+    )
+    # Calculate page from offset for backward compatibility
+    page = (offset // limit) + 1
     
     # Prioritize DB symbols if we rely on user-added ones, else use top list + DB
     # For now, let's use the TOP_CRYPTOS constant + some major ones from DB

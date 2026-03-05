@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from models.article import NewsItem
 from models.base import db
 from extensions import cache
+from utils.validators import safe_pagination
 
 news_bp = Blueprint('news', __name__)
 
@@ -17,8 +18,12 @@ news_bp = Blueprint('news', __name__)
 @cache.cached(timeout=60, query_string=True)
 def get_published_news():
     """Get published news articles with country filtering"""
-    limit = min(int(request.args.get('limit', 50)), 200)
-    offset = int(request.args.get('offset', 0))
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=200,
+        max_offset=10000
+    )
     category = request.args.get('category')
     search = request.args.get('search')
     country = getattr(request, 'user_country', None)
