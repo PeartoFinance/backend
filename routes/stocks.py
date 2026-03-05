@@ -385,12 +385,17 @@ def get_most_active():
 @cache.cached(timeout=300, query_string=True)
 def get_etfs():
     """List all ETFs with optional search and pagination"""
+    from utils.validators import safe_pagination
+    
     query = request.args.get('q', '').strip()
-    # Safe conversion: Returns 20 if invalid characters sent
-    limit = min(safe_int(request.args.get('limit'), 20), 100)
-    # Safe conversion: Returns page 1 if invalid characters sent
-    page = max(safe_int(request.args.get('page'), 1), 1)
-    offset = (page - 1) * limit
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=100,
+        max_offset=10000
+    )
+    # Calculate page from offset for backward compatibility
+    page = (offset // limit) + 1
 
     header_country = request.headers.get('X-User-Country')
     if header_country:

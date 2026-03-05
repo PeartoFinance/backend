@@ -45,8 +45,14 @@ def track_page_view():
 @auth_required
 def get_activity():
     """Get user activity log"""
-    limit = request.args.get('limit', 50, type=int)
-    offset = request.args.get('offset', 0, type=int)
+    from utils.validators import safe_pagination
+    
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=100,
+        max_offset=5000
+    )
     
     activities = UserActivity.query.filter_by(
         user_id=request.user.id

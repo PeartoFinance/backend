@@ -103,6 +103,19 @@ def extract_country():
     )
 
 
+# Teardown handler to clean up database sessions after each request
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    """
+    Clean up database sessions after every request.
+    This prevents connection leaks and ensures proper transaction cleanup.
+    """
+    try:
+        db.session.remove()
+    except Exception as e:
+        app.logger.warning(f"Error during session cleanup: {str(e)}")
+
+
 # Health check endpoint
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -255,6 +268,12 @@ def handle_exception(e):
     In Production: Returns a polite message instead of raw code errors.
     In Development: Returns the actual error for easy debugging.
     """
+    # Clean up database session on error to prevent corruption
+    try:
+        db.session.rollback()
+    except Exception as rollback_error:
+        app.logger.warning(f"Failed to rollback session on error: {str(rollback_error)}")
+    
     # Log the full error to the server logs so developers can fix it
     app.logger.error(f"Unhandled Exception: {str(e)}", exc_info=True)
     

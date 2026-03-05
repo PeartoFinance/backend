@@ -7,6 +7,7 @@ from sqlalchemy import desc, or_
 from models.article import Post, PostCategory
 from models.base import db
 from extensions import cache
+from utils.validators import safe_pagination
 
 blog_bp = Blueprint('blog', __name__)
 
@@ -15,8 +16,12 @@ blog_bp = Blueprint('blog', __name__)
 @cache.cached(timeout=60, query_string=True)
 def get_published_posts():
     """Get published blog posts with pagination, category & search filtering"""
-    limit = min(int(request.args.get('limit', 20)), 200)
-    offset = int(request.args.get('offset', 0))
+    limit, offset = safe_pagination(
+        request.args.get('limit'),
+        request.args.get('offset'),
+        max_limit=200,
+        max_offset=10000
+    )
     category = request.args.get('category')
     search = request.args.get('search')
     country = getattr(request, 'user_country', None)

@@ -114,7 +114,12 @@ def login():
         user_agent=request.headers.get('User-Agent')
     )
     db.session.add(session)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create login session: {str(e)}")
+        return jsonify({'error': 'Login failed. Please try again.'}), 500
     
     # Track login activity
     try:
@@ -191,7 +196,12 @@ def signup():
     )
     
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create user account: {str(e)}")
+        return jsonify({'error': 'Email already exists or invalid signup data'}), 400
     
     # Create user profile automatically
     profile = UserProfile(
@@ -200,7 +210,12 @@ def signup():
         trading_style='mixed'
     )
     db.session.add(profile)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create user profile: {str(e)}")
+        # Profile creation is non-critical, continue with signup
     
     # NEW: Automatically grant 'Free' subscription (if plan exists)
     try:
@@ -247,7 +262,11 @@ def forgot_password():
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
         )
         db.session.add(reset_token)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to create password reset token: {str(e)}")
         
         # Send password reset email
         try:
@@ -288,7 +307,12 @@ def reset_password():
         reset_token.used = True
         # Invalidate all active sessions so everyone must re-login with new password
         UserSession.query.filter_by(user_id=user.id).delete()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update password: {str(e)}")
+            return jsonify({'error': 'Password reset failed. Please try again.'}), 500
     
     return jsonify({'message': 'Password reset successful'})
 
@@ -363,7 +387,11 @@ def google_signin():
             user.avatar_url = avatar_url
         
         user.last_login_at = datetime.now(timezone.utc)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update existing user on Google login: {str(e)}")
         
     else:
         # Check referral code if provided
@@ -394,7 +422,12 @@ def google_signin():
             referred_by=referred_by_id
         )
         db.session.add(user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to create Google user account: {str(e)}")
+            return jsonify({'error': 'Account creation failed. Please try again.'}), 500
         
         # Create user profile automatically
         profile = UserProfile(
@@ -403,8 +436,11 @@ def google_signin():
             trading_style='mixed'
         )
         db.session.add(profile)
-        db.session.commit()
-        
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to create Google user profile: {str(e)}")
         # NEW: Automatically grant 'Free' subscription (if plan exists) for Google Signup
         try:
             from models.subscription import SubscriptionPlan
@@ -454,8 +490,12 @@ def google_signin():
         expires_at=datetime.now(timezone.utc) + timedelta(hours=config.JWT_EXPIRY_HOURS)
     )
     db.session.add(session)
-    db.session.commit()
-
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create Google login session: {str(e)}")
+        return jsonify({'error': 'Login session failed. Please try again.'}), 500
 
     # Track login and send notification
     try:
@@ -524,6 +564,12 @@ def set_password():
     user.password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     # Invalidate all active sessions so everyone must re-login with new password
     UserSession.query.filter_by(user_id=user.id).delete()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update password: {str(e)}")
+        return jsonify({'error': 'Password update failed. Please try again.'}), 500
     
     # Create a new session for the current user so they stay logged in
     payload = {
@@ -545,7 +591,12 @@ def set_password():
         user_agent=request.headers.get('User-Agent')
     )
     db.session.add(new_session)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create new session after password set: {str(e)}")
+        return jsonify({'error': 'Session creation failed. Please login again.'}), 500
     
     # Track password change/set
     try:
