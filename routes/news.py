@@ -26,6 +26,7 @@ def get_published_news():
     )
     category = request.args.get('category')
     search = request.args.get('search')
+    author = request.args.get('author')
     country = getattr(request, 'user_country', None)
     
     query = NewsItem.query.filter(
@@ -39,6 +40,9 @@ def get_published_news():
     
     if category:
         query = query.filter(NewsItem.category == category)
+    
+    if author:
+        query = query.filter(NewsItem.author.ilike(f'%{author}%'))
     
     if search:
         # Split into keywords and match any keyword in title or summary
