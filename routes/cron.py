@@ -530,3 +530,19 @@ def cron_sports_live_refresh():
         return jsonify({'ok': True, 'message': 'Sports live refresh job triggered'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@cron_bp.route('/trial-reminders', methods=['GET', 'POST'])
+def cron_trial_reminders():
+    """
+    cPanel Cron: URL-accessible endpoint for trial expiration reminders.
+    cURL example: curl -X POST https://apipearto.ashlya.com/api/cron/trial-reminders?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+    
+    try:
+        from jobs.notification_jobs import check_trial_expirations
+        queue_job(check_trial_expirations, 'check_trial_expirations')
+        return jsonify({'ok': True, 'message': 'Trial reminder job triggered'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from . import db
 from sqlalchemy.dialects.mysql import JSON
 
@@ -154,3 +154,29 @@ class PaymentTransaction(db.Model):
     description = db.Column(db.String(255), nullable=True)            # e.g., "Pro Plan - Nov Renewal"
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class TrialNotification(db.Model):
+    """
+    Tracks sent trial expiration notifications to prevent duplicate emails.
+    (cron-safe, idempotent)
+    """
+    __tablename__ = 'trial_notifications'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    subscription_id = db.Column(db.Integer, db.ForeignKey('user_subscriptions.id'), nullable=False)
+    
+    # Track when the notification was sent
+    sent_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Type of notification (e.g. '24h_before', 'expired')
+    notification_type = db.Column(db.String(50), default='24h_before')
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 
+            'subscription_id', 
+            'notification_type', 
+            name='ux_user_sub_trial_notification'
+        ),
+    )

@@ -345,6 +345,69 @@ Go to your dashboard: {{login_url}}
 
 If you have any questions, please contact our support team.'''
     },
+    'trial_ending_soon': {
+        'subject': f'Your {APP_NAME} Free Trial is Ending Soon! ⏳',
+        'html': '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #fce7f3; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: linear-gradient(135deg, #db2777 0%, #ec4899 100%); border-radius: 16px 16px 0 0; padding: 40px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Trial Ending Soon! ⏳</h1>
+        </div>
+        <div style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">Hi {{user_name}},</p>
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">We hope you've been enjoying your <strong>{{plan_name}}</strong> free trial on {{app_name}}.</p>
+            
+            <div style="background-color: #fff1f2; border-left: 4px solid #f43f5e; padding: 20px; margin: 25px 0; border-radius: 8px;">
+                <p style="margin: 0; color: #9f1239; font-weight: 700; font-size: 16px;">
+                    Your trial expires on: {{expiry_date}}
+                </p>
+                <p style="margin: 10px 0 0 0; color: #be123c; font-size: 14px;">
+                    Upgrade now to keep your premium benefits and avoid any interruption.
+                </p>
+            </div>
+
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">With your premium plan, you'll continue to get access to:</p>
+            <ul style="color: #4b5563; font-size: 15px; line-height: 1.8;">
+                <li>Real-time market insights & alerts</li>
+                <li>Advanced portfolio analytics & reporting</li>
+                <li>Exclusive AI-powered market forecasts</li>
+                <li>Unrestricted access to all tools</li>
+            </ul>
+
+            <div style="text-align: center; margin: 40px 0;">
+                <a href="{{billing_url}}" style="display: inline-block; background: #db2777; color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 700; font-size: 16px; transition: background 0.3s ease; box-shadow: 0 4px 6px rgba(219, 39, 119, 0.2);">Upgrade My Account</a>
+            </div>
+
+            <p style="font-size: 14px; color: #6b7280; text-align: center;">If you have any questions, our support team is always here to help.</p>
+            <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 30px 0;">
+            <p style="font-size: 12px; color: #9ca3af; text-align: center;">This is an automated reminder from {{app_name}}.</p>
+        </div>
+    </div>
+</body>
+</html>''',
+        'text': '''Your {{app_name}} Free Trial is Ending Soon!
+
+Hi {{user_name}},
+
+We hope you've been enjoying your {{plan_name}} free trial.
+Your trial expires on: {{expiry_date}}
+
+Upgrade now to keep your premium benefits: {{billing_url}}
+
+Premium Benefits:
+- Real-time market insights & alerts
+- Advanced portfolio analytics
+- AI-powered market forecasts
+- Unrestricted access to all tools
+
+If you have any questions, please contact our support team.'''
+    },
 }
 
 
@@ -557,5 +620,16 @@ def send_subscription_success_email(user_email: str, user_name: str, plan_name: 
         'user_name': user_name,
         'plan_name': plan_name,
         'amount': f"${amount:.2f}"
+    })
+
+
+def send_trial_ending_email(user_email: str, user_name: str, plan_name: str, expiry_date: datetime) -> bool:
+    """Send notification that trial is ending soon"""
+    billing_url = f"{get_app_url()}/subscription"
+    return _email_service.send_email_async(user_email, 'trial_ending_soon', {
+        'user_name': user_name,
+        'plan_name': plan_name,
+        'expiry_date': expiry_date.strftime('%Y-%m-%d'),
+        'billing_url': billing_url
     })
 
