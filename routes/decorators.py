@@ -89,6 +89,34 @@ def admin_required(f):
     return decorated
 
 
+def permission_required(permission_key):
+    """Decorator factory — requires admin role AND a specific permission key."""
+    def decorator(f):
+        @wraps(f)
+        @auth_required
+        def decorated(*args, **kwargs):
+            user = request.user
+            if user.role != 'admin':
+                return jsonify({'error': 'Admin privileges required'}), 403
+
+            from models.user import AdminUser
+            admin_user = AdminUser.query.filter_by(user_id=user.id).first()
+            if not admin_user:
+                return jsonify({'error': 'Admin record not found'}), 403
+
+            # Superadmins bypass all permission checks
+            if admin_user.is_superadmin:
+                return f(*args, **kwargs)
+
+            perms = admin_user.get_permissions()
+            if not perms.get(permission_key, False):
+                return jsonify({'error': f'Permission "{permission_key}" required'}), 403
+
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+
 def _get_client_ip() -> str:
     """Extract the real client IP from proxy headers, safe for VARCHAR(45)."""
     ip = (

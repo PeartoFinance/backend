@@ -93,6 +93,22 @@ def get_news():
         return jsonify({'error': str(e)}), 500
 
 
+@news_bp.route('/news/categories', methods=['GET'])
+@admin_required
+def get_news_categories():
+    """Return distinct category values used in news items"""
+    try:
+        from sqlalchemy import func
+        rows = db.session.query(NewsItem.category).filter(
+            NewsItem.category != None,
+            NewsItem.category != ''
+        ).distinct().order_by(NewsItem.category).all()
+        categories = [{'slug': r[0], 'name': r[0].replace('-', ' ').title()} for r in rows if r[0]]
+        return jsonify({'categories': categories})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @news_bp.route('/news/<int:news_id>', methods=['GET'])
 @admin_required
 def get_news_item(news_id):
