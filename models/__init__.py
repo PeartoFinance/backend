@@ -198,6 +198,7 @@ from .subscription import (
     SubscriptionCoupon,
     UserSubscription,
     PaymentTransaction,
+    TrialNotification,
 )
 
 # Feature Usage tracking
@@ -252,7 +253,7 @@ __all__ = [
     'TradingIdea', 'IdeaLike', 'IdeaComment', 'DiscussionGroup', 'GroupMember', 'GroupPost',
     'Badge', 'UserBadge', 'CopyTradingLink', 'CopyTradeExecution',
     # Subscription
-    'SubscriptionPlan', 'SubscriptionCoupon', 'UserSubscription', 'PaymentTransaction',
+    'SubscriptionPlan', 'SubscriptionCoupon', 'UserSubscription', 'PaymentTransaction', 'TrialNotification',
     # Feature Usage
     'UserFeatureUsage',
     # API Keys

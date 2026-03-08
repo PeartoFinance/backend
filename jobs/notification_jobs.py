@@ -493,3 +493,77 @@ def send_daily_pl_summaries() -> Dict[str, Any]:
         except:
             pass
 
+
+def check_trial_expirations() -> Dict[str, Any]:
+    """
+    Check for subscription free trials ending in the next 48 hours.
+    Sends reminders to users to upgrade before trial ends.
+    """
+    from models import db
+    logger.info("Running trial expiration notification check")
+    
+    try:
+        app = get_app()
+        with app.app_context():
+            from models import UserSubscription, TrialNotification
+            from notifications.email_service import send_trial_ending_email
+            from datetime import timedelta
+            
+            notifications_sent = 0
+            # Define window: between 0 and 48 hours from now
+            now = datetime.utcnow()
+            reminder_threshold = now + timedelta(hours=48)
+            
+            # 1. Find all active trials ending soon
+            expiring_trials = UserSubscription.query.filter(
+                UserSubscription.status == 'trialing',
+                UserSubscription.current_period_end > now,
+                UserSubscription.current_period_end <= reminder_threshold
+            ).all()
+            
+            for sub in expiring_trials:
+                try:
+                    # 2. Idempotency Check
+                    already_notified = TrialNotification.query.filter_by(
+                        user_id=sub.user_id,
+                        subscription_id=sub.id,
+                        notification_type='24h_before'
+                    ).first()
+                    
+                    if not already_notified:
+                        user = sub.user
+                        if user and user.email:
+                            # 3. Send email
+                            success = send_trial_ending_email(
+                                user_email=user.email,
+                                user_name=user.name,
+                                plan_name=sub.plan.name,
+                                expiry_date=sub.current_period_end
+                            )
+                            
+                            if success:
+                                # 4. Log notification
+                                notif = TrialNotification(
+                                    user_id=sub.user_id,
+                                    subscription_id=sub.id,
+                                    notification_type='24h_before'
+                                )
+                                db.session.add(notif)
+                                db.session.commit() # Commit each to avoid losing progress on crash
+                                notifications_sent += 1
+                                logger.info(f"Trial reminder sent to {user.email} (Ends: {sub.current_period_end})")
+                
+                except Exception as sub_err:
+                    logger.warning(f"Failed to process trial expiration for user {sub.user_id}: {sub_err}")
+                    db.session.rollback()
+            
+            return {'status': 'ok', 'reminders_sent': notifications_sent}
+            
+    except Exception as e:
+        logger.error(f"Trial expiration check failed: {e}")
+        return {'status': 'error', 'error': str(e)}
+    finally:
+        try:
+            db.session.remove()
+        except:
+            pass

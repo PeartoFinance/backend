@@ -238,7 +238,8 @@ def _execute_job_by_name(job_name, params_json):
     )
     from .notification_jobs import (
         check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
-        send_daily_pl_summaries, check_financial_goals, process_news_notifications
+        send_daily_pl_summaries, check_financial_goals, process_news_notifications,
+        check_trial_expirations
     )
     from .system_jobs import snapshot_user_wealth, cleanup_deleted_accounts
     from .news_jobs import import_all_news, cleanup_old_articles
@@ -266,6 +267,7 @@ def _execute_job_by_name(job_name, params_json):
         'send_daily_pl_summaries': send_daily_pl_summaries,
         'check_financial_goals': check_financial_goals,
         'process_news_notifications': process_news_notifications,
+        'check_trial_expirations': check_trial_expirations,
         
         'snapshot_user_wealth': snapshot_user_wealth,
         'cleanup_deleted_accounts': cleanup_deleted_accounts,
@@ -410,7 +412,7 @@ def _register_notification_jobs():
     """Register notification and alert jobs"""
     from .notification_jobs import (
         check_watchlist_alerts, send_daily_digest, check_earnings_alerts,
-        send_daily_pl_summaries, process_news_notifications
+        send_daily_pl_summaries, process_news_notifications, check_trial_expirations
     )
     from .news_jobs import import_all_news, cleanup_old_articles
     
@@ -455,6 +457,16 @@ def _register_notification_jobs():
         hour=8,
         id='daily_pl_summary',
         name='Send Daily P&L Summary',
+        replace_existing=True
+    )
+
+    # Trial Expiration Reminders (Daily at 10 AM)
+    scheduler.add_job(
+        lambda: queue_job(check_trial_expirations, 'check_trial_expirations'),
+        'cron',
+        hour=10,
+        id='trial_reminders',
+        name='Trial Expiration Reminders',
         replace_existing=True
     )
     
