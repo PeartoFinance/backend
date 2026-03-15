@@ -301,6 +301,23 @@ def cron_cleanup_accounts():
         return jsonify({'error': str(e)}), 500
 
 
+@cron_bp.route('/cleanup-news', methods=['GET', 'POST'])
+def cron_cleanup_news():
+    """
+    Delete news articles older than 20 days.
+    cURL: curl -X POST https://apipearto.ashlya.com/api/cron/cleanup-news?token=YOUR_TOKEN
+    """
+    if not verify_cron_token():
+        return jsonify({'error': 'Invalid cron token'}), 401
+
+    try:
+        from jobs.news_jobs import cleanup_old_articles
+        queue_job(cleanup_old_articles, 'cleanup_old_articles')
+        return jsonify({'ok': True, 'message': 'News cleanup triggered'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @cron_bp.route('/financials', methods=['GET', 'POST'])
 def cron_update_financials():
     """

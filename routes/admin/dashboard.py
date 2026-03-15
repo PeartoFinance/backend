@@ -3,14 +3,14 @@ Admin Dashboard Routes
 GET /api/admin/stats - Dashboard statistics
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, User, NewsItem, ToolSettings, Post, Page, Subscriber, AuditEvent
 
 dashboard_bp = Blueprint('admin_dashboard', __name__)
 
 
 @dashboard_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("dashboard")
 def get_stats():
     """Get dashboard statistics"""
     try:

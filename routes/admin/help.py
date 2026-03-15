@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, HelpCategory, HelpArticle, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 help_bp = Blueprint('admin_help', __name__, url_prefix='/help')
 
@@ -32,7 +32,7 @@ def log_audit(action, entity, entity_id, meta=None):
 # ============================================================================
 
 @help_bp.route('/categories', methods=['GET'])
-@admin_required
+@permission_required("help_center")
 def get_categories():
     """List all help categories"""
     try:
@@ -56,7 +56,7 @@ def get_categories():
 
 
 @help_bp.route('/categories/<int:category_id>', methods=['GET'])
-@admin_required
+@permission_required("help_center")
 def get_category(category_id):
     """Get single category"""
     try:
@@ -79,7 +79,7 @@ def get_category(category_id):
 
 
 @help_bp.route('/categories', methods=['POST'])
-@admin_required
+@permission_required("help_center")
 def create_category():
     """Create a help category"""
     try:
@@ -110,7 +110,7 @@ def create_category():
 
 
 @help_bp.route('/categories/<int:category_id>', methods=['PUT'])
-@admin_required
+@permission_required("help_center")
 def update_category(category_id):
     """Update a help category"""
     try:
@@ -142,7 +142,7 @@ def update_category(category_id):
 
 
 @help_bp.route('/categories/<int:category_id>', methods=['DELETE'])
-@admin_required
+@permission_required("help_center")
 def delete_category(category_id):
     """Delete a help category"""
     try:
@@ -169,7 +169,7 @@ def delete_category(category_id):
 # ============================================================================
 
 @help_bp.route('/articles', methods=['GET'])
-@admin_required
+@permission_required("help_center")
 def get_articles():
     """List all help articles"""
     try:
@@ -221,7 +221,7 @@ def get_articles():
 
 
 @help_bp.route('/articles/<int:article_id>', methods=['GET'])
-@admin_required
+@permission_required("help_center")
 def get_article(article_id):
     """Get single article"""
     try:
@@ -248,7 +248,7 @@ def get_article(article_id):
 
 
 @help_bp.route('/articles', methods=['POST'])
-@admin_required
+@permission_required("help_center")
 def create_article():
     """Create a help article"""
     try:
@@ -280,7 +280,7 @@ def create_article():
 
 
 @help_bp.route('/articles/<int:article_id>', methods=['PUT'])
-@admin_required
+@permission_required("help_center")
 def update_article(article_id):
     """Update a help article"""
     try:
@@ -312,7 +312,7 @@ def update_article(article_id):
 
 
 @help_bp.route('/articles/<int:article_id>', methods=['DELETE'])
-@admin_required
+@permission_required("help_center")
 def delete_article(article_id):
     """Delete a help article"""
     try:
@@ -334,7 +334,7 @@ def delete_article(article_id):
 # ============================================================================
 
 @help_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("help_center")
 def get_help_stats():
     """Get help center statistics"""
     try:

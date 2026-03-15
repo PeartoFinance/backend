@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from models import db, Vendor, VendorAPIKey, VendorCustomAPI, AuditEvent, VendorReview, VendorHistory
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 vendors_bp = Blueprint('admin_vendors', __name__)
 
@@ -32,7 +32,7 @@ def log_audit(action, entity, entity_id, meta=None):
 # ==========================================
 
 @vendors_bp.route('/vendors', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_vendors():
     """List all vendors"""
     try:
@@ -58,7 +58,7 @@ def get_vendors():
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors', methods=['POST'])
-@admin_required
+@permission_required("vendors_manage")
 def create_vendor():
     """Create new vendor"""
     try:
@@ -94,7 +94,7 @@ def create_vendor():
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_vendor(vendor_id):
     """Get full vendor details"""
     try:
@@ -130,7 +130,7 @@ def get_vendor(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>', methods=['PATCH'])
-@admin_required
+@permission_required("vendors_manage")
 def update_vendor(vendor_id):
     """Update vendor"""
     try:
@@ -171,7 +171,7 @@ def update_vendor(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>', methods=['DELETE'])
-@admin_required
+@permission_required("vendors_manage")
 def delete_vendor(vendor_id):
     """Suspend vendor (Soft Delete)"""
     try:
@@ -199,7 +199,7 @@ def delete_vendor(vendor_id):
 # ==========================================
 
 @vendors_bp.route('/vendors/<vendor_id>/api-keys', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_api_keys(vendor_id):
     try:
         keys = VendorAPIKey.query.filter_by(vendor_id=vendor_id).order_by(VendorAPIKey.created_at.desc()).all()
@@ -217,7 +217,7 @@ def get_api_keys(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/api-keys', methods=['POST'])
-@admin_required
+@permission_required("vendors_manage")
 def create_api_key(vendor_id):
     """Generate new API Key pair"""
     try:
@@ -268,7 +268,7 @@ def create_api_key(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/api-keys/<key_id>', methods=['PATCH'])
-@admin_required
+@permission_required("vendors_manage")
 def toggle_api_key(vendor_id, key_id):
     """Toggle API Key active status or update permissions"""
     try:
@@ -290,7 +290,7 @@ def toggle_api_key(vendor_id, key_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/api-keys/<key_id>', methods=['DELETE'])
-@admin_required
+@permission_required("vendors_manage")
 def revoke_api_key(vendor_id, key_id):
     """Revoke (Delete) API Key"""
     try:
@@ -310,7 +310,7 @@ def revoke_api_key(vendor_id, key_id):
 # ==========================================
 
 @vendors_bp.route('/vendors/<vendor_id>/custom-apis', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_webhooks(vendor_id):
     try:
         hooks = VendorCustomAPI.query.filter_by(vendor_id=vendor_id).all()
@@ -329,7 +329,7 @@ def get_webhooks(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/custom-apis', methods=['POST'])
-@admin_required
+@permission_required("vendors_manage")
 def create_webhook(vendor_id):
     try:
         data = request.get_json()
@@ -356,7 +356,7 @@ def create_webhook(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/custom-apis/<webhook_id>', methods=['PATCH'])
-@admin_required
+@permission_required("vendors_manage")
 def update_webhook(vendor_id, webhook_id):
     """Update webhook configuration"""
     try:
@@ -382,7 +382,7 @@ def update_webhook(vendor_id, webhook_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/custom-apis/<webhook_id>', methods=['DELETE'])
-@admin_required
+@permission_required("vendors_manage")
 def delete_webhook(vendor_id, webhook_id):
     try:
         hook = VendorCustomAPI.query.filter_by(id=webhook_id, vendor_id=vendor_id).first_or_404()
@@ -399,7 +399,7 @@ def delete_webhook(vendor_id, webhook_id):
 # ==========================================
 
 @vendors_bp.route('/vendors/<vendor_id>/reviews', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_admin_reviews(vendor_id):
     try:
         reviews = VendorReview.query.filter_by(vendor_id=vendor_id).order_by(VendorReview.created_at.desc()).all()
@@ -416,7 +416,7 @@ def get_admin_reviews(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/reviews/<review_id>', methods=['DELETE'])
-@admin_required
+@permission_required("vendors_manage")
 def delete_review(review_id):
     try:
         review = VendorReview.query.get_or_404(review_id)
@@ -450,7 +450,7 @@ def delete_review(review_id):
 # ==========================================
 
 @vendors_bp.route('/vendors/<vendor_id>/history', methods=['GET'])
-@admin_required
+@permission_required("vendors_manage")
 def get_admin_history(vendor_id):
     try:
         # Group by date for the UI
@@ -476,7 +476,7 @@ def get_admin_history(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/history', methods=['POST'])
-@admin_required
+@permission_required("vendors_manage")
 def add_history_point(vendor_id):
     try:
         data = request.get_json()
@@ -518,7 +518,7 @@ def add_history_point(vendor_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/history/<int:entry_id>', methods=['DELETE'])
-@admin_required
+@permission_required("vendors_manage")
 def delete_history_point(vendor_id, entry_id):
     """Delete a single history data point"""
     try:
@@ -532,7 +532,7 @@ def delete_history_point(vendor_id, entry_id):
         return jsonify({'error': str(e)}), 500
 
 @vendors_bp.route('/vendors/<vendor_id>/history/batch-delete', methods=['POST'])
-@admin_required
+@permission_required("vendors_manage")
 def delete_history_batch(vendor_id):
     """Delete all history points for a given date"""
     try:

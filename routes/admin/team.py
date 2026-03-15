@@ -4,14 +4,14 @@ CRUD for /api/admin/team
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, TeamMember
 
 team_bp = Blueprint('admin_team', __name__)
 
 
 @team_bp.route('/team', methods=['GET'])
-@admin_required
+@permission_required("team_manage")
 def get_team_members():
     """List all team members"""
     try:
@@ -42,7 +42,7 @@ def get_team_members():
 
 
 @team_bp.route('/team/<int:member_id>', methods=['GET'])
-@admin_required
+@permission_required("team_manage")
 def get_team_member(member_id):
     """Get single team member"""
     try:
@@ -65,7 +65,7 @@ def get_team_member(member_id):
 
 
 @team_bp.route('/team', methods=['POST'])
-@admin_required
+@permission_required("team_manage")
 def create_team_member():
     """Create team member"""
     try:
@@ -92,7 +92,7 @@ def create_team_member():
 
 
 @team_bp.route('/team/<int:member_id>', methods=['PUT'])
-@admin_required
+@permission_required("team_manage")
 def update_team_member(member_id):
     """Update team member"""
     try:
@@ -119,7 +119,7 @@ def update_team_member(member_id):
 
 
 @team_bp.route('/team/<int:member_id>', methods=['DELETE'])
-@admin_required
+@permission_required("team_manage")
 def delete_team_member(member_id):
     """Delete team member"""
     try:
@@ -133,7 +133,7 @@ def delete_team_member(member_id):
 
 
 @team_bp.route('/team/reorder', methods=['POST'])
-@admin_required
+@permission_required("team_manage")
 def reorder_team():
     """Reorder team members"""
     try:

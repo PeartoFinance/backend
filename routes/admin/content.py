@@ -5,7 +5,7 @@ CRUD for pages, posts, categories
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 import uuid
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, Page, Post, PostCategory
 
 content_bp = Blueprint('admin_content', __name__)
@@ -14,7 +14,7 @@ content_bp = Blueprint('admin_content', __name__)
 # ============ PAGES ============
 
 @content_bp.route('/pages', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_pages():
     """List all pages"""
     try:
@@ -46,7 +46,7 @@ def get_pages():
 
 
 @content_bp.route('/pages', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_page():
     """Create page"""
     try:
@@ -75,7 +75,7 @@ def create_page():
 
 
 @content_bp.route('/pages/<page_id>', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_page(page_id):
     """Get single page"""
     try:
@@ -102,7 +102,7 @@ def get_page(page_id):
 
 
 @content_bp.route('/pages/<page_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_page(page_id):
     """Update page"""
     try:
@@ -124,7 +124,7 @@ def update_page(page_id):
 
 
 @content_bp.route('/pages/<page_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_page(page_id):
     """Delete page"""
     try:
@@ -140,15 +140,38 @@ def delete_page(page_id):
 # ============ POSTS ============
 
 @content_bp.route('/posts', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_posts():
     """List all posts"""
     try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        status = request.args.get('status', '')
+
         country = getattr(request, 'user_country', 'US')
-        posts = Post.query.filter(
+        query = Post.query.filter(
             (Post.country_code == country) | 
             (Post.country_code == 'GLOBAL')
-        ).order_by(Post.created_at.desc()).limit(500).all()
+        )
+
+        if status and status != 'all':
+            query = query.filter(Post.status == status)
+            
+        if search:
+            query = query.filter(
+                db.or_(
+                    Post.title.ilike(f'%{search}%'),
+                    Post.content.ilike(f'%{search}%'),
+                    Post.excerpt.ilike(f'%{search}%')
+                )
+            )
+
+        paginated_posts = query.order_by(Post.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        posts = paginated_posts.items
+
         return jsonify({
             'posts': [{
                 'id': p.id,
@@ -158,14 +181,17 @@ def get_posts():
                 'status': p.status,
                 'featured_image': p.featured_image,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
-            } for p in posts]
+            } for p in posts],
+            'pages': paginated_posts.pages,
+            'total': paginated_posts.total,
+            'currentPage': paginated_posts.page
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
 @content_bp.route('/posts', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_post():
     """Create post"""
     try:
@@ -196,7 +222,7 @@ def create_post():
 
 
 @content_bp.route('/posts/<post_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_post(post_id):
     """Update post"""
     try:
@@ -220,7 +246,7 @@ def update_post(post_id):
 
 
 @content_bp.route('/posts/<post_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_post(post_id):
     """Delete post"""
     try:
@@ -236,7 +262,7 @@ def delete_post(post_id):
 # ============ CATEGORIES ============
 
 @content_bp.route('/categories', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_categories():
     """List all categories"""
     try:
@@ -254,7 +280,7 @@ def get_categories():
 
 
 @content_bp.route('/categories', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_category():
     """Create category"""
     try:
@@ -276,7 +302,7 @@ def create_category():
 
 
 @content_bp.route('/categories/<int:category_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_category(category_id):
     """Update category"""
     try:
@@ -298,7 +324,7 @@ def update_category(category_id):
 
 
 @content_bp.route('/categories/<int:category_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_category(category_id):
     """Delete category"""
     try:

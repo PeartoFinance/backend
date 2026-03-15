@@ -1,11 +1,11 @@
 from flask import Blueprint, jsonify, request
 from models import db, ApiKey, ApiUsageLog, User
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 admin_api_management_bp = Blueprint('admin_api_management', __name__)
 
 @admin_api_management_bp.route('/api-management/keys', methods=['GET'])
-@admin_required
+@permission_required("apis_integration")
 def get_all_keys():
     """List all API keys across the system"""
     try:
@@ -30,7 +30,7 @@ def get_all_keys():
         return jsonify({'error': str(e)}), 500
 
 @admin_api_management_bp.route('/api-management/keys/<int:key_id>', methods=['DELETE'])
-@admin_required
+@permission_required("apis_integration")
 def revoke_key(key_id):
     """Admin revoke API key"""
     try:
@@ -43,7 +43,7 @@ def revoke_key(key_id):
         return jsonify({'error': str(e)}), 500
 
 @admin_api_management_bp.route('/api-management/usage', methods=['GET'])
-@admin_required
+@permission_required("apis_integration")
 def get_global_usage():
     """Get global API usage stats"""
     try:

@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, Seller, SellerApplication, User, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 sellers_bp = Blueprint('admin_sellers', __name__, url_prefix='/sellers')
 
@@ -32,7 +32,7 @@ def log_audit(action, entity, entity_id, meta=None):
 # ============================================================================
 
 @sellers_bp.route('', methods=['GET'])
-@admin_required
+@permission_required("sellers_manage")
 def get_sellers():
     """List all sellers"""
     try:
@@ -78,7 +78,7 @@ def get_sellers():
 
 
 @sellers_bp.route('/<seller_id>', methods=['GET'])
-@admin_required
+@permission_required("sellers_manage")
 def get_seller(seller_id):
     """Get seller details"""
     try:
@@ -104,7 +104,7 @@ def get_seller(seller_id):
 
 
 @sellers_bp.route('/<seller_id>/status', methods=['PUT'])
-@admin_required
+@permission_required("sellers_manage")
 def update_seller_status(seller_id):
     """Update seller status"""
     try:
@@ -136,7 +136,7 @@ def update_seller_status(seller_id):
 # ============================================================================
 
 @sellers_bp.route('/applications', methods=['GET'])
-@admin_required
+@permission_required("sellers_manage")
 def get_applications():
     """List all seller applications"""
     try:
@@ -176,7 +176,7 @@ def get_applications():
 
 
 @sellers_bp.route('/applications/<int:app_id>', methods=['GET'])
-@admin_required
+@permission_required("sellers_manage")
 def get_application(app_id):
     """Get application details"""
     try:
@@ -202,7 +202,7 @@ def get_application(app_id):
 
 
 @sellers_bp.route('/applications/<int:app_id>/approve', methods=['PUT'])
-@admin_required
+@permission_required("sellers_manage")
 def approve_application(app_id):
     """Approve a seller application"""
     try:
@@ -240,7 +240,7 @@ def approve_application(app_id):
 
 
 @sellers_bp.route('/applications/<int:app_id>/reject', methods=['PUT'])
-@admin_required
+@permission_required("sellers_manage")
 def reject_application(app_id):
     """Reject a seller application"""
     try:

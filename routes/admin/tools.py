@@ -5,14 +5,14 @@ CRUD for /api/admin/tools
 from flask import Blueprint, jsonify, request
 from functools import wraps
 from models import db, ToolSettings
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 
 tools_bp = Blueprint('admin_tools', __name__)
 
     
 @tools_bp.route('/tools', methods=['GET'])
-@admin_required
+@permission_required("system_tools")
 def get_tools():
     """List all tool settings"""
     try:
@@ -45,7 +45,7 @@ def get_tools():
 
 
 @tools_bp.route('/tools', methods=['POST'])
-@admin_required
+@permission_required("system_tools")
 def create_tool():
     """Create new tool setting"""
     try:
@@ -83,7 +83,7 @@ def create_tool():
 
 
 @tools_bp.route('/tools/<string:tool_slug>', methods=['PATCH'])
-@admin_required
+@permission_required("system_tools")
 def update_tool(tool_slug):
     """Update tool settings"""
     try:
@@ -111,7 +111,7 @@ def update_tool(tool_slug):
 
 
 @tools_bp.route('/tools/bulk-toggle', methods=['POST'])
-@admin_required
+@permission_required("system_tools")
 def bulk_toggle_tools():
     """Enable/disable multiple tools"""
     try:

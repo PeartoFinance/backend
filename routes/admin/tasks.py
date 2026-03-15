@@ -3,7 +3,7 @@ Admin Tasks Routes - Task management
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, Task
 from datetime import datetime
 import uuid
@@ -12,7 +12,7 @@ tasks_bp = Blueprint('admin_tasks', __name__)
 
 
 @tasks_bp.route('/tasks', methods=['GET'])
-@admin_required
+@permission_required("system_tasks")
 def get_tasks():
     """List all tasks (country-filtered)"""
     try:
@@ -41,7 +41,7 @@ def get_tasks():
         return jsonify({'error': str(e)}), 500
 
 @tasks_bp.route('/tasks/<id>', methods=['GET'])
-@admin_required
+@permission_required("system_tasks")
 def get_task(id):
     """Get a task detail by id"""
     try:
@@ -64,7 +64,7 @@ def get_task(id):
 
 
 @tasks_bp.route('/tasks', methods=['POST'])
-@admin_required
+@permission_required("system_tasks")
 def create_task():
     """Create a task"""
     try:
@@ -87,7 +87,7 @@ def create_task():
 
 
 @tasks_bp.route('/tasks/<id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("system_tasks")
 def update_task(id):
     """Update a task"""
     try:
@@ -115,7 +115,7 @@ def update_task(id):
 
 
 @tasks_bp.route('/tasks/<id>', methods=['DELETE'])
-@admin_required
+@permission_required("system_tasks")
 def delete_task(id):
     """Delete a task"""
     try:

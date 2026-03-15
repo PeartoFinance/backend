@@ -3,7 +3,7 @@ Admin Media Routes - TV Channels and Radio Stations
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, TVChannel, RadioStation
 import uuid
 from datetime import datetime
@@ -16,7 +16,7 @@ media_bp = Blueprint('admin_media', __name__)
 # ============================================================================
 
 @media_bp.route('/media/tv-channels', methods=['GET'])
-@admin_required
+@permission_required("tv_manage")
 def get_tv_channels():
     """List all TV channels (country-filtered)"""
     try:
@@ -44,7 +44,7 @@ def get_tv_channels():
 
 
 @media_bp.route('/media/tv-channels', methods=['POST'])
-@admin_required
+@permission_required("tv_manage")
 def create_tv_channel():
     """Create a TV channel"""
     try:
@@ -72,7 +72,7 @@ def create_tv_channel():
 
 
 @media_bp.route('/media/tv-channels/<id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("tv_manage")
 def update_tv_channel(id):
     """Update a TV channel"""
     try:
@@ -90,7 +90,7 @@ def update_tv_channel(id):
 
 
 @media_bp.route('/media/tv-channels/<id>', methods=['DELETE'])
-@admin_required
+@permission_required("tv_manage")
 def delete_tv_channel(id):
     """Delete a TV channel"""
     try:
@@ -108,7 +108,7 @@ def delete_tv_channel(id):
 # ============================================================================
 
 @media_bp.route('/media/radio-stations', methods=['GET'])
-@admin_required
+@permission_required("radio_manage")
 def get_radio_stations():
     """List all radio stations (country-filtered)"""
     try:
@@ -137,7 +137,7 @@ def get_radio_stations():
 
 
 @media_bp.route('/media/radio-stations', methods=['POST'])
-@admin_required
+@permission_required("radio_manage")
 def create_radio_station():
     """Create a radio station"""
     try:
@@ -164,7 +164,7 @@ def create_radio_station():
 
 
 @media_bp.route('/media/radio-stations/<int:id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("radio_manage")
 def update_radio_station(id):
     """Update a radio station"""
     try:
@@ -182,7 +182,7 @@ def update_radio_station(id):
 
 
 @media_bp.route('/media/radio-stations/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("radio_manage")
 def delete_radio_station(id):
     """Delete a radio station"""
     try:
@@ -196,7 +196,7 @@ def delete_radio_station(id):
 
 
 @media_bp.route('/media/radio-stations/import', methods=['POST'])
-@admin_required
+@permission_required("radio_manage")
 def import_radio_stations():
     """Bulk import radio stations"""
     try:
@@ -235,7 +235,7 @@ def import_radio_stations():
 # ============================================================================
 
 @media_bp.route('/media/sports-events', methods=['GET'])
-@admin_required
+@permission_required("live_sports")
 def get_sports_events():
     """List all sports events (country-filtered)"""
     try:
@@ -270,7 +270,7 @@ def get_sports_events():
 
 
 @media_bp.route('/media/sports-events', methods=['POST'])
-@admin_required
+@permission_required("live_sports")
 def create_sports_event():
     """Create a sports event"""
     try:
@@ -311,7 +311,7 @@ def create_sports_event():
 
 
 @media_bp.route('/media/sports-events/<int:id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("live_sports")
 def update_sports_event(id):
     """Update a sports event"""
     try:
@@ -355,7 +355,7 @@ def update_sports_event(id):
 
 
 @media_bp.route('/media/sports-events/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("live_sports")
 def delete_sports_event(id):
     """Delete a sports event"""
     try:

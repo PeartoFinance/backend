@@ -4,7 +4,7 @@ CRUD for /api/admin/settings
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, Settings, Appearance
 from utils.crypto_utils import encrypt_value, decrypt_value
 import uuid
@@ -15,7 +15,7 @@ settings_bp = Blueprint('admin_settings', __name__)
 # ============ SETTINGS ============
 
 @settings_bp.route('/settings', methods=['GET'])
-@admin_required
+@permission_required("configuration")
 def get_settings():
     """List all settings"""
     try:
@@ -46,7 +46,7 @@ def get_settings():
 
 
 @settings_bp.route('/settings/decrypt', methods=['POST'])
-@admin_required
+@permission_required("configuration")
 def decrypt_setting_value():
     """Decrypt a specific setting value for viewing in admin panel"""
     try:
@@ -64,7 +64,7 @@ def decrypt_setting_value():
 
 
 @settings_bp.route('/settings/key', methods=['GET'])
-@admin_required
+@permission_required("configuration")
 def get_encryption_key():
     """Expose encryption key to superadmins for client-side decryption"""
     try:
@@ -80,7 +80,7 @@ def get_encryption_key():
 
 
 @settings_bp.route('/settings', methods=['POST'])
-@admin_required
+@permission_required("configuration")
 def create_setting():
     """Create setting"""
     try:
@@ -111,7 +111,7 @@ def create_setting():
 
 
 @settings_bp.route('/settings/<setting_id>', methods=['PUT'])
-@admin_required
+@permission_required("configuration")
 def update_setting(setting_id):
     """Update setting"""
     try:
@@ -149,7 +149,7 @@ def update_setting(setting_id):
 
 
 @settings_bp.route('/settings/<int:setting_id>', methods=['DELETE'])
-@admin_required
+@permission_required("configuration")
 def delete_setting(setting_id):
     """Delete setting"""
     try:
@@ -165,7 +165,7 @@ def delete_setting(setting_id):
 # ============ APPEARANCE ============
 
 @settings_bp.route('/appearance', methods=['GET'])
-@admin_required
+@permission_required("configuration")
 def get_appearance():
     """Get appearance settings"""
     try:
@@ -189,7 +189,7 @@ def get_appearance():
 
 
 @settings_bp.route('/appearance/<int:appearance_id>', methods=['PUT'])
-@admin_required
+@permission_required("configuration")
 def update_appearance(appearance_id):
     """Update appearance setting"""
     try:
@@ -210,7 +210,7 @@ def update_appearance(appearance_id):
 # ============ FEATURE FLAGS (Admin Toggles) ============
 
 @settings_bp.route('/feature-flags', methods=['GET'])
-@admin_required
+@permission_required("configuration")
 def get_feature_flags():
     """Get all admin-controlled feature flags"""
     try:
@@ -238,7 +238,7 @@ def get_feature_flags():
 
 
 @settings_bp.route('/feature-flags/<flag_key>', methods=['PUT'])
-@admin_required
+@permission_required("configuration")
 def update_feature_flag(flag_key):
     """Update a feature flag (creates if doesn't exist)"""
     try:

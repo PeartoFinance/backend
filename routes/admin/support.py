@@ -3,7 +3,7 @@ Admin Support Routes - Contact messages, support
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, ContactMessage
 from datetime import datetime
 
@@ -11,7 +11,7 @@ support_bp = Blueprint('admin_support', __name__)
 
 
 @support_bp.route('/contact-messages', methods=['GET'])
-@admin_required
+@permission_required("communications")
 def get_contact_messages():
     """List all contact messages (country-filtered)"""
     try:
@@ -43,7 +43,7 @@ def get_contact_messages():
 
 
 @support_bp.route('/contact-messages/<id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("communications")
 def update_contact_message(id):
     """Update message status (mark as read, replied)"""
     try:
@@ -61,7 +61,7 @@ def update_contact_message(id):
 
 
 @support_bp.route('/contact-messages/<id>', methods=['DELETE'])
-@admin_required
+@permission_required("communications")
 def delete_contact_message(id):
     """Delete a contact message"""
     try:

@@ -10,14 +10,20 @@ from models import db, User, AdminUser, Role, LoginEvent, UserActivity
 users_bp = Blueprint('admin_users', __name__)
 
 
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 
 @users_bp.route('/users', methods=['GET'])
-@admin_required
+@permission_required("users_view")
 def get_users():
     """List all users"""
     try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        role = request.args.get('role', '')
+        status = request.args.get('status', '')
+        
         country = getattr(request, 'user_country', 'US')
         
         # If 'GLOBAL' or empty, show users from all countries
@@ -25,15 +31,38 @@ def get_users():
         if country and country != 'GLOBAL':
             query = query.filter_by(country_code=country)
             
-        users = query.order_by(User.created_at.desc()).limit(500).all()
+        if search:
+            query = query.filter(
+                db.or_(
+                    User.name.ilike(f'%{search}%'),
+                    User.email.ilike(f'%{search}%')
+                )
+            )
+            
+        if role and role != 'all':
+            query = query.filter_by(role=role)
+            
+        if status and status != 'all':
+            if status == 'active':
+                query = query.filter_by(active=1)
+            elif status == 'inactive':
+                query = query.filter_by(active=0)
+            
+        users = query.order_by(User.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
         return jsonify({
-            'users': [u.to_dict() for u in users]
+            'users': [u.to_dict() for u in users.items],
+            'total': users.total,
+            'pages': users.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/users/<int:user_id>', methods=['GET'])
-@admin_required
+@permission_required("users_view")
 def get_user(user_id):
     """Get single user full profile"""
     try:
@@ -73,7 +102,7 @@ def get_user(user_id):
 
 
 @users_bp.route('/users', methods=['POST'])
-@admin_required
+@permission_required("users_access")
 def create_user():
     """Create new user"""
     try:
@@ -111,7 +140,7 @@ def create_user():
 
 
 @users_bp.route('/users/<int:user_id>', methods=['PATCH'])
-@admin_required
+@permission_required("users_access")
 def update_user(user_id):
     """Update user"""
     try:
@@ -142,7 +171,7 @@ def update_user(user_id):
 
 
 @users_bp.route('/users/<int:user_id>', methods=['DELETE'])
-@admin_required
+@permission_required("users_access")
 def delete_user(user_id):
     """Delete user"""
     try:
@@ -164,7 +193,7 @@ def delete_user(user_id):
 
 # Roles endpoints
 @users_bp.route('/roles', methods=['GET'])
-@admin_required
+@permission_required("users_view")
 def get_roles():
     """List all roles"""
     try:

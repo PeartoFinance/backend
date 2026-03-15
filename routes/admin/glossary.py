@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from models import db, GlossaryTerm, AuditEvent
 from datetime import datetime
 import json, uuid
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 admin_glossary_bp = Blueprint('admin_glossary', __name__)
 
@@ -26,7 +26,7 @@ def log_audit(action, entity, entity_id, meta=None):
 
 
 @admin_glossary_bp.route('/content/glossary', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_glossary_terms():
     """List all glossary terms with pagination, search and category filter"""
     try:
@@ -63,7 +63,7 @@ def get_glossary_terms():
 
 
 @admin_glossary_bp.route('/content/glossary', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_glossary_term():
     """Create a new glossary term"""
     try:
@@ -102,7 +102,7 @@ def create_glossary_term():
 
 
 @admin_glossary_bp.route('/content/glossary/<int:term_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_glossary_term(term_id):
     """Update an existing glossary term"""
     try:
@@ -133,7 +133,7 @@ def update_glossary_term(term_id):
 
 
 @admin_glossary_bp.route('/content/glossary/<int:term_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_glossary_term(term_id):
     """Delete a glossary term"""
     try:

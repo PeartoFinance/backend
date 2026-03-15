@@ -6,7 +6,7 @@ import json
 import uuid
 from flask import Blueprint, jsonify, request
 from models import db, Order, OrderItem, User, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 orders_bp = Blueprint('admin_orders', __name__, url_prefix='/orders')
 
@@ -27,7 +27,7 @@ def log_audit(action, entity, entity_id, meta=None):
 
 
 @orders_bp.route('', methods=['GET'])
-@admin_required
+@permission_required("orders_manage")
 def get_orders():
     """List all orders with filters"""
     try:
@@ -71,7 +71,7 @@ def get_orders():
 
 
 @orders_bp.route('/<order_id>', methods=['GET'])
-@admin_required
+@permission_required("orders_manage")
 def get_order(order_id):
     """Get single order with items"""
     try:
@@ -107,7 +107,7 @@ def get_order(order_id):
 
 
 @orders_bp.route('/<order_id>/status', methods=['PUT'])
-@admin_required
+@permission_required("orders_manage")
 def update_order_status(order_id):
     """Update order status"""
     try:
@@ -135,7 +135,7 @@ def update_order_status(order_id):
 
 
 @orders_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("orders_manage")
 def get_order_stats():
     """Get order statistics"""
     try:

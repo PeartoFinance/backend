@@ -3,7 +3,7 @@ Admin Marketing Routes - Subscribers, Affiliates, Campaigns
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, Subscriber, Affiliate, MarketingCampaign
 import uuid
 from datetime import datetime
@@ -16,7 +16,7 @@ marketing_bp = Blueprint('admin_marketing', __name__)
 # ============================================================================
 
 @marketing_bp.route('/subscribers', methods=['GET'])
-@admin_required
+@permission_required("marketing")
 def get_subscribers():
     """List all subscribers (country-filtered)"""
     try:
@@ -42,7 +42,7 @@ def get_subscribers():
 
 
 @marketing_bp.route('/subscribers', methods=['POST'])
-@admin_required
+@permission_required("marketing")
 def create_subscriber():
     """Create a subscriber"""
     try:
@@ -64,7 +64,7 @@ def create_subscriber():
 
 
 @marketing_bp.route('/subscribers/<int:id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("marketing")
 def update_subscriber(id):
     """Update a subscriber"""
     try:
@@ -86,7 +86,7 @@ def update_subscriber(id):
 
 
 @marketing_bp.route('/subscribers/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("marketing")
 def delete_subscriber(id):
     """Delete a subscriber"""
     try:
@@ -104,7 +104,7 @@ def delete_subscriber(id):
 # ============================================================================
 
 @marketing_bp.route('/affiliates', methods=['GET'])
-@admin_required
+@permission_required("marketing")
 def get_affiliates():
     """List all affiliates (country-filtered)"""
     try:
@@ -130,7 +130,7 @@ def get_affiliates():
 
 
 @marketing_bp.route('/affiliates', methods=['POST'])
-@admin_required
+@permission_required("marketing")
 def create_affiliate():
     """Create an affiliate"""
     try:
@@ -155,7 +155,7 @@ def create_affiliate():
 
 
 @marketing_bp.route('/affiliates/<id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("marketing")
 def update_affiliate(id):
     """Update an affiliate"""
     try:
@@ -184,7 +184,7 @@ def update_affiliate(id):
 
 
 @marketing_bp.route('/affiliates/<id>', methods=['DELETE'])
-@admin_required
+@permission_required("marketing")
 def delete_affiliate(id):
     """Delete an affiliate"""
     try:
@@ -202,7 +202,7 @@ def delete_affiliate(id):
 # ============================================================================
 
 @marketing_bp.route('/campaigns', methods=['GET'])
-@admin_required
+@permission_required("marketing")
 def get_campaigns():
     """List all campaigns"""
     try:
@@ -229,7 +229,7 @@ def get_campaigns():
 
 
 @marketing_bp.route('/campaigns', methods=['POST'])
-@admin_required
+@permission_required("marketing")
 def create_campaign():
     """Create a campaign"""
     try:
@@ -252,7 +252,7 @@ def create_campaign():
 
 
 @marketing_bp.route('/campaigns/<id>', methods=['DELETE'])
-@admin_required
+@permission_required("marketing")
 def delete_campaign(id):
     """Delete a campaign"""
     try:

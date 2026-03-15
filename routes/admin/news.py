@@ -4,14 +4,14 @@ CRUD for /api/admin/news
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, NewsItem
 
 news_bp = Blueprint('admin_news', __name__)
 
 
 @news_bp.route('/news', methods=['GET'])
-@admin_required
+@permission_required("news_media")
 def get_news():
     """List all news articles with filters"""
     try:
@@ -94,7 +94,7 @@ def get_news():
 
 
 @news_bp.route('/news/categories', methods=['GET'])
-@admin_required
+@permission_required("news_media")
 def get_news_categories():
     """Return distinct category values used in news items"""
     try:
@@ -110,7 +110,7 @@ def get_news_categories():
 
 
 @news_bp.route('/news/<int:news_id>', methods=['GET'])
-@admin_required
+@permission_required("news_media")
 def get_news_item(news_id):
     """Get single news article"""
     try:
@@ -121,7 +121,7 @@ def get_news_item(news_id):
 
 
 @news_bp.route('/news', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def create_news():
     """Create news article"""
     try:
@@ -151,7 +151,7 @@ def create_news():
 
 
 @news_bp.route('/news/<int:news_id>', methods=['PUT'])
-@admin_required
+@permission_required("news_media")
 def update_news(news_id):
     """Update news article"""
     try:
@@ -198,7 +198,7 @@ def update_news(news_id):
 
 
 @news_bp.route('/news/<int:news_id>', methods=['DELETE'])
-@admin_required
+@permission_required("news_media")
 def delete_news(news_id):
     """Delete news article"""
     try:
@@ -212,7 +212,7 @@ def delete_news(news_id):
 
 
 @news_bp.route('/news/fetch', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def fetch_news_from_sources():
     """Fetch news from RSS and external sources"""
     try:
@@ -228,7 +228,7 @@ def fetch_news_from_sources():
 
 
 @news_bp.route('/news/import-company', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def import_company_news():
     """Import news for a specific company/symbol from Yahoo Finance"""
     try:
@@ -251,7 +251,7 @@ def import_company_news():
 
 
 @news_bp.route('/news/external-search', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def search_external_news():
     """Search for news from external sources (preview only)"""
     try:
@@ -274,7 +274,7 @@ def search_external_news():
 
 
 @news_bp.route('/news/import-bulk', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def import_bulk_news():
     """Import specific selected news items"""
     try:
@@ -342,7 +342,7 @@ def import_bulk_news():
 
 
 @news_bp.route('/news/create', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def create_admin_article():
     """Create a new admin-written article"""
     try:
@@ -400,7 +400,7 @@ def create_admin_article():
 
 
 @news_bp.route('/news/bulk-action', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def bulk_action_news():
     """Bulk publish/archive/delete news items"""
     try:
@@ -439,7 +439,7 @@ def bulk_action_news():
 
 
 @news_bp.route('/news/cleanup-old', methods=['POST'])
-@admin_required
+@permission_required("news_media")
 def manual_cleanup_old_articles():
     """Manually trigger deletion of articles older than 20 days"""
     try:

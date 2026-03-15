@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, Pricing, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 pricing_bp = Blueprint('admin_pricing', __name__, url_prefix='/pricing')
 
@@ -28,7 +28,7 @@ def log_audit(action, entity, entity_id, meta=None):
 
 
 @pricing_bp.route('', methods=['GET'])
-@admin_required
+@permission_required("business")
 def get_pricing_plans():
     """List all pricing plans"""
     try:
@@ -55,7 +55,7 @@ def get_pricing_plans():
 
 
 @pricing_bp.route('/<int:plan_id>', methods=['GET'])
-@admin_required
+@permission_required("business")
 def get_pricing_plan(plan_id):
     """Get single pricing plan"""
     try:
@@ -78,7 +78,7 @@ def get_pricing_plan(plan_id):
 
 
 @pricing_bp.route('', methods=['POST'])
-@admin_required
+@permission_required("business")
 def create_pricing_plan():
     """Create a new pricing plan"""
     try:
@@ -112,7 +112,7 @@ def create_pricing_plan():
 
 
 @pricing_bp.route('/<int:plan_id>', methods=['PUT'])
-@admin_required
+@permission_required("business")
 def update_pricing_plan(plan_id):
     """Update a pricing plan"""
     try:
@@ -148,7 +148,7 @@ def update_pricing_plan(plan_id):
 
 
 @pricing_bp.route('/<int:plan_id>', methods=['DELETE'])
-@admin_required
+@permission_required("business")
 def delete_pricing_plan(plan_id):
     """Delete a pricing plan"""
     try:

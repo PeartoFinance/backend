@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, Product, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 products_bp = Blueprint('admin_products', __name__, url_prefix='/products')
 
@@ -28,7 +28,7 @@ def log_audit(action, entity, entity_id, meta=None):
 
 
 @products_bp.route('', methods=['GET'])
-@admin_required
+@permission_required("products_manage")
 def get_products():
     """List all products with filters"""
     try:
@@ -76,7 +76,7 @@ def get_products():
 
 
 @products_bp.route('/<product_id>', methods=['GET'])
-@admin_required
+@permission_required("products_manage")
 def get_product(product_id):
     """Get single product details"""
     try:
@@ -96,7 +96,7 @@ def get_product(product_id):
 
 
 @products_bp.route('', methods=['POST'])
-@admin_required
+@permission_required("products_manage")
 def create_product():
     """Create a new product"""
     try:
@@ -130,7 +130,7 @@ def create_product():
 
 
 @products_bp.route('/<product_id>', methods=['PUT'])
-@admin_required
+@permission_required("products_manage")
 def update_product(product_id):
     """Update a product"""
     try:
@@ -160,7 +160,7 @@ def update_product(product_id):
 
 
 @products_bp.route('/<product_id>', methods=['DELETE'])
-@admin_required
+@permission_required("products_manage")
 def delete_product(product_id):
     """Delete a product"""
     try:

@@ -388,20 +388,29 @@ class Role(db.Model):
     PERMISSION_KEYS = [
         'dashboard',
         'content',
+        'team_manage',       # Granular
+        'blog_manage',       # Granular
         'educational',
+        'courses_manage',    # Granular
+        'instructors_manage', # Granular
         'news_media',
-        'live_sports',      # Granular
-        'sports_config',    # Granular
-        'events_jobs',      # Will be used as 'jobs' in UI for consistency
+        'radio_manage',      # Granular
+        'tv_manage',         # Granular
+        'news_import',       # Granular
+        'live_sports',       # Granular
+        'sports_config',     # Granular
+        'events_jobs',
         'help_center',
         'users_access',
-        'users_view',       # Granular
-        'roles_management', # Granular
+        'users_view',        # Granular
+        'roles_management',  # Granular
         'subscriptions_view', # Granular
         'bookings',
         'business',
-        'vendors_manage',   # Granular
-        'sellers_manage',   # Granular
+        'products_manage',   # Granular
+        'orders_manage',     # Granular
+        'vendors_manage',    # Granular
+        'sellers_manage',    # Granular
         'seller_applications', # Granular
         'financial',
         'transactions_view', # Granular
@@ -414,6 +423,7 @@ class Role(db.Model):
         'ai_features',
         'ai_agent',          # Granular
         'ai_content_writer', # Granular
+        'chart_analysis',    # Granular
         'system',
         'system_tools',      # Granular
         'system_tasks',      # Granular

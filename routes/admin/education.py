@@ -26,7 +26,7 @@ from models import Course, Instructor, CourseModule
 from models.base import db
 from models.education import UserEnrollment
 from models.user import User
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from routes.admin.country_filter import get_country_context
 
 education_admin_bp = Blueprint('education_admin', __name__, url_prefix='/education')
@@ -34,7 +34,7 @@ education_admin_bp = Blueprint('education_admin', __name__, url_prefix='/educati
 # ===== COURSES =====
 
 @education_admin_bp.route('/courses', methods=['GET'])
-@admin_required
+@permission_required("courses_manage")
 def list_courses():
     """List all courses with filtering"""
     try:
@@ -75,7 +75,7 @@ def list_courses():
 
 
 @education_admin_bp.route('/courses', methods=['POST'])
-@admin_required
+@permission_required("courses_manage")
 def create_course():
     """
     Create one or multiple courses.
@@ -171,7 +171,7 @@ def create_course():
 
 
 @education_admin_bp.route('/courses/<int:course_id>', methods=['PUT'])
-@admin_required
+@permission_required("courses_manage")
 def update_course(course_id):
     """Update a course"""
     try:
@@ -206,7 +206,7 @@ def update_course(course_id):
 
 
 @education_admin_bp.route('/courses/<int:course_id>', methods=['DELETE'])
-@admin_required
+@permission_required("courses_manage")
 def delete_course(course_id):
     """Delete a course"""
     try:
@@ -225,7 +225,7 @@ def delete_course(course_id):
 # ===== INSTRUCTORS =====
 
 @education_admin_bp.route('/instructors', methods=['GET'])
-@admin_required
+@permission_required("instructors_manage")
 def list_instructors():
     """List all instructors"""
     try:
@@ -261,7 +261,7 @@ def list_instructors():
 
 
 @education_admin_bp.route('/instructors', methods=['POST'])
-@admin_required
+@permission_required("instructors_manage")
 def create_instructor():
     """Create a new instructor"""
     try:
@@ -298,7 +298,7 @@ def create_instructor():
 
 
 @education_admin_bp.route('/instructors/<int:instructor_id>', methods=['PUT'])
-@admin_required
+@permission_required("instructors_manage")
 def update_instructor(instructor_id):
     """Update an instructor"""
     try:
@@ -329,7 +329,7 @@ def update_instructor(instructor_id):
 
 
 @education_admin_bp.route('/instructors/<int:instructor_id>', methods=['DELETE'])
-@admin_required
+@permission_required("instructors_manage")
 def delete_instructor(instructor_id):
     """Delete an instructor"""
     try:
@@ -348,7 +348,7 @@ def delete_instructor(instructor_id):
 # ===== STATS =====
 
 @education_admin_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("courses_manage")
 def get_stats():
     """Get education stats"""
     try:
@@ -385,7 +385,7 @@ def get_stats():
 # ============= Modules =============
 # Post request to create course modules
 @education_admin_bp.route('/courses/<int:course_id>/modules', methods=['POST'])
-@admin_required
+@permission_required("courses_manage")
 def create_module(course_id):
     try:
         course = Course.query.get(course_id)
@@ -430,7 +430,7 @@ def create_module(course_id):
 
 
 @education_admin_bp.route('/courses/<int:course_id>/modules', methods=['GET'])
-@admin_required
+@permission_required("courses_manage")
 def list_modules(course_id):
     course = Course.query.get(course_id)
     if not course:
@@ -457,7 +457,7 @@ def list_modules(course_id):
 
 
 @education_admin_bp.route('/modules/<int:module_id>', methods=['PUT'])
-@admin_required
+@permission_required("courses_manage")
 def update_module(module_id):
     try:
         module = CourseModule.query.get(module_id)
@@ -489,7 +489,7 @@ def update_module(module_id):
 
 
 @education_admin_bp.route('/modules/<int:module_id>', methods=['DELETE'])
-@admin_required
+@permission_required("courses_manage")
 def delete_module(module_id):
     try:
         module = CourseModule.query.get(module_id)
@@ -525,7 +525,7 @@ def delete_module(module_id):
 # mutations here easily corrupt analytics
 
 @education_admin_bp.route('/courses/<int:course_id>/enrollments', methods=['GET'])
-@admin_required
+@permission_required("courses_manage")
 def list_course_enrollments(course_id):
     course = Course.query.get(course_id)
     if not course:
