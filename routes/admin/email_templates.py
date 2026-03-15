@@ -4,7 +4,7 @@ CRUD for /api/admin/email-templates
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db
 from models.settings import EmailTemplate
 
@@ -52,7 +52,7 @@ email_templates_bp = Blueprint('admin_email_templates', __name__)
 
 
 @email_templates_bp.route('/email-templates', methods=['GET'])
-@admin_required
+@permission_required("communications")
 def get_email_templates():
     """List all email templates"""
     try:
@@ -83,7 +83,7 @@ def get_email_templates():
 
 
 @email_templates_bp.route('/email-templates/<template_id>', methods=['GET'])
-@admin_required
+@permission_required("communications")
 def get_email_template(template_id):
     """Get single email template with defaults"""
     try:
@@ -118,7 +118,7 @@ def get_email_template(template_id):
 
 
 @email_templates_bp.route('/email-templates/<template_id>', methods=['PUT'])
-@admin_required
+@permission_required("communications")
 def update_email_template(template_id):
     """Update email template"""
     try:
@@ -159,7 +159,7 @@ def update_email_template(template_id):
 
 
 @email_templates_bp.route('/email-templates/<template_id>/reset', methods=['POST'])
-@admin_required
+@permission_required("communications")
 def reset_email_template(template_id):
     """Reset template to default (delete DB customization)"""
     try:
@@ -175,7 +175,7 @@ def reset_email_template(template_id):
 
 
 @email_templates_bp.route('/email-templates/test', methods=['POST'])
-@admin_required
+@permission_required("communications")
 def test_email_template():
     """Send test email with template"""
     try:

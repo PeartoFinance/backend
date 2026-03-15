@@ -4,7 +4,7 @@ CRUD for navigation menu items
 """
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, NavigationItem
 
 navigation_bp = Blueprint('admin_navigation', __name__)
@@ -30,7 +30,7 @@ SECTIONS = [
 
 
 @navigation_bp.route('/navigation', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_navigation_items():
     """List all navigation items with optional filtering"""
     try:
@@ -55,7 +55,7 @@ def get_navigation_items():
 
 
 @navigation_bp.route('/navigation', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_navigation_item():
     """Create a new navigation item"""
     try:
@@ -97,7 +97,7 @@ def create_navigation_item():
 
 
 @navigation_bp.route('/navigation/<int:item_id>', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_navigation_item(item_id):
     """Get a single navigation item"""
     try:
@@ -108,7 +108,7 @@ def get_navigation_item(item_id):
 
 
 @navigation_bp.route('/navigation/<int:item_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_navigation_item(item_id):
     """Update a navigation item"""
     try:
@@ -136,7 +136,7 @@ def update_navigation_item(item_id):
 
 
 @navigation_bp.route('/navigation/<int:item_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_navigation_item(item_id):
     """Delete a navigation item"""
     try:
@@ -155,7 +155,7 @@ def delete_navigation_item(item_id):
 
 
 @navigation_bp.route('/navigation/<int:item_id>/toggle', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def toggle_navigation_item(item_id):
     """Toggle active status of a navigation item"""
     try:
@@ -171,7 +171,7 @@ def toggle_navigation_item(item_id):
 
 
 @navigation_bp.route('/navigation/reorder', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def reorder_navigation_items():
     """Bulk reorder navigation items"""
     try:
@@ -193,7 +193,7 @@ def reorder_navigation_items():
 
 
 @navigation_bp.route('/navigation/seed', methods=['POST'])
-@admin_required
+@permission_required("content")
 def seed_navigation():
     """Seed default navigation items based on current hardcoded structure"""
     try:

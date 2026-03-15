@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, Transaction, Deposit, Withdrawal, User, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 financial_bp = Blueprint('admin_financial', __name__, url_prefix='/financial')
 
@@ -33,7 +33,7 @@ def log_audit(action, entity, entity_id, meta=None):
 # ============================================================================
 
 @financial_bp.route('/transactions', methods=['GET'])
-@admin_required
+@permission_required("transactions_view")
 def get_transactions():
     """List all transactions with filters"""
     try:
@@ -85,7 +85,7 @@ def get_transactions():
 
 
 @financial_bp.route('/transactions/<transaction_id>', methods=['GET'])
-@admin_required
+@permission_required("transactions_view")
 def get_transaction(transaction_id):
     """Get single transaction details"""
     try:
@@ -112,7 +112,7 @@ def get_transaction(transaction_id):
 
 
 @financial_bp.route('/transactions/<transaction_id>/status', methods=['PUT'])
-@admin_required
+@permission_required("transactions_view")
 def update_transaction_status(transaction_id):
     """Update transaction status"""
     try:
@@ -144,7 +144,7 @@ def update_transaction_status(transaction_id):
 # ============================================================================
 
 @financial_bp.route('/deposits', methods=['GET'])
-@admin_required
+@permission_required("deposits_manage")
 def get_deposits():
     """List all deposits with filters"""
     try:
@@ -190,7 +190,7 @@ def get_deposits():
 
 
 @financial_bp.route('/deposits/<deposit_id>', methods=['GET'])
-@admin_required
+@permission_required("deposits_manage")
 def get_deposit(deposit_id):
     """Get single deposit details"""
     try:
@@ -214,7 +214,7 @@ def get_deposit(deposit_id):
 
 
 @financial_bp.route('/deposits/<deposit_id>/status', methods=['PUT'])
-@admin_required
+@permission_required("deposits_manage")
 def update_deposit_status(deposit_id):
     """Update deposit status"""
     try:
@@ -247,7 +247,7 @@ def update_deposit_status(deposit_id):
 # ============================================================================
 
 @financial_bp.route('/withdrawals', methods=['GET'])
-@admin_required
+@permission_required("withdrawals_manage")
 def get_withdrawals():
     """List all withdrawals with filters"""
     try:
@@ -295,7 +295,7 @@ def get_withdrawals():
 
 
 @financial_bp.route('/withdrawals/<withdrawal_id>', methods=['GET'])
-@admin_required
+@permission_required("withdrawals_manage")
 def get_withdrawal(withdrawal_id):
     """Get single withdrawal details"""
     try:
@@ -323,7 +323,7 @@ def get_withdrawal(withdrawal_id):
 
 
 @financial_bp.route('/withdrawals/<withdrawal_id>/approve', methods=['PUT'])
-@admin_required
+@permission_required("withdrawals_manage")
 def approve_withdrawal(withdrawal_id):
     """Approve a pending withdrawal"""
     try:
@@ -352,7 +352,7 @@ def approve_withdrawal(withdrawal_id):
 
 
 @financial_bp.route('/withdrawals/<withdrawal_id>/reject', methods=['PUT'])
-@admin_required
+@permission_required("withdrawals_manage")
 def reject_withdrawal(withdrawal_id):
     """Reject a pending withdrawal"""
     try:
@@ -378,7 +378,7 @@ def reject_withdrawal(withdrawal_id):
 
 
 @financial_bp.route('/withdrawals/<withdrawal_id>/process', methods=['PUT'])
-@admin_required
+@permission_required("withdrawals_manage")
 def process_withdrawal(withdrawal_id):
     """Mark an approved withdrawal as processed/completed"""
     try:
@@ -408,7 +408,7 @@ def process_withdrawal(withdrawal_id):
 # ============================================================================
 
 @financial_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("financial")
 def get_financial_stats():
     """Get financial overview stats"""
     try:

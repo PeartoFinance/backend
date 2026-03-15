@@ -3,14 +3,14 @@ Admin Audit Log Routes
 GET /api/admin/audit
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, AuditEvent
 
 audit_bp = Blueprint('admin_audit', __name__)
 
 
 @audit_bp.route('/audit', methods=['GET'])
-@admin_required
+@permission_required("system_audit")
 def get_audit_events():
     """Get audit events with pagination"""
     try:
@@ -52,7 +52,7 @@ def get_audit_events():
 
 
 @audit_bp.route('/audit/stats', methods=['GET'])
-@admin_required
+@permission_required("system_audit")
 def get_audit_stats():
     """Get audit statistics"""
     try:

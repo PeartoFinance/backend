@@ -3,7 +3,7 @@ Admin Jobs Routes - Job listings management
 With country-specific filtering
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, JobListing
 from datetime import datetime
 
@@ -11,7 +11,7 @@ jobs_bp = Blueprint('admin_jobs', __name__)
 
 
 @jobs_bp.route('/jobs', methods=['GET'])
-@admin_required
+@permission_required("events_jobs")
 def get_jobs():
     """List all job listings (country-filtered)"""
     try:
@@ -41,7 +41,7 @@ def get_jobs():
 
 
 @jobs_bp.route('/jobs', methods=['POST'])
-@admin_required
+@permission_required("events_jobs")
 def create_job():
     """Create a job listing"""
     try:
@@ -67,7 +67,7 @@ def create_job():
 
 
 @jobs_bp.route('/jobs/<int:id>', methods=['PUT', 'PATCH'])
-@admin_required
+@permission_required("events_jobs")
 def update_job(id):
     """Update a job listing"""
     try:
@@ -85,7 +85,7 @@ def update_job(id):
 
 
 @jobs_bp.route('/jobs/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("events_jobs")
 def delete_job(id):
     """Delete a job listing"""
     try:

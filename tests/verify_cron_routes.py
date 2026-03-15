@@ -19,6 +19,7 @@ endpoints = [
     '/all-market',
     '/business-profiles',
     '/cleanup-accounts',
+    '/cleanup-news',
     '/financials',
     '/forecast',
     '/import-news',

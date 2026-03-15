@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import db, FAQ, AuditEvent
 from datetime import datetime
 import json, uuid
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 admin_faq_bp = Blueprint('admin_faq', __name__)
 
@@ -21,7 +21,7 @@ def log_audit(action, entity, entity_id, meta=None):
         print(f"Audit log failed: {e}")
 
 @admin_faq_bp.route('/content/faq', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_faqs():
     try:
         page = request.args.get('page', 1, type=int)
@@ -70,7 +70,7 @@ def get_faqs():
         return jsonify({'error': str(e)}), 500
 
 @admin_faq_bp.route('/content/faq', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_faq():
     try:
         data = request.get_json()
@@ -104,7 +104,7 @@ def create_faq():
         return jsonify({'error': str(e)}), 500
 
 @admin_faq_bp.route('/content/faq/<faq_id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_faq(faq_id):
     try:
         faq = FAQ.query.get_or_404(faq_id)
@@ -136,7 +136,7 @@ def update_faq(faq_id):
         return jsonify({'error': str(e)}), 500
 
 @admin_faq_bp.route('/content/faq/<faq_id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_faq(faq_id):
     """Soft delete FAQ"""
     try:

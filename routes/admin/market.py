@@ -2,7 +2,7 @@
 Admin Market Routes - Market data management
 """
 from flask import Blueprint, jsonify, request
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 from models import db, MarketData, MarketIndices, MarketSentiment, CryptoMarketData, CommodityData, MarketIssue
 from datetime import datetime
 
@@ -10,13 +10,12 @@ market_bp = Blueprint('admin_market', __name__)
 
 
 @market_bp.route('/market-data', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_market_data():
     """List market data with filters"""
     try:
-        asset_type = request.args.get('type', 'stock')
-        search = request.args.get('search', '')
-        limit = int(request.args.get('limit', 100))
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', request.args.get('limit', 100, type=int), type=int)
         
         country = getattr(request, 'user_country', 'US')
         query = MarketData.query.filter(
@@ -30,7 +29,11 @@ def get_market_data():
                     MarketData.name.ilike(f'%{search}%')
                 )
             )
-        items = query.order_by(MarketData.symbol).limit(limit).all()
+        
+        paginated_data = query.order_by(MarketData.symbol).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        items = paginated_data.items
         
         return jsonify({
             'items': [{
@@ -66,14 +69,16 @@ def get_market_data():
                 'is_featured': m.is_featured,
                 'last_updated': m.last_updated.isoformat() if m.last_updated else None
             } for m in items],
-            'total': len(items)
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
 @market_bp.route('/market-data/stats', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_market_stats():
     """Get market data statistics"""
     try:
@@ -104,7 +109,7 @@ def get_market_stats():
 
 
 @market_bp.route('/market-data/import', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_market_data():
     """Bulk import market data"""
     try:
@@ -160,7 +165,7 @@ def import_market_data():
 
 
 @market_bp.route('/market-data/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("market_data")
 def delete_market_data(id):
     """Delete a market data item"""
     try:
@@ -178,14 +183,32 @@ def delete_market_data(id):
 # ============================================================================
 
 @market_bp.route('/indices', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_indices():
     """List market indices"""
     try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        
         country = getattr(request, 'user_country', 'US')
-        indices = MarketIndices.query.filter(
+        query = MarketIndices.query.filter(
             (MarketIndices.country_code == country) | (MarketIndices.country_code == 'GLOBAL')
-        ).all()
+        )
+        
+        if search:
+            query = query.filter(
+                db.or_(
+                    MarketIndices.symbol.ilike(f'%{search}%'),
+                    MarketIndices.name.ilike(f'%{search}%')
+                )
+            )
+            
+        paginated_data = query.order_by(MarketIndices.symbol).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        indices = paginated_data.items
+        
         return jsonify({
             'items': [{
                 'id': i.id,
@@ -202,7 +225,10 @@ def get_indices():
                 'market_status': i.market_status,
                 'country_code': i.country_code,
                 'last_updated': i.last_updated.isoformat() if i.last_updated else None
-            } for i in indices]
+            } for i in indices],
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -213,17 +239,37 @@ def get_indices():
 # ============================================================================
 
 @market_bp.route('/stock-offers', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_stock_offers():
     """List stock offers (IPOs, FPOs)"""
     try:
         from models import StockOffer
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        
         country = getattr(request, 'user_country', 'US')
-        offers = StockOffer.query.filter(
+        query = StockOffer.query.filter(
             (StockOffer.country_code == country) | (StockOffer.country_code == 'GLOBAL')
-        ).order_by(StockOffer.created_at.desc()).all()
+        )
+        if search:
+            query = query.filter(
+                db.or_(
+                    StockOffer.symbol.ilike(f'%{search}%'),
+                    StockOffer.company_name.ilike(f'%{search}%')
+                )
+            )
+            
+        paginated_data = query.order_by(StockOffer.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
         return jsonify({
-            'items': [o.to_dict() for o in offers]
+            'items': [o.to_dict() for o in paginated_data.items],
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e), 'items': []}), 200
@@ -234,14 +280,43 @@ def get_stock_offers():
 # ============================================================================
 
 @market_bp.route('/commodities', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_commodities():
     """List all commodities"""
     try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        category = request.args.get('category', 'all')
+        
         country = getattr(request, 'user_country', 'US')
-        commodities = CommodityData.query.filter(
+        query = CommodityData.query.filter(
             (CommodityData.country_code == country) | (CommodityData.country_code == 'GLOBAL')
-        ).all()
+        )
+
+        metals_symbols = ['GC=F', 'SI=F', 'PL=F', 'PA=F', 'HG=F']
+        energy_symbols = ['CL=F', 'BZ=F', 'NG=F', 'RB=F', 'HO=F']
+        
+        if category == 'metals':
+            query = query.filter(CommodityData.symbol.in_(metals_symbols))
+        elif category == 'energy':
+            query = query.filter(CommodityData.symbol.in_(energy_symbols))
+        elif category == 'agriculture':
+            query = query.filter(~CommodityData.symbol.in_(metals_symbols + energy_symbols + ['LE=F', 'HE=F']))
+
+        if search:
+            query = query.filter(
+                db.or_(
+                    CommodityData.symbol.ilike(f'%{search}%'),
+                    CommodityData.name.ilike(f'%{search}%')
+                )
+            )
+            
+        paginated_data = query.order_by(CommodityData.symbol).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        commodities = paginated_data.items
+        
         return jsonify({
             'items': [{
                 'id': c.id,
@@ -257,7 +332,10 @@ def get_commodities():
                 'unit': c.unit,
                 'currency': c.currency,
                 'last_updated': c.last_updated.isoformat() if c.last_updated else None
-            } for c in commodities]
+            } for c in commodities],
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -268,16 +346,33 @@ def get_commodities():
 # ============================================================================
 
 @market_bp.route('/earnings-calendar', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_earnings_calendar():
     """List earnings calendar events from database"""
     try:
         from models import EarningsCalendar
-        limit = int(request.args.get('limit', 50))
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', request.args.get('limit', 50, type=int), type=int)
+        search = request.args.get('search', '')
+        
         country = getattr(request, 'user_country', 'US')
-        events = EarningsCalendar.query.filter(
+        query = EarningsCalendar.query.filter(
             (EarningsCalendar.country_code == country) | (EarningsCalendar.country_code == 'GLOBAL')
-        ).order_by(EarningsCalendar.earnings_date.asc()).limit(limit).all()
+        )
+        if search:
+            query = query.filter(
+                db.or_(
+                    EarningsCalendar.symbol.ilike(f'%{search}%'),
+                    EarningsCalendar.company_name.ilike(f'%{search}%')
+                )
+            )
+            
+        paginated_data = query.order_by(EarningsCalendar.earnings_date.asc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        events = paginated_data.items
+        
         return jsonify({
             'items': [{
                 'id': e.id,
@@ -291,7 +386,10 @@ def get_earnings_calendar():
                 'revenue_actual': e.revenue_actual,
                 'market_cap': e.market_cap,
                 'before_after_market': e.before_after_market,
-            } for e in events]
+            } for e in events],
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e), 'items': []}), 200
@@ -302,7 +400,7 @@ def get_earnings_calendar():
 # ============================================================================
 
 @market_bp.route('/sentiment', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_sentiment():
     """Get market sentiment data"""
     try:
@@ -324,7 +422,7 @@ def get_sentiment():
 
 
 @market_bp.route('/sentiment', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def add_sentiment():
     """Add sentiment data"""
     try:
@@ -349,7 +447,7 @@ def add_sentiment():
 # ============================================================================
 
 @market_bp.route('/import/stocks', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_stocks_yfinance():
     """Import stocks from yfinance by symbols"""
     try:
@@ -375,7 +473,7 @@ def import_stocks_yfinance():
 
 
 @market_bp.route('/import/crypto', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_crypto_yfinance():
     """Import cryptocurrencies from yfinance"""
     try:
@@ -398,7 +496,7 @@ def import_crypto_yfinance():
 
 
 @market_bp.route('/import/indices', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_indices_yfinance():
     """Import market indices from yfinance"""
     try:
@@ -421,7 +519,7 @@ def import_indices_yfinance():
 
 
 @market_bp.route('/import/commodities', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_commodities_yfinance():
     """Import commodities from yfinance"""
     try:
@@ -444,7 +542,7 @@ def import_commodities_yfinance():
 
 
 @market_bp.route('/import/screener', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_from_screener():
     """Import stocks from a predefined screener"""
     try:
@@ -472,7 +570,7 @@ def import_from_screener():
 
 
 @market_bp.route('/import/calendar/earnings', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_earnings_calendar():
     """Import earnings calendar from yfinance"""
     try:
@@ -495,7 +593,7 @@ def import_earnings_calendar():
 
 
 @market_bp.route('/import/calendar/ipos', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_ipo_calendar():
     """Import IPO calendar from yfinance"""
     try:
@@ -518,7 +616,7 @@ def import_ipo_calendar():
 
 
 @market_bp.route('/market-data/search', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def search_market_data():
     """Search for tickers using yfinance"""
     try:
@@ -537,7 +635,7 @@ def search_market_data():
 
 
 @market_bp.route('/market-data/refresh/<symbol>', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def refresh_symbol(symbol):
     """Refresh data for a single symbol from yfinance"""
     try:
@@ -554,7 +652,7 @@ def refresh_symbol(symbol):
 
 
 @market_bp.route('/market-data/history/<symbol>', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_symbol_history(symbol):
     """Get price history for a symbol from yfinance"""
     try:
@@ -582,7 +680,7 @@ def get_symbol_history(symbol):
 
 
 @market_bp.route('/screeners', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_available_screeners():
     """Get list of available predefined screeners"""
     try:
@@ -593,7 +691,7 @@ def get_available_screeners():
 
 
 @market_bp.route('/screener/<screener_name>', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def run_screener(screener_name):
     """Run a screener and get results (without importing)"""
     try:
@@ -619,7 +717,7 @@ def run_screener(screener_name):
 # ============================================================================
 
 @market_bp.route('/dividends', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_dividends():
     """Get all dividends from database"""
     try:
@@ -627,7 +725,9 @@ def get_dividends():
         from sqlalchemy import desc
         
         status = request.args.get('status')
-        limit = min(int(request.args.get('limit', 100)), 500)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', request.args.get('limit', 100, type=int), type=int)
+        search = request.args.get('search', '')
         country = getattr(request, 'user_country', 'US')
         
         query = Dividend.query.filter(
@@ -635,19 +735,31 @@ def get_dividends():
         )
         if status:
             query = query.filter(Dividend.status == status)
+        if search:
+            query = query.filter(
+                db.or_(
+                    Dividend.symbol.ilike(f'%{search}%'),
+                    Dividend.company_name.ilike(f'%{search}%')
+                )
+            )
         
-        dividends = query.order_by(desc(Dividend.created_at)).limit(limit).all()
+        paginated_data = query.order_by(desc(Dividend.created_at)).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        dividends = paginated_data.items
         
         return jsonify({
             'items': [d.to_dict() for d in dividends],
-            'total': len(dividends)
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e), 'items': []}), 200
 
 
 @market_bp.route('/import/dividends', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def import_dividends_yfinance():
     """Import dividend data from yfinance"""
     try:
@@ -669,7 +781,7 @@ def import_dividends_yfinance():
 
 
 @market_bp.route('/dividends/calendar', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_dividend_calendar():
     """Get upcoming ex-dividend dates"""
     try:
@@ -685,7 +797,7 @@ def get_dividend_calendar():
 
 
 @market_bp.route('/dividends/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("market_data")
 def delete_dividend(id):
     """Delete a dividend entry"""
     try:
@@ -708,15 +820,17 @@ def delete_dividend(id):
 # ============================================================================
 
 @market_bp.route('/bulk-transactions', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_bulk_transactions():
     """Get all bulk transactions from database"""
     try:
         from models import BulkTransaction
         from sqlalchemy import desc
         
-        limit = min(int(request.args.get('limit', 100)), 500)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', request.args.get('limit', 100, type=int), type=int)
         symbol = request.args.get('symbol')
+        search = request.args.get('search', '')
         country = getattr(request, 'user_country', 'US')
         
         query = BulkTransaction.query.filter(
@@ -724,19 +838,31 @@ def get_bulk_transactions():
         )
         if symbol:
             query = query.filter(BulkTransaction.symbol == symbol.upper())
+        if search:
+            query = query.filter(
+                db.or_(
+                    BulkTransaction.symbol.ilike(f'%{search}%'),
+                    BulkTransaction.company_name.ilike(f'%{search}%')
+                )
+            )
         
-        transactions = query.order_by(desc(BulkTransaction.transaction_date)).limit(limit).all()
+        paginated_data = query.order_by(desc(BulkTransaction.transaction_date)).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        transactions = paginated_data.items
         
         return jsonify({
             'items': [t.to_dict() for t in transactions],
-            'total': len(transactions)
+            'total': paginated_data.total,
+            'pages': paginated_data.pages,
+            'currentPage': page
         })
     except Exception as e:
         return jsonify({'error': str(e), 'items': []}), 200
 
 
 @market_bp.route('/bulk-transactions', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def add_bulk_transaction():
     """Add a bulk transaction manually"""
     try:
@@ -769,7 +895,7 @@ def add_bulk_transaction():
 
 
 @market_bp.route('/bulk-transactions/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("market_data")
 def delete_bulk_transaction(id):
     """Delete a bulk transaction"""
     try:
@@ -788,7 +914,7 @@ def delete_bulk_transaction(id):
 
 
 @market_bp.route('/dividend-stocks', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def get_dividend_stock_list():
     """Get list of popular dividend stocks for import"""
     try:
@@ -803,7 +929,7 @@ def get_dividend_stock_list():
 # ============================================================================
 
 @market_bp.route('/business/sync-financials', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_sync_financials():
     """
     Sync financial statements for a symbol.
@@ -829,7 +955,7 @@ def admin_sync_financials():
 
 
 @market_bp.route('/business/bulk-sync-financials', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_bulk_sync_financials():
     """
     Sync financials for multiple symbols.
@@ -870,7 +996,7 @@ def admin_bulk_sync_financials():
 
 
 @market_bp.route('/business/sync-forecast', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_sync_forecast():
     """Sync analyst forecast data for a symbol"""
     try:
@@ -888,7 +1014,7 @@ def admin_sync_forecast():
 
 
 @market_bp.route('/business/sync-news', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_sync_news():
     """Sync latest news for a symbol from yfinance"""
     try:
@@ -906,7 +1032,7 @@ def admin_sync_news():
 
 
 @market_bp.route('/business/toggle-listing', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_toggle_listing():
     """Toggle business listing status"""
     try:
@@ -925,7 +1051,7 @@ def admin_toggle_listing():
 
 
 @market_bp.route('/business/add-issue', methods=['POST'])
-@admin_required
+@permission_required("market_data")
 def admin_add_issue():
     """Add a market issue/alert for a business"""
     try:
@@ -946,7 +1072,7 @@ def admin_add_issue():
 
 
 @market_bp.route('/business/issues/<symbol>', methods=['GET'])
-@admin_required
+@permission_required("market_data")
 def admin_get_issues(symbol):
     """Get all market issues for a business"""
     try:
@@ -957,7 +1083,7 @@ def admin_get_issues(symbol):
 
 
 @market_bp.route('/business/issues/<int:issue_id>', methods=['DELETE'])
-@admin_required
+@permission_required("market_data")
 def admin_delete_issue(issue_id):
     """Resolve/Delete a market issue"""
     try:

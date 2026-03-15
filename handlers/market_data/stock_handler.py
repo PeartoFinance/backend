@@ -6,6 +6,7 @@ import yfinance as yf
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import logging
+import math
 from . import get_yfinance_session
 
 logger = logging.getLogger(__name__)
@@ -266,16 +267,33 @@ def get_stock_history(
             return []
         
         results = []
+
+        def safe_float(val):
+            """Return float if finite, else None. Prevents NaN/Inf in JSON."""
+            try:
+                f = float(val)
+                return f if math.isfinite(f) else None
+            except (TypeError, ValueError):
+                return None
+
+        def safe_int(val):
+            """Return int if finite float, else None."""
+            try:
+                f = float(val)
+                return int(f) if math.isfinite(f) else None
+            except (TypeError, ValueError):
+                return None
+
         for date, row in hist.iterrows():
             # Use isoformat to include time for intraday data (1m, 5m, 1h, etc.)
             formatted_date = date.isoformat() if hasattr(date, 'isoformat') else str(date)
             results.append({
                 'date': formatted_date,
-                'open': float(row['Open']) if row['Open'] else None,
-                'high': float(row['High']) if row['High'] else None,
-                'low': float(row['Low']) if row['Low'] else None,
-                'close': float(row['Close']) if row['Close'] else None,
-                'volume': int(row['Volume']) if row['Volume'] else None,
+                'open': safe_float(row['Open']),
+                'high': safe_float(row['High']),
+                'low': safe_float(row['Low']),
+                'close': safe_float(row['Close']),
+                'volume': safe_int(row['Volume']),
             })
         return results
     except Exception as e:

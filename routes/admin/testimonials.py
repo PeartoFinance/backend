@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from models import db, Testimonial, AuditEvent
 from datetime import datetime
 import json, uuid
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 admin_testimonials_bp = Blueprint('admin_testimonials', __name__)
 
@@ -21,7 +21,7 @@ def log_audit(action, entity, entity_id, meta=None):
         print(f"Audit log failed: {e}")
 
 @admin_testimonials_bp.route('/content/testimonials', methods=['GET'])
-@admin_required
+@permission_required("content")
 def get_testimonials():
     try:
         page = request.args.get('page', 1, type=int)
@@ -72,7 +72,7 @@ def get_testimonials():
         return jsonify({'error': str(e)}), 500
 
 @admin_testimonials_bp.route('/content/testimonials', methods=['POST'])
-@admin_required
+@permission_required("content")
 def create_testimonial():
     try:
         data = request.get_json()
@@ -111,7 +111,7 @@ def create_testimonial():
         return jsonify({'error': str(e)}), 500
 
 @admin_testimonials_bp.route('/content/testimonials/<int:id>', methods=['PUT'])
-@admin_required
+@permission_required("content")
 def update_testimonial(id):
     try:
         testimonial = Testimonial.query.get_or_404(id)
@@ -147,7 +147,7 @@ def update_testimonial(id):
         return jsonify({'error': str(e)}), 500
 
 @admin_testimonials_bp.route('/content/testimonials/<int:id>', methods=['DELETE'])
-@admin_required
+@permission_required("content")
 def delete_testimonial(id):
     try:
         testimonial = Testimonial.query.get_or_404(id)

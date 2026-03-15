@@ -8,7 +8,7 @@ import asyncio
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, AgentRun, AIGenerationRun, AIPostDraft, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 ai_bp = Blueprint('admin_ai', __name__, url_prefix='/ai')
 
@@ -55,7 +55,7 @@ def log_audit(action, entity, entity_id, meta=None):
 # ============================================================================
 
 @ai_bp.route('/agent-runs', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_agent_runs():
     """List all AI agent runs"""
     try:
@@ -92,7 +92,7 @@ def get_agent_runs():
 
 
 @ai_bp.route('/agent-runs/<run_id>', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_agent_run(run_id):
     """Get single agent run details"""
     try:
@@ -114,7 +114,7 @@ def get_agent_run(run_id):
 
 
 @ai_bp.route('/agent-runs', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def create_agent_run():
     """Create a new AI agent run"""
     try:
@@ -151,7 +151,7 @@ def create_agent_run():
 
 
 @ai_bp.route('/agent-runs/<run_id>/retry', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def retry_agent_run(run_id):
     """Retry a failed agent run"""
     try:
@@ -179,7 +179,7 @@ def retry_agent_run(run_id):
 # ============================================================================
 
 @ai_bp.route('/drafts', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_drafts():
     """List all AI content drafts"""
     try:
@@ -206,7 +206,7 @@ def get_drafts():
 
 
 @ai_bp.route('/drafts/<draft_id>', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_draft(draft_id):
     """Get full draft content"""
     try:
@@ -224,7 +224,7 @@ def get_draft(draft_id):
 
 
 @ai_bp.route('/drafts', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def create_draft():
     """Create/generate a new AI draft"""
     try:
@@ -255,7 +255,7 @@ def create_draft():
 
 
 @ai_bp.route('/drafts/<draft_id>', methods=['PUT'])
-@admin_required
+@permission_required("ai_features")
 def update_draft(draft_id):
     """Update a draft"""
     try:
@@ -279,7 +279,7 @@ def update_draft(draft_id):
 
 
 @ai_bp.route('/drafts/<draft_id>', methods=['DELETE'])
-@admin_required
+@permission_required("ai_features")
 def delete_draft(draft_id):
     """Delete a draft"""
     try:
@@ -301,7 +301,7 @@ def delete_draft(draft_id):
 # ============================================================================
 
 @ai_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_ai_stats():
     """Get AI feature statistics"""
     try:
@@ -333,7 +333,7 @@ def get_ai_stats():
 # ============================================================================
 
 @ai_bp.route('/generate', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def generate_content():
     """Generate AI content for various admin forms"""
     from services.ai_service import ai_service
@@ -373,6 +373,12 @@ INSTRUCTION: Do not include any conversational filler, introductory remarks, or 
     
     system_prompt = prompts.get(content_type, prompts['article'])
     
+    # Append structured context if provided
+    if context and isinstance(context, dict):
+        context_str = "\n".join([f"- {k}: {v}" for k, v in context.items() if v])
+        if context_str:
+            system_prompt += f"\n\nContext/Requirements:\n{context_str}"
+            
     try:
         result = _run_async(
             ai_service.chat(system_prompt, {'page_type': 'admin'}, {'max_tokens': 1500})
@@ -384,7 +390,7 @@ INSTRUCTION: Do not include any conversational filler, introductory remarks, or 
 
 
 @ai_bp.route('/enhance', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def enhance_content():
     """Enhance/improve existing content"""
     from services.ai_service import ai_service
@@ -394,20 +400,28 @@ def enhance_content():
     action = data.get('action', 'improve')
     tone = data.get('tone', 'professional')
     
+    context = data.get('context', None)
+    
     if not content:
         return jsonify({'error': 'Content is required'}), 400
     
-    actions = {
+    base_prompt = {
         'improve': f"Improve and polish while maintaining meaning:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
         'expand': f"Expand with more details:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
         'shorten': f"Make more concise:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
         'proofread': f"Fix grammar/spelling:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
         'tone': f"Rewrite in {{tone}} tone:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.",
-    }
+    }.get(action, f"Improve and polish while maintaining meaning:\n\n{{content}}\n\nINSTRUCTION: Do not include any conversational filler, introductory remarks, or concluding remarks. Respond ONLY with the requested content.")
     
+    final_prompt = base_prompt.format(content=content, tone=tone)
+    
+    if context:
+        context_str = json.dumps(context, indent=2) if isinstance(context, dict) else str(context)
+        final_prompt += f"\n\nContext/Requirements to consider when enhancing:\n{context_str}"
+        
     try:
         result = _run_async(
-            ai_service.chat(actions.get(action, actions['improve']), {'page_type': 'admin'}, {'max_tokens': 1000})
+            ai_service.chat(final_prompt, {'page_type': 'admin'}, {'max_tokens': 1000})
         )
         return jsonify({'ok': True, 'content': result.get('response', ''), 'action': action})
     except Exception as e:
@@ -415,7 +429,7 @@ def enhance_content():
 
 
 @ai_bp.route('/analyze-content', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def analyze_content():
     """Analyze content for improvements"""
     from services.ai_service import ai_service
@@ -442,7 +456,7 @@ Content: {content[:2000]}"""
 # ============================================================================
 
 @ai_bp.route('/booyah/predict', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def booyah_predict():
     """
     Generate AI-powered stock/crypto prediction.
@@ -636,7 +650,7 @@ Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact struc
 
 
 @ai_bp.route('/booyah/quick-scan', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def booyah_quick_scan():
     """
     Quick AI scan of multiple symbols for rapid signal overview.
@@ -732,7 +746,7 @@ Respond ONLY with valid JSON array (no markdown):
 # ============================================================================
 
 @ai_bp.route('/provider', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_ai_provider():
     """Get current AI provider configuration"""
     from services.ai_provider import get_active_provider_name
@@ -764,7 +778,7 @@ def get_ai_provider():
 
 
 @ai_bp.route('/provider', methods=['PUT'])
-@admin_required
+@permission_required("ai_features")
 def update_ai_provider():
     """Switch AI provider or update AI settings"""
     from models.settings import Settings
@@ -836,7 +850,7 @@ def update_ai_provider():
 
 
 @ai_bp.route('/provider/test', methods=['POST'])
-@admin_required
+@permission_required("ai_features")
 def test_ai_provider():
     """Test the active (or specified) AI provider with a quick chat"""
     from services.ai_provider import chat_completion, health_check
@@ -871,7 +885,7 @@ def test_ai_provider():
 
 
 @ai_bp.route('/provider/models', methods=['GET'])
-@admin_required
+@permission_required("ai_features")
 def get_ai_models():
     """Return available models per provider for the admin UI"""
     from services.g4f_models import G4F_TEXT_MODELS

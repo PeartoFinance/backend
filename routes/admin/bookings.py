@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import db, Booking, User, AuditEvent
-from ..decorators import admin_required
+from ..decorators import admin_required, permission_required
 
 bookings_bp = Blueprint('admin_bookings', __name__, url_prefix='/bookings')
 
@@ -28,7 +28,7 @@ def log_audit(action, entity, entity_id, meta=None):
 
 
 @bookings_bp.route('', methods=['GET'])
-@admin_required
+@permission_required("bookings")
 def get_bookings():
     """List all bookings with pagination and filters"""
     try:
@@ -74,7 +74,7 @@ def get_bookings():
 
 
 @bookings_bp.route('/<booking_id>', methods=['GET'])
-@admin_required
+@permission_required("bookings")
 def get_booking(booking_id):
     """Get single booking details"""
     try:
@@ -100,7 +100,7 @@ def get_booking(booking_id):
 
 
 @bookings_bp.route('/<booking_id>/status', methods=['PUT'])
-@admin_required
+@permission_required("bookings")
 def update_booking_status(booking_id):
     """Update booking status"""
     try:
@@ -129,7 +129,7 @@ def update_booking_status(booking_id):
 
 
 @bookings_bp.route('/<booking_id>', methods=['PUT'])
-@admin_required
+@permission_required("bookings")
 def update_booking(booking_id):
     """Update booking details"""
     try:
@@ -163,7 +163,7 @@ def update_booking(booking_id):
 
 
 @bookings_bp.route('/<booking_id>', methods=['DELETE'])
-@admin_required
+@permission_required("bookings")
 def delete_booking(booking_id):
     """Delete a booking"""
     try:
@@ -181,7 +181,7 @@ def delete_booking(booking_id):
 
 
 @bookings_bp.route('/stats', methods=['GET'])
-@admin_required
+@permission_required("bookings")
 def get_booking_stats():
     """Get booking statistics"""
     try:

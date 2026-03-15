@@ -183,6 +183,7 @@ def get_courses():
         level = request.args.get("level")
         is_free = request.args.get("free")
         search = request.args.get("search")
+        limit = request.args.get("limit", type=int)
 
         # Determine country filter: GLOBAL courses visible to all, plus country-specific
         header_country = request.headers.get("X-User-Country")
@@ -203,7 +204,11 @@ def get_courses():
         if search:
             query = query.filter(Course.title.ilike(f"%{search}%"))
 
-        courses = query.order_by(Course.created_at.desc()).all()
+        query = query.order_by(Course.created_at.desc())
+        if limit:
+            query = query.limit(limit)
+
+        courses = query.all()
 
         return jsonify(
             {
@@ -216,7 +221,7 @@ def get_courses():
                         "category": c.category,
                         "countryCode": c.country_code,
                         "level": c.level,
-                        "durationHours": c.duration_hours,
+                        "duration": c.duration_hours,
                         "durationWeeks": c.duration_weeks,
                         "price": float(c.price) if c.price else 0,
                         "discountPrice": (
@@ -224,14 +229,16 @@ def get_courses():
                         ),
                         "thumbnailUrl": c.thumbnail_url,
                         "isFree": c.is_free,
-                        "enrollmentCount": c.enrollment_count or 0,
+                        "enrolledCount": c.enrollment_count or 0,
                         "rating": float(c.rating) if c.rating else 0,
                         "ratingCount": c.rating_count or 0,
                         "instructorId": c.instructor_id,
                     }
                     for c in courses
                 ],
-                "total": len(courses),
+                "total": query.count() if not limit else Course.query.filter(
+                    Course.is_published == True, country_filter
+                ).count(),
             }
         )
     except Exception as e:
@@ -354,6 +361,41 @@ def get_instructors():
                 ]
             }
         )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@education_bp.route("/stats", methods=["GET"])
+@cache.cached(timeout=300)
+def get_education_stats():
+    """Public education statistics: total courses, total enrolled students, completion rate"""
+    try:
+        from sqlalchemy import func
+
+        total_courses = Course.query.filter(Course.is_published == True).count()
+
+        total_students = db.session.query(
+            func.sum(Course.enrollment_count)
+        ).filter(Course.is_published == True).scalar() or 0
+
+        total_enrollments = UserEnrollment.query.filter(
+            UserEnrollment.status != "unenrolled"
+        ).count()
+
+        completed_enrollments = UserEnrollment.query.filter(
+            UserEnrollment.status == "completed"
+        ).count()
+
+        if total_enrollments > 0:
+            avg_completion_rate = round((completed_enrollments / total_enrollments) * 100)
+        else:
+            avg_completion_rate = 0
+
+        return jsonify({
+            "totalCourses": total_courses,
+            "totalStudents": int(total_students),
+            "avgCompletionRate": avg_completion_rate,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
